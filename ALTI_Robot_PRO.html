@@ -1010,7 +1010,7 @@ async function loadForexDaily(){
   forexDailyPromise=(async()=>{
     try{
       const end=new Date().toISOString().split('T')[0];
-      const start=new Date(Date.now()-25*86400000).toISOString().split('T')[0];
+      const start=new Date(Date.now()-120*86400000).toISOString().split('T')[0]; // 120 jours = ~85 jours de trading (kumo complet)
       const r=await fetch(`https://api.frankfurter.app/${start}..${end}?from=EUR&to=USD,GBP,JPY,AUD,CAD,NZD,CHF`,
         {signal:AbortSignal.timeout(8000)});
       if(!r.ok) throw new Error(`BCE ${r.status}`);
@@ -1508,7 +1508,17 @@ async function startRobot(){
     grid.appendChild(el);
   });
 
-  // 1. Prix live forex
+  // 1. Vider cache candle forex pour forcer rechargement avec 120 jours
+  forexDaily=null; forexDailyTime=0;
+  FOREX.forEach(a=>{
+    ['m1','m5','m15','H1','H4','D1'].forEach(tf=>{
+      delete candleCache[`${a.sym}_${tf}`];
+      delete cacheTime[`${a.sym}_${tf}`];
+    });
+  });
+  sentSignals.clear(); // Réinitialiser les signaux déjà envoyés
+
+  // 2. Prix live forex
   document.getElementById('status-txt').textContent='⟳ Connexion données forex…';
   await updateLiveForex();
 
@@ -1539,8 +1549,10 @@ async function startRobot(){
   // 6. Intervalles
   scanInt=setInterval(runScan,MODES[activeMode].scan);
   liveInt=setInterval(updateLiveForex,30000);
-  alexInt=setInterval(alexCheckPositions,10000);     // Vérifie TP/SL toutes les 10s
-  alexLiveInt=setInterval(alexUpdateLive,1000);      // Mise à jour P&L et charts chaque seconde
+  alexInt=setInterval(alexCheckPositions,10000);
+  alexLiveInt=setInterval(alexUpdateLive,1000);
+  // Réinitialiser sentSignals toutes les 6h → permet de re-alerter si tendance confirmée
+  setInterval(()=>{ sentSignals.clear(); },6*3600*1000);
 }
 
 function stopRobot(){
