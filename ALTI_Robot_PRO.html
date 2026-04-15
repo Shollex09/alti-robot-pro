@@ -433,7 +433,7 @@ select{background:#141820;color:var(--text);border:1px solid #252d3d;border-radi
         </div>
         <div class="alex-row">
           <span class="alex-lbl">Filtre session</span>
-          <button id="btn-session-filter" class="alex-on-btn on" onclick="toggleSessionFilter()">ON</button>
+          <button id="btn-session-filter" class="alex-on-btn off" onclick="toggleSessionFilter()">OFF</button>
         </div>
         <div class="alex-row" style="margin-top:8px;padding-top:6px;border-top:1px solid #1a2030">
           <span class="alex-lbl" style="font-weight:700">Robot actif</span>
@@ -602,13 +602,14 @@ function getParisHour(){
     {timeZone:'Europe/Paris',hour:'numeric',hour12:false}).format(new Date());
 }
 function isGoodHour(){
-  // Si filtre désactivé → toujours OK
-  if(localStorage.getItem('alti_session_filter')==='0') return true;
-  const h=getParisHour();
-  const day=new Date().getDay(); // 0=dim, 6=sam
-  if(day===0||day===6) return false; // Weekend forex fermé
-  // Session Londres 8h-18h + New York 14h-23h (heure Paris)
-  return h>=8&&h<=22;
+  // Filtre session actif seulement si explicitement activé (OFF par défaut = 24h/24)
+  if(localStorage.getItem('alti_session_filter')==='1'){
+    const h=getParisHour();
+    const day=new Date().getDay();
+    if(day===0||day===6) return false; // Weekend forex fermé
+    return h>=8&&h<=22;
+  }
+  return true; // 24h/24 par défaut
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1818,12 +1819,12 @@ function alexToggleTrailing(){
 
 // ── Toggle filtre session ──────────────────────────────────────────
 function toggleSessionFilter(){
-  const cur=localStorage.getItem('alti_session_filter')!=='0';
+  const cur=localStorage.getItem('alti_session_filter')==='1';
   const next=!cur;
   localStorage.setItem('alti_session_filter',next?'1':'0');
   const btn=document.getElementById('btn-session-filter');
   if(btn){btn.className='alex-on-btn '+(next?'on':'off');btn.textContent=next?'ON':'OFF';}
-  toast('🕐 Filtre session '+(next?'activé (8h-23h)':'désactivé (24/7)'),'info');
+  toast('🕐 Filtre session '+(next?'activé (8h-22h lun-ven)':'désactivé (24h/24)'),'info');
 }
 
 // ── Export CSV des trades ──────────────────────────────────────────
@@ -2228,7 +2229,7 @@ function alexInit(){
   // Filtre session
   const sessionBtn=document.getElementById('btn-session-filter');
   if(sessionBtn){
-    const on=localStorage.getItem('alti_session_filter')!=='0';
+    const on=localStorage.getItem('alti_session_filter')==='1';
     sessionBtn.className='alex-on-btn '+(on?'on':'off');
     sessionBtn.textContent=on?'ON':'OFF';
   }
