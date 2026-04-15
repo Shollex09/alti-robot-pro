@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="90" fill="#0b0e11"/>
+  <!-- Graphique / bougies japonaises -->
+  <rect x="80" y="300" width="40" height="120" rx="4" fill="#00ffaa" opacity="0.9"/>
+  <rect x="80" y="260" width="40" height="30" rx="2" fill="#00ffaa" opacity="0.4"/>
+  <rect x="80" y="420" width="40" height="20" rx="2" fill="#00ffaa" opacity="0.4"/>
+  <rect x="148" y="220" width="40" height="180" rx="4" fill="#ff2255" opacity="0.9"/>
+  <rect x="148" y="190" width="40" height="25" rx="2" fill="#ff2255" opacity="0.4"/>
+  <rect x="148" y="400" width="40" height="30" rx="2" fill="#ff2255" opacity="0.4"/>
+  <rect x="216" y="180" width="40" height="220" rx="4" fill="#00ffaa" opacity="0.9"/>
+  <rect x="216" y="140" width="40" height="35" rx="2" fill="#00ffaa" opacity="0.4"/>
+  <rect x="216" y="400" width="40" height="25" rx="2" fill="#00ffaa" opacity="0.4"/>
+  <rect x="284" y="240" width="40" height="160" rx="4" fill="#00ffaa" opacity="0.9"/>
+  <rect x="284" y="210" width="40" height="25" rx="2" fill="#00ffaa" opacity="0.4"/>
+  <rect x="284" y="400" width="40" height="20" rx="2" fill="#00ffaa" opacity="0.4"/>
+  <rect x="352" y="160" width="40" height="240" rx="4" fill="#ff2255" opacity="0.9"/>
+  <rect x="352" y="130" width="40" height="25" rx="2" fill="#ff2255" opacity="0.4"/>
+  <rect x="352" y="400" width="40" height="20" rx="2" fill="#ff2255" opacity="0.4"/>
+  <!-- Ligne Ichimoku kumo -->
+  <path d="M80 290 Q170 200 256 230 Q340 260 432 190" stroke="#00ffaa" stroke-width="5" fill="none" opacity="0.7"/>
+  <path d="M80 320 Q170 250 256 270 Q340 290 432 230" stroke="#ffdd00" stroke-width="3" fill="none" opacity="0.5"/>
+  <!-- Texte ALTI -->
+  <text x="256" y="105" text-anchor="middle" fill="#00ffaa" font-family="'Courier New',monospace" font-weight="bold" font-size="72" letter-spacing="6">ALTI</text>
+  <text x="256" y="490" text-anchor="middle" fill="#848e9c" font-family="'Courier New',monospace" font-size="36" letter-spacing="4">ROBOT PRO</text>
+</svg>
