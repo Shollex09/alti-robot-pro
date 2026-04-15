@@ -182,6 +182,8 @@ select{background:#141820;color:var(--text);border:1px solid #252d3d;border-radi
 .alex-pos-pnl{font-size:11px;font-family:var(--mono);font-weight:700}
 .alex-pos-pnl.pos{color:var(--green)}.alex-pos-pnl.neg{color:var(--red)}
 .alex-pos-info{font-size:9px;color:var(--muted)}
+.alex-pos-chart{width:100%;height:46px;border-radius:3px;margin-top:5px;display:block;background:#0c1017}
+.alex-equity-curve{width:100%;height:60px;border-radius:4px;margin-bottom:8px;display:block;background:#0c1017}
 /* Historique */
 .alex-trade{display:flex;justify-content:space-between;align-items:center;padding:4px 6px;border-radius:4px;margin-bottom:2px;font-family:var(--mono);font-size:10px}
 .alex-trade.win{background:rgba(0,255,170,.05);border-left:2px solid var(--green)}
@@ -431,6 +433,9 @@ select{background:#141820;color:var(--text);border:1px solid #252d3d;border-radi
         </div>
       </div>
 
+      <!-- COURBE ÉQUITÉ -->
+      <canvas id="alex-equity-curve" class="alex-equity-curve" title="Courbe d'équité"></canvas>
+
       <!-- FOREX vs CRYPTO -->
       <div class="alex-compare">
         <div class="alex-cfg-title" style="margin-bottom:6px">📊 Forex vs Crypto</div>
@@ -527,12 +532,14 @@ let activeMode = localStorage.getItem('alti_mode')||'daytrader';
 // ══════════════════════════════════════════════════════════════════
 //  ÉTAT GLOBAL
 // ══════════════════════════════════════════════════════════════════
-let robotOn=false, scanInt=null, liveInt=null, alexInt=null;
+let robotOn=false, scanInt=null, liveInt=null, alexInt=null, alexLiveInt=null;
 let scanCount=0;
 const enabledAssets = new Set(ASSETS.map(a=>a.sym));
 const sentSignals   = new Set();
 const candleCache   = {}, cacheTime = {};
 const livePrices    = {};
+const priceHistory  = {}; // sym → [{t,p}] rolling 200 ticks for mini charts
+const PRICE_HIST_MAX= 200;
 let   binWS=null, tdWS=null;
 let   forexDaily=null, forexDailyTime=0, forexDailyPromise=null;
 const forexSource   = {};
@@ -779,26 +786,33 @@ async function validateFinnhub(){
   setFHStatus('loading','⟳ Test clé Finnhub…');
   try{
     const r = await fetch(
-      `https://finnhub.io/api/v1/quote?symbol=OANDA:EUR_USD&token=${finnhubKey}`,
+      `https://finnhub.io/api/v1/forex/rates?base=USD&token=${finnhubKey}`,
       {signal: AbortSignal.timeout(6000)}
     );
-    const d = await r.json();
-    if(d.error || r.status===401 || r.status===403){
-      setFHStatus('error', `✗ ${d.error||'Clé invalide'}`);
+    if(r.status===401||r.status===403){
+      setFHStatus('error','✗ Clé Finnhub invalide (401/403)');
       toast('✗ Clé Finnhub invalide','warn');
       return;
     }
-    if(!d.c || isNaN(+d.c)){
-      setFHStatus('error','✗ Réponse inattendue');
+    const d = await r.json();
+    if(d.error){
+      setFHStatus('error', `✗ ${d.error}`);
+      toast('✗ Finnhub : '+d.error,'warn');
       return;
     }
-    const price = parseFloat(d.c).toFixed(5);
-    setFHStatus('ok', `✓ Clé OK · EUR/USD = ${price} · Connexion WS…`);
+    // La réponse contient d.quote avec les taux USD→autres devises
+    const hasRates = d.quote && Object.keys(d.quote).length > 0;
+    if(!hasRates){
+      setFHStatus('error','✗ Réponse Finnhub inattendue');
+      return;
+    }
+    const eurUsd = d.quote['EUR'] ? (1/d.quote['EUR']).toFixed(5) : '—';
+    setFHStatus('ok', `✓ Clé OK · EUR/USD ≈ ${eurUsd} · Connexion WS…`);
     toast('✓ Finnhub validé — connexion WebSocket forex','buy');
     if(robotOn) connectFinnhub();
-    else setFHStatus('ok',`✓ Clé valide · EUR/USD = ${price} · WS au démarrage`);
+    else setFHStatus('ok',`✓ Clé valide · EUR/USD ≈ ${eurUsd} · WS au démarrage`);
   }catch(e){
-    setFHStatus('error', `✗ Erreur : ${e.message}`);
+    setFHStatus('error', `✗ Erreur réseau : ${e.message}`);
   }
 }
 
@@ -829,6 +843,10 @@ function connectFinnhub(){
         if(!asset) return;
         const prev = livePrices[sym];
         livePrices[sym] = price;
+        // Historique prix pour mini-charts
+        if(!priceHistory[sym]) priceHistory[sym]=[];
+        priceHistory[sym].push({t:Date.now(),p:price});
+        if(priceHistory[sym].length>PRICE_HIST_MAX) priceHistory[sym].shift();
         // Mettre à jour dernière bougie en cache
         MODES[activeMode].tfs.forEach(tf => {
           const k = `${sym}_${tf}`;
@@ -1053,7 +1071,14 @@ async function updateLiveForex(){
       if(d.result!=='success') throw new Error('ER-API failed');
       closes=computeForexCloses(d.rates);
     }
-    FOREX.forEach(a=>{if(closes[a.sym]&&!isNaN(closes[a.sym]))livePrices[a.sym]=closes[a.sym];});
+    FOREX.forEach(a=>{
+      if(closes[a.sym]&&!isNaN(closes[a.sym])){
+        livePrices[a.sym]=closes[a.sym];
+        if(!priceHistory[a.sym]) priceHistory[a.sym]=[];
+        priceHistory[a.sym].push({t:Date.now(),p:closes[a.sym]});
+        if(priceHistory[a.sym].length>PRICE_HIST_MAX) priceHistory[a.sym].shift();
+      }
+    });
     // Invalider cache intraday
     FOREX.forEach(a=>{
       ['m1','m5','m15','H1','H4'].forEach(tf=>{
@@ -1114,6 +1139,10 @@ function connectBinance(){
       const msg=JSON.parse(e.data),t=msg.data;if(!t)return;
       const a=CRYPTO.find(x=>x.bin===t.s);if(!a)return;
       const p=parseFloat(t.c); livePrices[a.sym]=p;
+      // Historique prix pour mini-charts
+      if(!priceHistory[a.sym]) priceHistory[a.sym]=[];
+      priceHistory[a.sym].push({t:Date.now(),p});
+      if(priceHistory[a.sym].length>PRICE_HIST_MAX) priceHistory[a.sym].shift();
       const entryTF=MODES[activeMode].tfs[2];
       const key=`${a.sym}_${entryTF}`;
       if(candleCache[key]?.length) candleCache[key][candleCache[key].length-1].c=p;
@@ -1437,12 +1466,14 @@ async function startRobot(){
   // 6. Intervalles
   scanInt=setInterval(runScan,MODES[activeMode].scan);
   liveInt=setInterval(updateLiveForex,30000);
-  alexInt=setInterval(alexCheckPositions,10000); // Vérifie TP/SL toutes les 10s
+  alexInt=setInterval(alexCheckPositions,10000);     // Vérifie TP/SL toutes les 10s
+  alexLiveInt=setInterval(alexUpdateLive,1000);      // Mise à jour P&L et charts chaque seconde
 }
 
 function stopRobot(){
   robotOn=false;
-  clearInterval(scanInt);clearInterval(liveInt);clearInterval(alexInt);scanInt=liveInt=alexInt=null;
+  clearInterval(scanInt);clearInterval(liveInt);clearInterval(alexInt);clearInterval(alexLiveInt);
+  scanInt=liveInt=alexInt=alexLiveInt=null;
   if(binWS){binWS.close();binWS=null;}
   if(tdWS){tdWS.close();tdWS=null;}
   document.getElementById('btn-start').style.display='';
@@ -1491,6 +1522,7 @@ function switchTab(tab){
     equity:data.equity!==undefined?data.equity:(cfg.capital||10000),
     trades:data.trades||[],
     openPositions:data.openPositions||[],
+    equityHistory:data.equityHistory||[], // [{t,v}] pour la courbe
   };
 })();
 
@@ -1509,10 +1541,17 @@ function alexSaveConfig(){
 }
 
 function alexSaveData(){
+  // Enregistre un point d'équité si l'equity a changé
+  const last=alex.equityHistory[alex.equityHistory.length-1];
+  if(!last||last.v!==alex.equity){
+    alex.equityHistory.push({t:Date.now(),v:alex.equity});
+    if(alex.equityHistory.length>500) alex.equityHistory.shift();
+  }
   localStorage.setItem('alex_data',JSON.stringify({
     trades:alex.trades.slice(-300),
     openPositions:alex.openPositions,
     equity:alex.equity,
+    equityHistory:alex.equityHistory.slice(-500),
   }));
 }
 
@@ -1533,6 +1572,7 @@ function alexReset(){
   alex.trades=[];
   alex.openPositions=[];
   alex.equity=cap;
+  alex.equityHistory=[];
   alexSaveData();
   alexRenderAll();
   toast('↺ Robot Alex remis à zéro','info');
@@ -1564,6 +1604,7 @@ function alexOpenPosition(asset,sig){
     tfMode:MODES[activeMode].name,
     tfKey:activeMode,
     openTime:new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),
+    openTs:Date.now(),
     score:sig.score,
     utConv:sig.utConv,
   };
@@ -1613,6 +1654,113 @@ function alexRenderAll(){
   alexRenderStats();
   alexRenderPositions();
   alexRenderHistory();
+  drawEquityCurve();
+}
+
+// Mise à jour temps réel (chaque seconde) — pas de re-rendu HTML, juste les valeurs et les charts
+function alexUpdateLive(){
+  if(!document.getElementById('alex-panel')?.className?.includes('show')) return;
+  // Equity unrealised = equity fermé + PnL flottant des positions ouvertes
+  let floatPnl=0;
+  alex.openPositions.forEach((pos,i)=>{
+    const price=livePrices[pos.sym];
+    if(!price||isNaN(price)) return;
+    const isBuy=pos.dir==='BUY';
+    const pnl=(isBuy?1:-1)*(price-pos.entry)*pos.units;
+    floatPnl+=pnl;
+    // Mettre à jour le badge PnL et le prix live de la carte
+    const pnlEl=document.getElementById(`alex-pos-pnl-${pos.id||i}`);
+    if(pnlEl){
+      const sign=pnl>=0?'+':'';
+      pnlEl.textContent=sign+'€'+Math.abs(pnl).toFixed(0);
+      pnlEl.className='alex-pos-pnl '+(pnl>=0?'pos':'neg');
+    }
+    const pxEl=document.getElementById(`alex-pos-px-${pos.id||i}`);
+    if(pxEl) pxEl.textContent=fp(price,pos.pip);
+    // Redessiner le mini-chart
+    drawPosChart(pos,i);
+  });
+
+  // Equity totale affichée (capital fermé + flottant)
+  const totalEq=alex.equity+floatPnl;
+  const startCap=alex.capital;
+  const eqEl=document.getElementById('alex-equity');
+  const pnlEl=document.getElementById('alex-pnl');
+  if(eqEl){
+    eqEl.textContent='€'+Math.round(totalEq).toLocaleString('fr-FR');
+    eqEl.style.color=totalEq>=startCap?'var(--green)':'var(--red)';
+  }
+  if(pnlEl){
+    const tot=totalEq-startCap;
+    const sign=tot>=0?'+':'';
+    pnlEl.textContent=sign+'€'+Math.abs(Math.round(tot)).toLocaleString('fr-FR');
+    pnlEl.style.color=tot>=0?'var(--green)':'var(--red)';
+  }
+  drawEquityCurve(floatPnl);
+}
+
+function drawEquityCurve(floatPnl=0){
+  const canvas=document.getElementById('alex-equity-curve');
+  if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.offsetWidth||canvas.width||300;
+  const H=canvas.offsetHeight||canvas.height||60;
+  canvas.width=W; canvas.height=H;
+  ctx.clearRect(0,0,W,H);
+
+  // Points de l'historique + point "live" avec PnL flottant
+  const pts=[...alex.equityHistory];
+  const liveEq=alex.equity+floatPnl;
+  if(!pts.length){
+    // Ligne plate au capital initial
+    pts.push({t:Date.now()-1000,v:alex.capital});
+    pts.push({t:Date.now(),v:liveEq});
+  } else {
+    pts.push({t:Date.now(),v:liveEq});
+  }
+
+  const vals=pts.map(x=>x.v);
+  let minV=Math.min(...vals), maxV=Math.max(...vals);
+  if(minV===maxV){ minV*=0.995; maxV*=1.005; }
+  const padV=(maxV-minV)*0.1;
+  minV-=padV; maxV+=padV;
+
+  const t0=pts[0].t, t1=pts[pts.length-1].t;
+  const xS=t=>t0===t1?W/2:(t-t0)/(t1-t0)*W;
+  const yS=v=>H-(v-minV)/(maxV-minV)*H;
+
+  // Ligne de référence au capital initial
+  const refY=yS(alex.capital);
+  ctx.setLineDash([2,3]);
+  ctx.strokeStyle='rgba(132,142,156,0.3)';
+  ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,refY); ctx.lineTo(W,refY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Courbe
+  const lastUp=liveEq>=alex.capital;
+  const lineColor=lastUp?'#00ffaa':'#ff2255';
+
+  ctx.strokeStyle=lineColor;
+  ctx.lineWidth=1.5;
+  ctx.beginPath();
+  pts.forEach((pt,i)=>{
+    const x=xS(pt.t), y=yS(pt.v);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // Remplissage
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,lastUp?'rgba(0,255,170,0.18)':'rgba(255,34,85,0.18)');
+  grad.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+  ctx.fillStyle=grad; ctx.fill();
+
+  // Label capital initial (ligne de référence)
+  ctx.fillStyle='rgba(132,142,156,0.6)';
+  ctx.font='8px monospace';
+  ctx.fillText('€'+Math.round(alex.capital).toLocaleString('fr-FR'), 3, refY-2);
 }
 
 function alexRenderStats(){
@@ -1721,27 +1869,120 @@ function alexRenderPositions(){
     el.innerHTML='<div style="color:#3a4555;font-size:9px;font-family:var(--mono);text-align:center;padding:8px">Aucune position ouverte</div>';
     return;
   }
-  el.innerHTML=alex.openPositions.map(pos=>{
+  el.innerHTML=alex.openPositions.map((pos,i)=>{
     const price=livePrices[pos.sym];
     const isBuy=pos.dir==='BUY';
     const pnl=price?((isBuy?1:-1)*(price-pos.entry)*pos.units):0;
     const sign=pnl>=0?'+':'';
-    const pnlCol=pnl>=0?'var(--green)':'var(--red)';
-    const distPct=price?((isBuy?(price-pos.entry):(pos.entry-price))/Math.abs(pos.entry-pos.sl)*100).toFixed(0):0;
-    return `<div class="alex-pos">
+    // Progression vers TP (0→100%)
+    const range=Math.abs(pos.tp1-pos.entry);
+    const moved=price?Math.max(0,(isBuy?(price-pos.entry):(pos.entry-price))):0;
+    const progPct=range?Math.min(100,Math.max(-100,moved/range*100)).toFixed(0):0;
+    return `<div class="alex-pos" id="alex-pos-card-${pos.id||i}">
       <div class="alex-pos-head">
         <span class="alex-pos-sym">${pos.sym}</span>
         <span class="alex-pos-dir ${pos.dir.toLowerCase()}">${pos.dir==='BUY'?'▲ LONG':'▼ SHORT'}</span>
-        <span class="alex-pos-pnl ${pnl>=0?'pos':'neg'}">${sign}€${Math.abs(pnl).toFixed(0)}</span>
+        <span class="alex-pos-pnl ${pnl>=0?'pos':'neg'}" id="alex-pos-pnl-${pos.id||i}">${sign}€${Math.abs(pnl).toFixed(0)}</span>
       </div>
       <div class="alex-pos-info">
         E: <span style="color:var(--blue)">${fp(pos.entry,pos.pip)}</span>
         &nbsp;·&nbsp;SL: <span style="color:var(--red)">${fp(pos.sl,pos.pip)}</span>
         &nbsp;·&nbsp;TP: <span style="color:var(--green)">${fp(pos.tp1,pos.pip)}</span>
+        &nbsp;·&nbsp;<span id="alex-pos-px-${pos.id||i}" style="color:var(--yellow)">${price?fp(price,pos.pip):'—'}</span>
       </div>
-      <div class="alex-pos-info" style="color:#3a4555;margin-top:2px">${pos.openTime} · ${pos.market} · ${pos.tfMode} · R€${Math.round(pos.risk)} · ${pos.score}/4 ⭐${pos.utConv}</div>
+      <canvas class="alex-pos-chart" id="alex-pos-chart-${pos.id||i}"></canvas>
+      <div class="alex-pos-info" style="color:#3a4555;margin-top:2px">${pos.openTime} · ${pos.market} · ${pos.tfMode} · R€${Math.round(pos.risk)} · ${pos.score}/4 ⭐</div>
     </div>`;
   }).join('');
+  // Dessiner les charts après injection HTML
+  alex.openPositions.forEach((pos,i)=>drawPosChart(pos,i));
+}
+
+function drawPosChart(pos,i){
+  const canvas=document.getElementById(`alex-pos-chart-${pos.id||i}`);
+  if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.offsetWidth||canvas.width||240;
+  const H=canvas.offsetHeight||canvas.height||46;
+  canvas.width=W; canvas.height=H;
+  ctx.clearRect(0,0,W,H);
+
+  // Historique depuis l'entrée en position
+  const hist=(priceHistory[pos.sym]||[]).filter(pt=>pt.t>=pos.openTs);
+  const isBuy=pos.dir==='BUY';
+
+  // Points à tracer : entrée + historique + prix actuel
+  const pts=[];
+  pts.push({t:pos.openTs, p:pos.entry});
+  hist.forEach(pt=>pts.push(pt));
+  const curP=livePrices[pos.sym];
+  if(curP) pts.push({t:Date.now(),p:curP});
+  if(pts.length<2) pts.push({t:Date.now(),p:pos.entry}); // ligne plate si pas d'historique
+
+  // Échelle Y
+  const allP=pts.map(x=>x.p).concat([pos.sl,pos.tp1]);
+  let minP=Math.min(...allP), maxP=Math.max(...allP);
+  const pad=(maxP-minP)*0.1||pos.pip*5;
+  minP-=pad; maxP+=pad;
+  const yScale=v=>H-(v-minP)/(maxP-minP)*H;
+
+  // Échelle X
+  const t0=pts[0].t, t1=pts[pts.length-1].t;
+  const xScale=t=>t0===t1?W/2:(t-t0)/(t1-t0)*W;
+
+  // Zone SL (danger)
+  ctx.fillStyle='rgba(255,34,85,0.06)';
+  const slY=yScale(pos.sl);
+  if(isBuy){ ctx.fillRect(0,slY,W,H-slY); }
+  else      { ctx.fillRect(0,0,W,slY); }
+
+  // Zone TP (profit)
+  ctx.fillStyle='rgba(0,255,170,0.06)';
+  const tpY=yScale(pos.tp1);
+  if(isBuy){ ctx.fillRect(0,0,W,tpY); }
+  else      { ctx.fillRect(0,tpY,W,H-tpY); }
+
+  // Ligne SL
+  ctx.setLineDash([3,3]);
+  ctx.strokeStyle='rgba(255,34,85,0.5)';
+  ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,slY); ctx.lineTo(W,slY); ctx.stroke();
+
+  // Ligne TP
+  ctx.strokeStyle='rgba(0,255,170,0.5)';
+  ctx.beginPath(); ctx.moveTo(0,tpY); ctx.lineTo(W,tpY); ctx.stroke();
+
+  // Ligne entrée
+  ctx.strokeStyle='rgba(0,136,255,0.6)';
+  const eY=yScale(pos.entry);
+  ctx.beginPath(); ctx.moveTo(0,eY); ctx.lineTo(W,eY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Courbe prix
+  const lastP=pts[pts.length-1].p;
+  const lineCol=lastP>=pos.entry?'#00ffaa':'#ff2255';
+  ctx.strokeStyle=lineCol;
+  ctx.lineWidth=1.5;
+  ctx.beginPath();
+  pts.forEach((pt,idx)=>{
+    const x=xScale(pt.t), y=yScale(pt.p);
+    idx===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // Remplissage sous courbe
+  ctx.lineTo(xScale(pts[pts.length-1].t),H);
+  ctx.lineTo(xScale(pts[0].t),H);
+  ctx.closePath();
+  ctx.fillStyle=lastP>=pos.entry?'rgba(0,255,170,0.07)':'rgba(255,34,85,0.07)';
+  ctx.fill();
+
+  // Prix actuel — point final
+  if(curP){
+    const cx=xScale(pts[pts.length-1].t), cy=yScale(curP);
+    ctx.fillStyle=lineCol;
+    ctx.beginPath(); ctx.arc(cx,cy,3,0,Math.PI*2); ctx.fill();
+  }
 }
 
 function alexRenderHistory(){
