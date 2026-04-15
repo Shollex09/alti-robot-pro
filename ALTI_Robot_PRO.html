@@ -785,32 +785,25 @@ async function validateFinnhub(){
   if(!finnhubKey) return;
   setFHStatus('loading','⟳ Test clé Finnhub…');
   try{
+    // Valider la clé avec un endpoint stock gratuit (AAPL) — toujours disponible sur plan free
     const r = await fetch(
-      `https://finnhub.io/api/v1/forex/rates?base=USD&token=${finnhubKey}`,
+      `https://finnhub.io/api/v1/quote?symbol=AAPL&token=${finnhubKey}`,
       {signal: AbortSignal.timeout(6000)}
     );
-    if(r.status===401||r.status===403){
-      setFHStatus('error','✗ Clé Finnhub invalide (401/403)');
+    const d = await r.json();
+    if(r.status===401||r.status===403||d.error){
+      setFHStatus('error','✗ Clé Finnhub invalide — vérifie sur finnhub.io');
       toast('✗ Clé Finnhub invalide','warn');
       return;
     }
-    const d = await r.json();
-    if(d.error){
-      setFHStatus('error', `✗ ${d.error}`);
-      toast('✗ Finnhub : '+d.error,'warn');
-      return;
-    }
-    // La réponse contient d.quote avec les taux USD→autres devises
-    const hasRates = d.quote && Object.keys(d.quote).length > 0;
-    if(!hasRates){
+    if(d.c===undefined){
       setFHStatus('error','✗ Réponse Finnhub inattendue');
       return;
     }
-    const eurUsd = d.quote['EUR'] ? (1/d.quote['EUR']).toFixed(5) : '—';
-    setFHStatus('ok', `✓ Clé OK · EUR/USD ≈ ${eurUsd} · Connexion WS…`);
+    setFHStatus('ok','✓ Clé valide · Connexion WebSocket forex…');
     toast('✓ Finnhub validé — connexion WebSocket forex','buy');
     if(robotOn) connectFinnhub();
-    else setFHStatus('ok',`✓ Clé valide · EUR/USD ≈ ${eurUsd} · WS au démarrage`);
+    else setFHStatus('ok','✓ Clé valide · WebSocket forex au démarrage du robot');
   }catch(e){
     setFHStatus('error', `✗ Erreur réseau : ${e.message}`);
   }
