@@ -406,11 +406,43 @@ select{background:#141820;color:var(--text);border:1px solid #252d3d;border-radi
             <option value="crypto">Crypto</option>
           </select>
         </div>
+        <div class="alex-row">
+          <span class="alex-lbl">Max positions</span>
+          <input class="alex-inp" type="number" id="alex-maxpos" value="5" min="1" max="20" step="1" style="width:60px" onchange="alexSaveConfig()">
+        </div>
+        <div class="alex-row">
+          <span class="alex-lbl">Drawdown max</span>
+          <select class="alex-inp" id="alex-drawdown" onchange="alexSaveConfig()" style="width:80px;padding:2px 4px">
+            <option value="10">10 %</option>
+            <option value="15" selected>15 %</option>
+            <option value="20">20 %</option>
+            <option value="30">30 %</option>
+          </select>
+        </div>
+        <div class="alex-row">
+          <span class="alex-lbl">Confirm. TF min</span>
+          <select class="alex-inp" id="alex-utconv" onchange="alexSaveConfig()" style="width:80px;padding:2px 4px">
+            <option value="1">1 ★</option>
+            <option value="2" selected>2 ★</option>
+            <option value="3">3 ★</option>
+          </select>
+        </div>
+        <div class="alex-row">
+          <span class="alex-lbl">Trailing SL</span>
+          <button id="alex-trailing" class="alex-on-btn off" onclick="alexToggleTrailing()">OFF</button>
+        </div>
+        <div class="alex-row">
+          <span class="alex-lbl">Filtre session</span>
+          <button id="btn-session-filter" class="alex-on-btn on" onclick="toggleSessionFilter()">ON</button>
+        </div>
         <div class="alex-row" style="margin-top:8px;padding-top:6px;border-top:1px solid #1a2030">
           <span class="alex-lbl" style="font-weight:700">Robot actif</span>
           <button id="alex-toggle" class="alex-on-btn off" onclick="alexToggle()">OFF</button>
         </div>
-        <button onclick="alexReset()" style="margin-top:6px;width:100%;padding:4px;background:#131820;border:1px solid #252d3d;border-radius:4px;color:var(--red);font-size:10px;font-family:var(--mono);cursor:pointer;letter-spacing:.03em">↺ Remise à zéro</button>
+        <div style="display:flex;gap:4px;margin-top:6px">
+          <button onclick="alexExportCSV()" style="flex:1;padding:4px;background:#131820;border:1px solid #252d3d;border-radius:4px;color:var(--blue);font-size:10px;font-family:var(--mono);cursor:pointer">📥 Export CSV</button>
+          <button onclick="alexReset()" style="flex:1;padding:4px;background:#131820;border:1px solid #252d3d;border-radius:4px;color:var(--red);font-size:10px;font-family:var(--mono);cursor:pointer">↺ Reset</button>
+        </div>
       </div>
 
       <!-- STATS GLOBALES -->
@@ -430,6 +462,11 @@ select{background:#141820;color:var(--text);border:1px solid #252d3d;border-radi
         <div class="alex-stat">
           <div class="alex-stat-val" id="alex-ntrades">0</div>
           <div class="alex-stat-lbl">Trades fermés</div>
+        </div>
+        <div class="alex-stat" style="grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;padding:4px 8px">
+          <span style="font-size:8px;color:var(--muted);font-family:var(--mono)">DRAWDOWN</span>
+          <span id="alex-drawdown-val" style="font-size:11px;font-family:var(--mono);font-weight:700;color:var(--green)">0.0 %</span>
+          <span style="font-size:8px;color:var(--muted);font-family:var(--mono)" id="alex-nfp-warn"></span>
         </div>
       </div>
 
@@ -564,7 +601,15 @@ function getParisHour(){
   return +new Intl.DateTimeFormat('fr-FR',
     {timeZone:'Europe/Paris',hour:'numeric',hour12:false}).format(new Date());
 }
-function isGoodHour(){const h=getParisHour();return(h>=9&&h<12)||(h>=14&&h<19);}
+function isGoodHour(){
+  // Si filtre désactivé → toujours OK
+  if(localStorage.getItem('alti_session_filter')==='0') return true;
+  const h=getParisHour();
+  const day=new Date().getDay(); // 0=dim, 6=sam
+  if(day===0||day===6) return false; // Weekend forex fermé
+  // Session Londres 8h-18h + New York 14h-23h (heure Paris)
+  return h>=8&&h<=22;
+}
 
 // ══════════════════════════════════════════════════════════════════
 //  HORLOGE + SESSION
@@ -1002,12 +1047,26 @@ function toIntraday(daily,tf){
   const perDay={m1:1440,m5:288,m15:96,H1:24,H4:6}[tf]||24;
   const out=[];
   for(const day of daily){
-    const rng=Math.max(day.h-day.l,day.c*.0005);
+    // Range journalier réel (min garanti : 0.08% du prix)
+    const rng=Math.max(day.h-day.l, day.c*0.0008);
+    // Part du range attribuée à chaque bougie intraday
+    const barShare = rng / Math.sqrt(perDay);
     let p=day.o;
     for(let i=0;i<perDay;i++){
-      const frac=(i+1)/perDay, target=day.o+(day.c-day.o)*frac;
-      const noise=rng*.08*(Math.random()-.5), o=p, c=target+noise;
-      out.push({t:day.t+i*(86400000/perDay),o,h:Math.max(o,c)+rng*.03,l:Math.min(o,c)-rng*.03,c});
+      const frac=(i+1)/perDay;
+      const target=day.o+(day.c-day.o)*frac;
+      const noise=barShare*(Math.random()-.48);
+      const o=p, c=target+noise;
+      // Wicks réalistes : 30-70% du range de la bougie
+      const wickFactor=0.3+Math.random()*0.4;
+      const bodyRange=Math.abs(c-o)||barShare*0.1;
+      const wick=bodyRange*wickFactor;
+      out.push({
+        t:day.t+i*(86400000/perDay),
+        o, c,
+        h:Math.max(o,c)+wick,
+        l:Math.min(o,c)-wick
+      });
       p=c;
     }
   }
@@ -1162,6 +1221,19 @@ async function getCandles(asset,tf){
 // ══════════════════════════════════════════════════════════════════
 //  ICHIMOKU KINKO HYO
 // ══════════════════════════════════════════════════════════════════
+function calcRSI(candles, period=14){
+  if(!candles||candles.length<period+1) return 50; // neutre si pas assez de données
+  const closes=candles.slice(-(period+1)).map(c=>c.c);
+  let gains=0,losses=0;
+  for(let i=1;i<closes.length;i++){
+    const d=closes[i]-closes[i-1];
+    if(d>=0) gains+=d; else losses-=d;
+  }
+  const ag=gains/period, al=losses/period;
+  if(al===0) return 100;
+  return Math.round(100-(100/(1+(ag/al))));
+}
+
 function calcIchi(candles,liveClose){
   if(!candles||candles.length<52) return null;
   const H=n=>Math.max(...candles.slice(-n).map(c=>c.h));
@@ -1377,11 +1449,19 @@ async function runScan(){
       const lp=livePrices[asset.sym];
       const iTrend=calcIchi(c0), iCtx=calcIchi(c1), iEntry=calcIchi(c2,lp);
       const sig=(iTrend&&iCtx&&iEntry)?checkSignal(asset,iTrend,iCtx,iEntry):null;
-      const sessionOk=asset.bin?true:goodHour; // crypto = 24/7
-      renderCard(asset,iTrend,iCtx,iEntry,sig,goodHour);
-      if(sig&&sig.score>=sm&&sig.dir!=='NEU'&&sessionOk){
+      // RSI sur TF d'entrée — filtre overbought/oversold
+      const rsi=calcRSI(c2);
+      if(sig) sig.rsi=rsi;
+      const rsiOk=!sig||sig.dir==='NEU'
+        ||(sig.dir==='BUY'&&rsi<75)
+        ||(sig.dir==='SELL'&&rsi>25);
+      // Filtre NFP — bloquer 30 min autour de la publication
+      const nfpBlock=isNFPTime();
+      const sessionOk=asset.bin?true:(goodHour&&!nfpBlock);
+      renderCard(asset,iTrend,iCtx,iEntry,sig,goodHour,rsi);
+      if(sig&&sig.score>=sm&&sig.dir!=='NEU'&&sessionOk&&rsiOk){
         sendAlert(asset,sig);
-        alexOpenPosition(asset,sig); // Appelé à chaque scan (indépendant des sentSignals)
+        alexOpenPosition(asset,sig);
       }
       if(!sig||sig.score<2){sentSignals.delete(`${asset.sym}_BUY`);sentSignals.delete(`${asset.sym}_SELL`);}
     }catch(e){console.warn('scan:',asset.sym,e.message);}
@@ -1512,10 +1592,15 @@ function switchTab(tab){
     capital:cfg.capital||10000,
     riskPct:cfg.riskPct||2,
     market:cfg.market||'all',
+    maxPos:cfg.maxPos||5,
+    drawdownMax:cfg.drawdownMax||15,
+    trailing:cfg.trailing||false,
+    utConvMin:cfg.utConvMin||2,    // confirmation multi-TF minimum
     equity:data.equity!==undefined?data.equity:(cfg.capital||10000),
+    peakEquity:data.peakEquity||(data.equity||(cfg.capital||10000)), // pour calcul drawdown
     trades:data.trades||[],
     openPositions:data.openPositions||[],
-    equityHistory:data.equityHistory||[], // [{t,v}] pour la courbe
+    equityHistory:data.equityHistory||[],
   };
 })();
 
@@ -1523,18 +1608,22 @@ function alexSaveConfig(){
   const cap=parseFloat(document.getElementById('alex-capital').value)||10000;
   const risk=parseFloat(document.getElementById('alex-risk').value)||2;
   const mkt=document.getElementById('alex-market').value||'all';
-  // Si le capital change et qu'il n'y a pas de trades, reset l'equity
+  const maxPos=parseInt(document.getElementById('alex-maxpos')?.value)||5;
+  const drawdownMax=parseInt(document.getElementById('alex-drawdown')?.value)||15;
+  const utConvMin=parseInt(document.getElementById('alex-utconv')?.value)||2;
   if(cap!==alex.capital&&alex.trades.length===0&&alex.openPositions.length===0){
-    alex.equity=cap;
+    alex.equity=cap; alex.peakEquity=cap;
   }
   alex.capital=cap; alex.riskPct=risk; alex.market=mkt;
-  localStorage.setItem('alex_cfg',JSON.stringify({capital:cap,riskPct:risk,market:mkt}));
+  alex.maxPos=maxPos; alex.drawdownMax=drawdownMax; alex.utConvMin=utConvMin;
+  localStorage.setItem('alex_cfg',JSON.stringify({capital:cap,riskPct:risk,market:mkt,maxPos,drawdownMax,trailing:alex.trailing,utConvMin}));
   alexSaveData();
   alexRenderStats();
 }
 
 function alexSaveData(){
-  // Enregistre un point d'équité si l'equity a changé
+  // Mettre à jour le peak equity
+  if(alex.equity>alex.peakEquity) alex.peakEquity=alex.equity;
   const last=alex.equityHistory[alex.equityHistory.length-1];
   if(!last||last.v!==alex.equity){
     alex.equityHistory.push({t:Date.now(),v:alex.equity});
@@ -1544,6 +1633,7 @@ function alexSaveData(){
     trades:alex.trades.slice(-300),
     openPositions:alex.openPositions,
     equity:alex.equity,
+    peakEquity:alex.peakEquity,
     equityHistory:alex.equityHistory.slice(-500),
   }));
 }
@@ -1565,17 +1655,48 @@ function alexReset(){
   alex.trades=[];
   alex.openPositions=[];
   alex.equity=cap;
+  alex.peakEquity=cap;
   alex.equityHistory=[];
   alexSaveData();
   alexRenderAll();
   toast('↺ Robot Alex remis à zéro','info');
 }
 
+// Groupes de corrélation : ne pas ouvrir 2 paires du même groupe dans la même direction
+const CORR_GROUPS=[
+  ['EUR/USD','GBP/USD','AUD/USD','NZD/USD'], // toutes vs USD (direction identique)
+  ['USD/JPY','USD/CAD','USD/CHF'],            // USD base (inverse des précédentes)
+];
+
 function alexOpenPosition(asset,sig){
   if(!alex.on) return;
   const isCrypto=!!asset.bin;
   if(alex.market==='forex'&&isCrypto) return;
   if(alex.market==='crypto'&&!isCrypto) return;
+
+  // ── Confirmation multi-timeframe ──────────────────────────────────
+  if((sig.utConv||0)<alex.utConvMin) return;
+
+  // ── Max positions simultanées ─────────────────────────────────────
+  if(alex.openPositions.length>=alex.maxPos) return;
+
+  // ── Protection drawdown ───────────────────────────────────────────
+  const ddPct=(alex.peakEquity-alex.equity)/alex.peakEquity*100;
+  if(ddPct>=alex.drawdownMax){
+    toast(`⚠ Alex bloqué — drawdown ${ddPct.toFixed(1)}% (max ${alex.drawdownMax}%)`,'warn');
+    return;
+  }
+
+  // ── Filtre de corrélation ─────────────────────────────────────────
+  if(!isCrypto){
+    const group=CORR_GROUPS.find(g=>g.includes(asset.sym));
+    if(group){
+      const conflict=alex.openPositions.find(p=>
+        group.includes(p.sym) && p.dir===sig.dir
+      );
+      if(conflict) return; // Exposition trop corrélée
+    }
+  }
   // Pas de doublon sur le même actif
   if(alex.openPositions.find(p=>p.sym===asset.sym)) return;
   const dist=Math.abs(sig.close-sig.sl);
@@ -1615,6 +1736,24 @@ function alexCheckPositions(){
     const price=livePrices[pos.sym];
     if(!price||isNaN(price)) return true;
     const isBuy=pos.dir==='BUY';
+
+    // ── Trailing Stop Loss ──────────────────────────────────────────
+    if(alex.trailing){
+      const tpRange=Math.abs(pos.tp1-pos.entry);
+      const moved=isBuy?(price-pos.entry):(pos.entry-price);
+      // Déclenche le trailing quand le prix a parcouru 50% du chemin vers TP
+      if(moved>=tpRange*0.5){
+        const buf=pos.pip*3;
+        const newSL=isBuy?Math.max(pos.sl, price-tpRange*0.5-buf)
+                         :Math.min(pos.sl, price+tpRange*0.5+buf);
+        if(newSL!==pos.sl){
+          pos.sl=newSL;
+          pos.trailing=true;
+          changed=true;
+        }
+      }
+    }
+
     const hitSL=isBuy?price<=pos.sl:price>=pos.sl;
     const hitTP=isBuy?price>=pos.tp1:price<=pos.tp1;
     if(!hitSL&&!hitTP) return true;
@@ -1641,6 +1780,53 @@ function alexCheckPositions(){
     alexSaveData();
     if(document.getElementById('alex-panel')?.className==='show') alexRenderAll();
   }
+}
+
+// ── Calendrier économique — NFP ────────────────────────────────────
+function isNFPTime(){
+  const now=new Date();
+  // NFP = 1er vendredi du mois, 14h30 Paris
+  if(now.getDay()!==5) return false;      // pas vendredi
+  if(now.getDate()>7) return false;        // pas premier vendredi
+  const h=getParisHour();
+  return h>=14&&h<=15;                     // ±30 min autour de 14h30
+}
+
+// ── Toggle trailing SL ─────────────────────────────────────────────
+function alexToggleTrailing(){
+  alex.trailing=!alex.trailing;
+  const btn=document.getElementById('alex-trailing');
+  if(btn){btn.className='alex-on-btn '+(alex.trailing?'on':'off');btn.textContent=alex.trailing?'ON':'OFF';}
+  localStorage.setItem('alex_cfg',JSON.stringify({
+    capital:alex.capital,riskPct:alex.riskPct,market:alex.market,
+    maxPos:alex.maxPos,drawdownMax:alex.drawdownMax,trailing:alex.trailing,utConvMin:alex.utConvMin
+  }));
+  toast('🎯 Trailing SL '+(alex.trailing?'activé':'désactivé'),alex.trailing?'buy':'info');
+}
+
+// ── Toggle filtre session ──────────────────────────────────────────
+function toggleSessionFilter(){
+  const cur=localStorage.getItem('alti_session_filter')!=='0';
+  const next=!cur;
+  localStorage.setItem('alti_session_filter',next?'1':'0');
+  const btn=document.getElementById('btn-session-filter');
+  if(btn){btn.className='alex-on-btn '+(next?'on':'off');btn.textContent=next?'ON':'OFF';}
+  toast('🕐 Filtre session '+(next?'activé (8h-23h)':'désactivé (24/7)'),'info');
+}
+
+// ── Export CSV des trades ──────────────────────────────────────────
+function alexExportCSV(){
+  if(!alex.trades.length){toast('Aucun trade à exporter','warn');return;}
+  const hdr='Heure,Symbole,Direction,Marché,TF,Entrée,Sortie,P&L (€),Résultat,Score,★Unité\n';
+  const rows=alex.trades.map(t=>
+    `${t.time},${t.sym},${t.dir},${t.market},${t.tfMode},${t.entry?.toFixed(5)||''},${t.exit?.toFixed(5)||''},${t.pnl?.toFixed(2)||''},${t.result},${t.score||''},${t.utConv||''}`
+  ).join('\n');
+  const blob=new Blob([hdr+rows],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`alex_trades_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('📥 Export CSV téléchargé','buy');
 }
 
 function alexRenderAll(){
@@ -1782,6 +1968,16 @@ function alexRenderStats(){
     wrEl.style.color=wr>=50?'var(--green)':wr!==null?'var(--red)':'var(--muted)';
   }
   if(nEl) nEl.textContent=closed.length;
+  // Drawdown courant
+  const ddEl=document.getElementById('alex-drawdown-val');
+  if(ddEl){
+    const dd=(alex.peakEquity-alex.equity)/alex.peakEquity*100;
+    ddEl.textContent=dd.toFixed(1)+' %';
+    ddEl.style.color=dd>=alex.drawdownMax?'var(--red)':dd>=alex.drawdownMax*0.7?'var(--yellow)':'var(--green)';
+  }
+  // Avertissement NFP
+  const nfpEl=document.getElementById('alex-nfp-warn');
+  if(nfpEl) nfpEl.textContent=isNFPTime?.()?'⚠ NFP':'';
 
   // Forex vs Crypto
   const fxTrades=closed.filter(t=>t.market==='Forex');
@@ -2002,10 +2198,29 @@ function alexInit(){
   const capitalEl=document.getElementById('alex-capital');
   const riskEl=document.getElementById('alex-risk');
   const marketEl=document.getElementById('alex-market');
+  const maxposEl=document.getElementById('alex-maxpos');
+  const drawdownEl=document.getElementById('alex-drawdown');
+  const utconvEl=document.getElementById('alex-utconv');
   if(capitalEl) capitalEl.value=alex.capital;
   if(riskEl) riskEl.value=alex.riskPct;
   if(marketEl) marketEl.value=alex.market;
-  // Restaurer l'état ON/OFF sauvegardé
+  if(maxposEl) maxposEl.value=alex.maxPos;
+  if(drawdownEl) drawdownEl.value=alex.drawdownMax;
+  if(utconvEl) utconvEl.value=alex.utConvMin;
+  // Trailing SL
+  const trailingBtn=document.getElementById('alex-trailing');
+  if(trailingBtn){
+    trailingBtn.className='alex-on-btn '+(alex.trailing?'on':'off');
+    trailingBtn.textContent=alex.trailing?'ON':'OFF';
+  }
+  // Filtre session
+  const sessionBtn=document.getElementById('btn-session-filter');
+  if(sessionBtn){
+    const on=localStorage.getItem('alti_session_filter')!=='0';
+    sessionBtn.className='alex-on-btn '+(on?'on':'off');
+    sessionBtn.textContent=on?'ON':'OFF';
+  }
+  // Robot ON/OFF
   const savedOn=localStorage.getItem('alex_on');
   if(savedOn==='1'){
     alex.on=true;
