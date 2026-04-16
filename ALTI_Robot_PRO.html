@@ -1075,17 +1075,76 @@ function toIntraday(daily,tf){
   return out;
 }
 
+// ── Yahoo Finance — OHLCV réel gratuit sans clé API ───────────────
+const YH_SYM={
+  'EUR/USD':'EURUSD=X','GBP/USD':'GBPUSD=X','USD/JPY':'USDJPY=X',
+  'AUD/USD':'AUDUSD=X','EUR/GBP':'EURGBP=X','USD/CAD':'USDCAD=X',
+  'NZD/USD':'NZDUSD=X','USD/CHF':'USDCHF=X'
+};
+// interval Yahoo → [interval_param, range_param, ttl_ms]
+const YH_CFG={
+  'm1' :['1m' ,'1d'  , 60000],
+  'm5' :['5m' ,'5d'  ,300000],
+  'm15':['15m','60d' ,900000],
+  'H1' :['1h' ,'730d',3600000],
+  'H4' :['1h' ,'730d',3600000], // agrégé depuis H1
+  'D1' :['1d' ,'2y'  ,86400000],
+};
+
+async function getYahooForexCandles(asset,tf){
+  const sym=YH_SYM[asset.sym];
+  if(!sym) throw new Error('no YH sym');
+  const key=`${asset.sym}_${tf}`;
+  const [interval,range,ttl]=YH_CFG[tf]||YH_CFG['H1'];
+  if(candleCache[key]&&Date.now()-(cacheTime[key]||0)<ttl) return candleCache[key];
+
+  // Deux endpoints Yahoo en fallback l'un sur l'autre
+  const urls=[
+    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}`,
+  ];
+  let result=null;
+  for(const url of urls){
+    try{
+      const r=await fetch(url,{signal:AbortSignal.timeout(7000)});
+      if(!r.ok) continue;
+      const d=await r.json();
+      result=d.chart?.result?.[0];
+      if(result?.timestamp) break;
+    }catch(e){}
+  }
+  if(!result?.timestamp) throw new Error('Yahoo: no data');
+
+  const ts=result.timestamp;
+  const q=result.indicators.quote[0];
+  let candles=ts.map((t,i)=>({
+    t:t*1000, o:+q.open[i], h:+q.high[i], l:+q.low[i], c:+q.close[i]
+  })).filter(c=>c.o>0&&c.h>0&&c.l>0&&c.c>0&&!isNaN(c.c));
+
+  if(tf==='H4') candles=groupToH4(candles);
+  if(candles.length<52) throw new Error(`Yahoo: seulement ${candles.length} bougies`);
+
+  candleCache[key]=candles; cacheTime[key]=Date.now();
+  forexSource[asset.sym]='yahoo';
+  return candles;
+}
+
 async function getForexCandles(asset,tf){
-  // Priorité 1 : Finnhub (gratuit, WebSocket + OHLCV réels)
+  // Priorité 1 : Finnhub (premium)
   if(finnhubKey){
     try{return await getFinnhubCandles(asset,tf);}
-    catch(e){console.warn('Finnhub→TD:',asset.sym,tf,e.message);}
+    catch(e){console.warn('Finnhub→YH:',asset.sym,tf,e.message);}
   }
-  // Priorité 2 : Twelve Data (bougies H4 incluses)
+  // Priorité 2 : Twelve Data (clé utilisateur)
   if(twelveDataKey){
     try{return await getTDCandles(asset,tf);}
-    catch(e){console.warn('TD→BCE:',asset.sym,tf,e.message);}
+    catch(e){console.warn('TD→YH:',asset.sym,tf,e.message);}
   }
+  // Priorité 3 : Yahoo Finance — vraies bougies OHLCV, sans clé, gratuit
+  try{return await getYahooForexCandles(asset,tf);}
+  catch(e){console.warn('Yahoo→BCE:',asset.sym,tf,e.message);}
+
+  // Fallback final : BCE daily → intraday synthétique
   const key=`${asset.sym}_${tf}`;
   if(candleCache[key]&&Date.now()-(cacheTime[key]||0)<3600000) return candleCache[key];
   const all=await loadForexDaily();
@@ -1131,14 +1190,17 @@ async function updateLiveForex(){
         if(!priceHistory[a.sym]) priceHistory[a.sym]=[];
         priceHistory[a.sym].push({t:Date.now(),p:closes[a.sym]});
         if(priceHistory[a.sym].length>PRICE_HIST_MAX) priceHistory[a.sym].shift();
+        // Mettre à jour le close de la dernière bougie en cache (sans tout effacer)
+        ['m1','m5','m15','H1','H4','D1'].forEach(tf=>{
+          const k=`${a.sym}_${tf}`;
+          if(candleCache[k]?.length){
+            const last=candleCache[k][candleCache[k].length-1];
+            last.c=closes[a.sym];
+            last.h=Math.max(last.h,last.c);
+            last.l=Math.min(last.l,last.c);
+          }
+        });
       }
-    });
-    // Invalider cache intraday
-    FOREX.forEach(a=>{
-      ['m1','m5','m15','H1','H4'].forEach(tf=>{
-        delete candleCache[`${a.sym}_${tf}`];
-        delete cacheTime[`${a.sym}_${tf}`];
-      });
     });
     if(!twelveDataKey&&document.getElementById('src-txt').textContent.includes('open.er')){
       // silencieux — déjà affiché
@@ -1400,8 +1462,8 @@ function renderCard(asset,iTrend,iCtx,iEntry,sig,goodHour){
   const stars=sig?'⭐'.repeat(sig.utConv)+'☆'.repeat(3-sig.utConv):'☆☆☆';
   const price=livePrices[asset.sym]??iEntry?.close;
   const isCrypto=!!asset.bin;
-  const srcDot=isCrypto?'dot-g':twelveDataKey?'dot-g':forexSource[asset.sym]==='bce'?'dot-b':'dot-y';
-  const srcLbl=isCrypto?'Binance WS':twelveDataKey?'Twelve Data WS':forexSource[asset.sym]==='bce'?'BCE':'Estimé';
+  const srcDot=isCrypto?'dot-g':twelveDataKey?'dot-g':forexSource[asset.sym]==='yahoo'?'dot-g':forexSource[asset.sym]==='bce'?'dot-b':'dot-y';
+  const srcLbl=isCrypto?'Binance WS':twelveDataKey?'Twelve Data WS':forexSource[asset.sym]==='yahoo'?'Yahoo Finance':forexSource[asset.sym]==='bce'?'BCE':'Estimé';
 
   card.innerHTML=`
     <div class="sc-head">
@@ -1542,7 +1604,7 @@ async function startRobot(){
     document.getElementById('src-txt').textContent='📡 Binance WS + Twelve Data (bougies) + open.er-api.com';
   } else {
     setLiveDot('partial');
-    document.getElementById('src-txt').textContent='📡 Binance WS + open.er-api.com (forex/h)';
+    document.getElementById('src-txt').textContent='📡 Binance WS (crypto) + Yahoo Finance (forex OHLCV réel)';
   }
 
   // 5. Premier scan
