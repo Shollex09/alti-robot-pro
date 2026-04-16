@@ -184,6 +184,26 @@ select{background:#141820;color:var(--text);border:1px solid #252d3d;border-radi
 .alex-pos-info{font-size:9px;color:var(--muted)}
 .alex-pos-chart{width:100%;height:46px;border-radius:3px;margin-top:5px;display:block;background:#0c1017}
 .alex-equity-curve{width:100%;height:60px;border-radius:4px;margin-bottom:8px;display:block;background:#0c1017}
+/* ── BACKTEST ───────────────────────────────────────────────────── */
+#bt-panel{flex:1;display:none;flex-direction:column;overflow:hidden;min-height:0;background:#0c1017}
+#bt-panel.show{display:flex}
+.bt-scroll{flex:1;overflow-y:auto;padding:8px;min-height:0}
+.bt-stats-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px}
+.bt-stat{background:#111720;border-radius:5px;padding:5px 6px;text-align:center}
+.bt-sv{font-size:12px;font-family:var(--mono);font-weight:700}
+.bt-sl{font-size:8px;color:var(--muted);text-transform:uppercase;margin-top:1px}
+.bt-equity-canvas{width:100%;height:90px;border-radius:4px;margin:6px 0;display:block;background:#0c1017}
+.bt-param-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;font-size:10px}
+.bt-param-lbl{color:var(--muted);font-family:var(--mono);font-size:9px}
+.bt-param-inp{width:65px;padding:2px 5px;background:#0c1017;border:1px solid #252d3d;border-radius:3px;color:var(--text);font-family:var(--mono);font-size:10px}
+.bt-run-btn{width:100%;padding:7px;background:linear-gradient(90deg,#005533,#003322);border:1px solid var(--green);border-radius:5px;color:var(--green);font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.05em;margin-top:6px}
+.bt-run-btn:hover{background:linear-gradient(90deg,#007744,#004433)}
+.bt-run-btn:disabled{opacity:.5;cursor:default}
+.bt-progress{font-size:9px;font-family:var(--mono);color:var(--muted);text-align:center;padding:4px;min-height:16px}
+.bt-section-title{font-size:9px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:8px 0 4px}
+.bt-badge{display:inline-block;font-size:8px;font-family:var(--mono);padding:1px 5px;border-radius:3px;margin-left:4px}
+.bt-badge.good{background:rgba(0,255,170,.1);color:var(--green)}
+.bt-badge.bad{background:rgba(255,34,85,.1);color:var(--red)}
 /* Historique */
 .alex-trade{display:flex;justify-content:space-between;align-items:center;padding:4px 6px;border-radius:4px;margin-bottom:2px;font-family:var(--mono);font-size:10px}
 .alex-trade.win{background:rgba(0,255,170,.05);border-left:2px solid var(--green)}
@@ -364,6 +384,7 @@ select{background:#141820;color:var(--text);border:1px solid #252d3d;border-radi
   <div class="ap-tabs">
     <button class="ap-tab active" id="tab-alerts" onclick="switchTab('alerts')">📡 Alertes</button>
     <button class="ap-tab" id="tab-alex" onclick="switchTab('alex')">🤖 Alex</button>
+    <button class="ap-tab" id="tab-bt" onclick="switchTab('backtest')">📊 Backtest</button>
   </div>
 
   <!-- CONTENU ALERTES -->
@@ -505,6 +526,139 @@ select{background:#141820;color:var(--text);border:1px solid #252d3d;border-radi
         <span id="alex-hist-count" style="font-size:9px;font-family:var(--mono);color:var(--muted)">0 trades</span>
       </div>
       <div id="alex-hist-list"><div style="color:#3a4555;font-size:9px;font-family:var(--mono);text-align:center;padding:8px">Aucun trade fermé</div></div>
+
+    </div>
+  </div>
+
+  <!-- ══ PANEL BACKTEST ══════════════════════════════════════════ -->
+  <div id="bt-panel">
+    <div class="bt-scroll">
+
+      <!-- CONFIG -->
+      <div class="alex-cfg">
+        <div class="alex-cfg-title">📊 Backtest — Test de stratégie historique</div>
+
+        <div class="bt-param-row">
+          <span class="bt-param-lbl">Stratégie</span>
+          <select class="bt-param-inp" id="bt-strategy" style="width:130px" onchange="btUpdateParams()">
+            <option value="ichimoku">Ichimoku (actuel)</option>
+            <option value="ichi_rsi">Ichimoku + RSI</option>
+            <option value="ema">Croisement EMA</option>
+            <option value="rsi">RSI Mean Reversion</option>
+            <option value="bb">Bollinger Bands</option>
+          </select>
+        </div>
+        <div class="bt-param-row">
+          <span class="bt-param-lbl">Actif</span>
+          <select class="bt-param-inp" id="bt-asset" style="width:130px">
+            <optgroup label="Forex">
+              <option value="EUR/USD">EUR/USD</option>
+              <option value="GBP/USD">GBP/USD</option>
+              <option value="USD/JPY">USD/JPY</option>
+              <option value="AUD/USD">AUD/USD</option>
+              <option value="EUR/GBP">EUR/GBP</option>
+              <option value="USD/CAD">USD/CAD</option>
+              <option value="NZD/USD">NZD/USD</option>
+              <option value="USD/CHF">USD/CHF</option>
+            </optgroup>
+            <optgroup label="Crypto">
+              <option value="BTC/USDT">BTC/USDT</option>
+              <option value="ETH/USDT">ETH/USDT</option>
+              <option value="BNB/USDT">BNB/USDT</option>
+              <option value="SOL/USDT">SOL/USDT</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="bt-param-row">
+          <span class="bt-param-lbl">Timeframe</span>
+          <select class="bt-param-inp" id="bt-tf" style="width:130px" onchange="btUpdateParams()">
+            <option value="H1">H1 (recommandé)</option>
+            <option value="H4">H4</option>
+            <option value="D1">D1</option>
+            <option value="m15">m15</option>
+          </select>
+        </div>
+        <div class="bt-param-row">
+          <span class="bt-param-lbl">Période</span>
+          <select class="bt-param-inp" id="bt-period" style="width:130px">
+            <option value="3mo">3 mois</option>
+            <option value="6mo">6 mois</option>
+            <option value="1y" selected>1 an</option>
+            <option value="2y">2 ans</option>
+          </select>
+        </div>
+        <div class="bt-param-row">
+          <span class="bt-param-lbl">Risk/Reward</span>
+          <select class="bt-param-inp" id="bt-rr" style="width:130px">
+            <option value="1">1:1</option>
+            <option value="1.5">1:1.5</option>
+            <option value="2" selected>1:2</option>
+            <option value="3">1:3</option>
+            <option value="4">1:4</option>
+          </select>
+        </div>
+        <div class="bt-param-row">
+          <span class="bt-param-lbl">Capital test (€)</span>
+          <input class="bt-param-inp" type="number" id="bt-capital" value="10000" min="100">
+        </div>
+        <div class="bt-param-row">
+          <span class="bt-param-lbl">Risque / trade</span>
+          <select class="bt-param-inp" id="bt-riskpct" style="width:130px">
+            <option value="1">1 %</option>
+            <option value="2" selected>2 %</option>
+            <option value="3">3 %</option>
+            <option value="5">5 %</option>
+          </select>
+        </div>
+
+        <!-- Paramètres Ichimoku -->
+        <div id="bt-p-ichi" class="bt-param-block">
+          <div class="bt-section-title">Paramètres Ichimoku</div>
+          <div class="bt-param-row"><span class="bt-param-lbl">Score min (/ 4)</span>
+            <select class="bt-param-inp" id="bt-ichi-score">
+              <option value="2">2</option><option value="3" selected>3</option><option value="4">4</option>
+            </select></div>
+        </div>
+
+        <!-- Paramètres Ichimoku + RSI -->
+        <div id="bt-p-ichirsi" class="bt-param-block" style="display:none">
+          <div class="bt-section-title">Ichimoku + Filtre RSI</div>
+          <div class="bt-param-row"><span class="bt-param-lbl">Score min</span>
+            <select class="bt-param-inp" id="bt-ir-score"><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option></select></div>
+          <div class="bt-param-row"><span class="bt-param-lbl">RSI max BUY</span><input class="bt-param-inp" id="bt-ir-rsimax" type="number" value="70"></div>
+          <div class="bt-param-row"><span class="bt-param-lbl">RSI min SELL</span><input class="bt-param-inp" id="bt-ir-rsimin" type="number" value="30"></div>
+        </div>
+
+        <!-- Paramètres EMA -->
+        <div id="bt-p-ema" class="bt-param-block" style="display:none">
+          <div class="bt-section-title">Croisement EMA</div>
+          <div class="bt-param-row"><span class="bt-param-lbl">EMA rapide</span><input class="bt-param-inp" id="bt-ema-fast" type="number" value="9"></div>
+          <div class="bt-param-row"><span class="bt-param-lbl">EMA lente</span><input class="bt-param-inp" id="bt-ema-slow" type="number" value="21"></div>
+          <div class="bt-param-row"><span class="bt-param-lbl">SL (× ATR)</span><input class="bt-param-inp" id="bt-ema-sl" type="number" value="2" step="0.5"></div>
+        </div>
+
+        <!-- Paramètres RSI -->
+        <div id="bt-p-rsi" class="bt-param-block" style="display:none">
+          <div class="bt-section-title">RSI Mean Reversion</div>
+          <div class="bt-param-row"><span class="bt-param-lbl">Période RSI</span><input class="bt-param-inp" id="bt-rsi-period" type="number" value="14"></div>
+          <div class="bt-param-row"><span class="bt-param-lbl">Survente (BUY)</span><input class="bt-param-inp" id="bt-rsi-os" type="number" value="30"></div>
+          <div class="bt-param-row"><span class="bt-param-lbl">Surachat (SELL)</span><input class="bt-param-inp" id="bt-rsi-ob" type="number" value="70"></div>
+          <div class="bt-param-row"><span class="bt-param-lbl">SL (× ATR)</span><input class="bt-param-inp" id="bt-rsi-sl" type="number" value="2" step="0.5"></div>
+        </div>
+
+        <!-- Paramètres Bollinger -->
+        <div id="bt-p-bb" class="bt-param-block" style="display:none">
+          <div class="bt-section-title">Bollinger Bands</div>
+          <div class="bt-param-row"><span class="bt-param-lbl">Période</span><input class="bt-param-inp" id="bt-bb-period" type="number" value="20"></div>
+          <div class="bt-param-row"><span class="bt-param-lbl">Écart-type</span><input class="bt-param-inp" id="bt-bb-mult" type="number" value="2" step="0.5"></div>
+        </div>
+
+        <button class="bt-run-btn" id="bt-run-btn" onclick="runBacktest()">▶ Lancer le Backtest</button>
+        <div class="bt-progress" id="bt-progress"></div>
+      </div>
+
+      <!-- RÉSULTATS -->
+      <div id="bt-results" style="display:none"></div>
 
     </div>
   </div>
@@ -1641,19 +1795,25 @@ function stopRobot(){
 function switchTab(tab){
   const alertsContent=document.getElementById('alerts-content');
   const alexPanel=document.getElementById('alex-panel');
+  const btPanel=document.getElementById('bt-panel');
   const tabAlerts=document.getElementById('tab-alerts');
   const tabAlex=document.getElementById('tab-alex');
+  const tabBt=document.getElementById('tab-bt');
+  // Reset all
+  alertsContent.style.display='none';
+  alexPanel.className='';
+  btPanel.className='';
+  [tabAlerts,tabAlex,tabBt].forEach(t=>{if(t)t.className='ap-tab';});
   if(tab==='alerts'){
     alertsContent.style.display='';
-    alexPanel.className='';
     tabAlerts.className='ap-tab active';
-    tabAlex.className='ap-tab';
-  } else {
-    alertsContent.style.display='none';
+  } else if(tab==='alex'){
     alexPanel.className='show';
-    tabAlerts.className='ap-tab';
     tabAlex.className='ap-tab active';
     alexRenderAll();
+  } else {
+    btPanel.className='show';
+    tabBt.className='ap-tab active';
   }
 }
 
@@ -2387,6 +2547,343 @@ renderAlertPanel = function(flash){
   updateMobBadge();
 };
 updateMobBadge();
+
+// ══════════════════════════════════════════════════════════════════
+//  BACKTEST ENGINE
+// ══════════════════════════════════════════════════════════════════
+const btCache={};
+
+// ── Indicateurs ───────────────────────────────────────────────────
+function calcEMAArr(prices,period){
+  const k=2/(period+1); const out=[prices[0]];
+  for(let i=1;i<prices.length;i++) out.push(prices[i]*k+out[i-1]*(1-k));
+  return out;
+}
+function calcATR(candles,period=14){
+  if(candles.length<2) return 0;
+  const trs=[];
+  for(let i=1;i<candles.length;i++){
+    trs.push(Math.max(candles[i].h-candles[i].l,Math.abs(candles[i].h-candles[i-1].c),Math.abs(candles[i].l-candles[i-1].c)));
+  }
+  const last=trs.slice(-period);
+  return last.reduce((s,v)=>s+v,0)/last.length;
+}
+function calcBBands(candles,period=20,mult=2){
+  if(candles.length<period) return null;
+  const cl=candles.slice(-period).map(c=>c.c);
+  const mid=cl.reduce((s,v)=>s+v,0)/period;
+  const std=Math.sqrt(cl.reduce((s,v)=>s+(v-mid)**2,0)/period);
+  return{upper:mid+std*mult,mid,lower:mid-std*mult};
+}
+
+// ── Signaux par stratégie ──────────────────────────────────────────
+function btSigIchimoku(candles,idx,params){
+  const slice=candles.slice(0,idx+1);
+  const ichi=calcIchi(slice);
+  if(!ichi||ichi.trend==='NEU') return null;
+  const up=ichi.trend==='UP';
+  const score=[true,up?ichi.kumoUp:!ichi.kumoUp,
+    up?(ichi.aboveKijun&&ichi.aboveTenkan):(!ichi.aboveKijun&&!ichi.aboveTenkan),
+    up?ichi.aboveKumo:ichi.belowKumo].filter(Boolean).length;
+  if(score<params.minScore) return null;
+  if(params.rsiFilter){
+    const rsi=calcRSI(slice);
+    if(up&&rsi>=params.rsiMax) return null;
+    if(!up&&rsi<=params.rsiMin) return null;
+  }
+  const entry=candles[idx].c;
+  const buf=params.pip*3;
+  const sl=up?Math.min(ichi.kijun,ichi.kBot,candles[idx].l)-buf:Math.max(ichi.kijun,ichi.kTop,candles[idx].h)+buf;
+  const risk=Math.abs(entry-sl)||params.pip*10;
+  return{dir:up?'BUY':'SELL',entry,sl,tp:up?entry+risk*params.rr:entry-risk*params.rr};
+}
+function btSigEMA(candles,idx,params){
+  if(idx<params.slow+1) return null;
+  const cl=candles.slice(0,idx+1).map(c=>c.c);
+  const fa=calcEMAArr(cl,params.fast), sa=calcEMAArr(cl,params.slow);
+  const crossUp=fa[fa.length-2]<=sa[sa.length-2]&&fa[fa.length-1]>sa[sa.length-1];
+  const crossDn=fa[fa.length-2]>=sa[sa.length-2]&&fa[fa.length-1]<sa[sa.length-1];
+  if(!crossUp&&!crossDn) return null;
+  const up=crossUp; const entry=candles[idx].c;
+  const atr=calcATR(candles.slice(0,idx+1));
+  const sl=up?entry-atr*params.slMult:entry+atr*params.slMult;
+  const risk=Math.abs(entry-sl)||atr;
+  return{dir:up?'BUY':'SELL',entry,sl,tp:up?entry+risk*params.rr:entry-risk*params.rr};
+}
+function btSigRSI(candles,idx,params){
+  if(idx<params.period+2) return null;
+  const rsi=calcRSI(candles.slice(0,idx+1),params.period);
+  const prevRsi=calcRSI(candles.slice(0,idx),params.period);
+  const crossOs=prevRsi>=params.oversold&&rsi<params.oversold;
+  const crossOb=prevRsi<=params.overbought&&rsi>params.overbought;
+  if(!crossOs&&!crossOb) return null;
+  const up=crossOs; const entry=candles[idx].c;
+  const atr=calcATR(candles.slice(0,idx+1));
+  const sl=up?entry-atr*params.slMult:entry+atr*params.slMult;
+  const risk=Math.abs(entry-sl)||atr;
+  return{dir:up?'BUY':'SELL',entry,sl,tp:up?entry+risk*params.rr:entry-risk*params.rr};
+}
+function btSigBB(candles,idx,params){
+  if(idx<params.period+1) return null;
+  const slice=candles.slice(0,idx+1);
+  const bb=calcBBands(slice,params.period,params.mult);
+  if(!bb) return null;
+  const c=candles[idx];
+  const touchL=c.l<=bb.lower, touchU=c.h>=bb.upper;
+  if(!touchL&&!touchU) return null;
+  const up=touchL; const entry=c.c;
+  const sl=up?bb.lower-params.pip*5:bb.upper+params.pip*5;
+  const risk=Math.abs(entry-sl)||params.pip*10;
+  return{dir:up?'BUY':'SELL',entry,sl,tp:up?entry+risk*params.rr:entry-risk*params.rr};
+}
+
+// ── Fetch données historiques ──────────────────────────────────────
+async function btFetchCandles(assetSym,tf,period){
+  const k=`bt_${assetSym}_${tf}_${period}`;
+  if(btCache[k]) return btCache[k];
+  const asset=ASSETS.find(a=>a.sym===assetSym);
+  if(!asset) throw new Error('Actif inconnu');
+  let candles;
+  if(asset.bin){
+    candles=await btFetchBinance(asset,tf,period);
+  } else {
+    candles=await btFetchYahoo(asset,tf,period);
+  }
+  btCache[k]=candles;
+  return candles;
+}
+async function btFetchYahoo(asset,tf,period){
+  const sym=YH_SYM[asset.sym];
+  if(!sym) throw new Error('Symbole Yahoo introuvable');
+  const tfMap={'D1':'1d','H4':'1h','H1':'1h','m15':'15m','m5':'5m'};
+  const rangeMap={'1mo':'1mo','3mo':'3mo','6mo':'6mo','1y':'1y','2y':'730d'};
+  const interval=tfMap[tf]||'1h', range=rangeMap[period]||'1y';
+  const urls=[
+    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}`
+  ];
+  let res=null;
+  for(const url of urls){
+    try{const r=await fetch(url,{signal:AbortSignal.timeout(12000)});if(!r.ok)continue;const d=await r.json();res=d.chart?.result?.[0];if(res?.timestamp)break;}catch(e){}
+  }
+  if(!res?.timestamp) throw new Error('Yahoo Finance inaccessible — réessaie');
+  let candles=res.timestamp.map((t,i)=>({
+    t:t*1000,o:+res.indicators.quote[0].open[i],h:+res.indicators.quote[0].high[i],
+    l:+res.indicators.quote[0].low[i],c:+res.indicators.quote[0].close[i]
+  })).filter(c=>c.o>0&&c.c>0&&!isNaN(c.c));
+  if(tf==='H4') candles=groupToH4(candles);
+  return candles;
+}
+async function btFetchBinance(asset,tf,period){
+  const intMap={'m1':'1m','m5':'5m','m15':'15m','H1':'1h','H4':'4h','D1':'1d'};
+  const daysMap={'1mo':30,'3mo':90,'6mo':180,'1y':365,'2y':730};
+  const interval=intMap[tf]||'1h', days=daysMap[period]||365;
+  let candles=[], from=Date.now()-days*86400000;
+  for(let page=0;page<15;page++){
+    const url=`https://api.binance.com/api/v3/klines?symbol=${asset.bin}&interval=${interval}&startTime=${from}&limit=1000`;
+    const r=await fetch(url,{signal:AbortSignal.timeout(10000)});
+    if(!r.ok) break;
+    const d=await r.json();
+    if(!d.length) break;
+    d.forEach(k=>candles.push({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]}));
+    if(d.length<1000) break;
+    from=d[d.length-1][0]+1;
+    await new Promise(r=>setTimeout(r,150));
+  }
+  return candles;
+}
+
+// ── Paramètres stratégie ───────────────────────────────────────────
+function btGetParams(strategy,pip,rr){
+  const v=id=>{const el=document.getElementById(id);return el?+el.value:0;};
+  switch(strategy){
+    case 'ichimoku': return{pip,rr,warmup:52,minScore:v('bt-ichi-score')||3,rsiFilter:false};
+    case 'ichi_rsi': return{pip,rr,warmup:52,minScore:v('bt-ir-score')||3,rsiFilter:true,rsiMax:v('bt-ir-rsimax')||70,rsiMin:v('bt-ir-rsimin')||30};
+    case 'ema':      return{pip,rr,warmup:200,fast:v('bt-ema-fast')||9,slow:v('bt-ema-slow')||21,slMult:v('bt-ema-sl')||2};
+    case 'rsi':      return{pip,rr,warmup:50,period:v('bt-rsi-period')||14,oversold:v('bt-rsi-os')||30,overbought:v('bt-rsi-ob')||70,slMult:v('bt-rsi-sl')||2};
+    case 'bb':       return{pip,rr,warmup:50,period:v('bt-bb-period')||20,mult:v('bt-bb-mult')||2};
+    default:         return{pip,rr,warmup:52};
+  }
+}
+
+// ── Moteur principal ───────────────────────────────────────────────
+async function runBacktest(){
+  const strategy=document.getElementById('bt-strategy').value;
+  const assetSym=document.getElementById('bt-asset').value;
+  const tf=document.getElementById('bt-tf').value;
+  const period=document.getElementById('bt-period').value;
+  const rr=parseFloat(document.getElementById('bt-rr').value)||2;
+  const capital=parseFloat(document.getElementById('bt-capital').value)||10000;
+  const riskPct=parseFloat(document.getElementById('bt-riskpct').value)||2;
+  const asset=ASSETS.find(a=>a.sym===assetSym);
+  if(!asset){toast('Actif introuvable','warn');return;}
+  const btn=document.getElementById('bt-run-btn');
+  const prog=document.getElementById('bt-progress');
+  btn.disabled=true; btn.textContent='⟳ Chargement…';
+  prog.textContent='⟳ Récupération des données historiques…';
+  document.getElementById('bt-results').style.display='none';
+  try{
+    const candles=await btFetchCandles(assetSym,tf,period);
+    if(candles.length<100) throw new Error(`Données insuffisantes (${candles.length} bougies)`);
+    prog.textContent=`✓ ${candles.length} bougies · Simulation en cours…`;
+    const params=btGetParams(strategy,asset.pip,rr);
+    const warmup=Math.max(52,params.warmup||52);
+    let curEq=capital, openPos=null;
+    const trades=[], equity=[capital];
+    for(let i=warmup;i<candles.length;i++){
+      const c=candles[i];
+      if(openPos){
+        const isBuy=openPos.dir==='BUY';
+        const hitSL=isBuy?c.l<=openPos.sl:c.h>=openPos.sl;
+        const hitTP=isBuy?c.h>=openPos.tp:c.l<=openPos.tp;
+        if(hitSL||hitTP){
+          const exitP=hitTP?openPos.tp:openPos.sl;
+          const pnl=(isBuy?1:-1)*(exitP-openPos.entry)*openPos.units;
+          curEq+=pnl;
+          trades.push({dir:openPos.dir,entry:openPos.entry,exit:exitP,sl:openPos.sl,tp:openPos.tp,
+            pnl,result:hitTP?'WIN':'LOSS',
+            entryTime:new Date(openPos.t).toLocaleDateString('fr-FR'),
+            exitTime:new Date(c.t).toLocaleDateString('fr-FR'),sym:assetSym});
+          equity.push(curEq);
+          openPos=null;
+        }
+      }
+      if(!openPos){
+        let sig=null;
+        if(strategy==='ichimoku'||strategy==='ichi_rsi') sig=btSigIchimoku(candles,i,params);
+        else if(strategy==='ema')  sig=btSigEMA(candles,i,params);
+        else if(strategy==='rsi')  sig=btSigRSI(candles,i,params);
+        else if(strategy==='bb')   sig=btSigBB(candles,i,params);
+        if(sig){
+          const risk=curEq*(riskPct/100);
+          const slDist=Math.abs(sig.entry-sig.sl)||asset.pip*10;
+          openPos={...sig,t:c.t,units:risk/slDist};
+        }
+      }
+    }
+    // Position ouverte à la fin
+    if(openPos){
+      const lastC=candles[candles.length-1];
+      const isBuy=openPos.dir==='BUY';
+      const pnl=(isBuy?1:-1)*(lastC.c-openPos.entry)*openPos.units;
+      curEq+=pnl;
+      trades.push({dir:openPos.dir,entry:openPos.entry,exit:lastC.c,pnl,result:pnl>=0?'WIN':'LOSS',
+        open:true,entryTime:new Date(openPos.t).toLocaleDateString('fr-FR'),exitTime:'En cours',sym:assetSym});
+      equity.push(curEq);
+    }
+    prog.textContent=`✓ ${trades.length} trades simulés sur ${candles.length} bougies`;
+    btShowResults({trades,equity,capital,assetSym,tf,period,strategy});
+  }catch(e){
+    prog.textContent='✗ '+e.message;
+    toast('Erreur backtest: '+e.message,'warn');
+  }finally{
+    btn.disabled=false; btn.textContent='▶ Lancer le Backtest';
+  }
+}
+
+// ── Affichage résultats ────────────────────────────────────────────
+function btShowResults({trades,equity,capital,assetSym,tf,period,strategy}){
+  const el=document.getElementById('bt-results');
+  el.style.display='';
+  if(!trades.length){el.innerHTML='<div style="color:var(--muted);text-align:center;padding:16px;font-size:10px">Aucun signal sur cette période.<br>Essaie un score min plus bas ou une autre stratégie.</div>';return;}
+  const wins=trades.filter(t=>t.result==='WIN');
+  const losses=trades.filter(t=>t.result==='LOSS');
+  const wr=Math.round(wins.length/trades.length*100);
+  const totalPnl=equity[equity.length-1]-capital;
+  const pct=(totalPnl/capital*100).toFixed(1);
+  const maxDD=btMaxDD(equity);
+  const avgWin=wins.length?wins.reduce((s,t)=>s+t.pnl,0)/wins.length:0;
+  const avgLoss=losses.length?losses.reduce((s,t)=>s+t.pnl,0)/losses.length:0;
+  const pf=losses.length&&avgLoss!==0?Math.abs((wins.length*avgWin)/(losses.length*avgLoss)).toFixed(2):'∞';
+  const sign=totalPnl>=0?'+':'';
+  const pnlCol=totalPnl>=0?'var(--green)':'var(--red)';
+  const stratNames={ichimoku:'Ichimoku',ichi_rsi:'Ichimoku+RSI',ema:'EMA Cross',rsi:'RSI MR',bb:'Bollinger'};
+  el.innerHTML=`
+    <div class="alex-cfg" style="padding:6px 8px;margin-bottom:6px">
+      <div style="font-size:8px;font-family:var(--mono);color:var(--muted);margin-bottom:4px">${stratNames[strategy]||strategy} · ${assetSym} · ${tf} · ${period}</div>
+      <div class="bt-stats-grid">
+        <div class="bt-stat"><div class="bt-sv" style="color:${pnlCol}">${sign}€${Math.round(totalPnl).toLocaleString('fr-FR')}</div><div class="bt-sl">P&L net</div></div>
+        <div class="bt-stat"><div class="bt-sv" style="color:${pnlCol}">${sign}${pct}%</div><div class="bt-sl">Rendement</div></div>
+        <div class="bt-stat"><div class="bt-sv" style="color:${wr>=50?'var(--green)':'var(--red)'}">${wr}%</div><div class="bt-sl">Win rate</div></div>
+        <div class="bt-stat"><div class="bt-sv">${trades.length}</div><div class="bt-sl">Trades</div></div>
+        <div class="bt-stat"><div class="bt-sv" style="color:${maxDD<15?'var(--green)':maxDD<25?'var(--yellow)':'var(--red)'}">${maxDD.toFixed(1)}%</div><div class="bt-sl">Max DD</div></div>
+        <div class="bt-stat"><div class="bt-sv" style="color:${pf>=1.5?'var(--green)':pf>=1?'var(--yellow)':'var(--red)'}">${pf}</div><div class="bt-sl">Profit Factor</div></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;font-family:var(--mono);color:var(--muted);margin-top:4px">
+        <span>✓ Gain moyen <span style="color:var(--green)">+€${Math.round(avgWin)}</span></span>
+        <span>✗ Perte moy. <span style="color:var(--red)">−€${Math.round(Math.abs(avgLoss))}</span></span>
+      </div>
+    </div>
+    <div class="alex-cfg-title" style="margin-bottom:3px">📈 Courbe d'équité</div>
+    <canvas id="bt-eq-cv" class="bt-equity-canvas"></canvas>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div class="alex-cfg-title" style="margin:0">📋 Derniers trades</div>
+      <button onclick="btExportCSV()" style="font-size:9px;font-family:var(--mono);padding:2px 7px;background:#131820;border:1px solid #252d3d;border-radius:3px;color:var(--blue);cursor:pointer">📥 CSV</button>
+    </div>
+    <div id="bt-tlist">${trades.slice(-30).reverse().map(t=>{
+      const s=t.pnl>=0?'+':'';
+      return`<div class="alex-trade ${t.result==='WIN'?'win':'loss'}" style="font-size:9px">
+        <span style="color:var(--muted);font-size:8px">${t.entryTime}</span>
+        <span style="font-weight:700">${t.sym}</span>
+        <span style="color:${t.dir==='BUY'?'var(--green)':'var(--red)'}">${t.dir==='BUY'?'▲':'▼'}</span>
+        <span style="font-family:var(--mono);color:${t.pnl>=0?'var(--green)':'var(--red)'};font-weight:700">${s}€${Math.abs(t.pnl).toFixed(0)}</span>
+      </div>`;
+    }).join('')}</div>
+  `;
+  // Stocker pour export CSV
+  window._btLastTrades=trades;
+  window._btLastAsset=assetSym;
+  requestAnimationFrame(()=>btDrawEq(equity,capital));
+}
+
+function btMaxDD(equity){
+  let peak=equity[0],maxDD=0;
+  equity.forEach(v=>{peak=Math.max(peak,v);maxDD=Math.max(maxDD,(peak-v)/peak*100);});
+  return maxDD;
+}
+function btDrawEq(equity,capital){
+  const cv=document.getElementById('bt-eq-cv');
+  if(!cv) return;
+  const W=cv.offsetWidth||300, H=cv.offsetHeight||90;
+  cv.width=W; cv.height=H;
+  const ctx=cv.getContext('2d');
+  let minV=Math.min(...equity,capital),maxV=Math.max(...equity,capital);
+  if(minV===maxV){minV*=0.99;maxV*=1.01;}
+  const pad=(maxV-minV)*0.08; minV-=pad; maxV+=pad;
+  const xS=i=>i/(equity.length-1)*W, yS=v=>H-(v-minV)/(maxV-minV)*H;
+  // Référence capital
+  ctx.setLineDash([3,3]);ctx.strokeStyle='rgba(132,142,156,0.3)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,yS(capital));ctx.lineTo(W,yS(capital));ctx.stroke();ctx.setLineDash([]);
+  const lastUp=equity[equity.length-1]>=capital;
+  ctx.strokeStyle=lastUp?'#00ffaa':'#ff2255';ctx.lineWidth=1.5;
+  ctx.beginPath();equity.forEach((v,i)=>i===0?ctx.moveTo(xS(i),yS(v)):ctx.lineTo(xS(i),yS(v)));ctx.stroke();
+  ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,lastUp?'rgba(0,255,170,0.18)':'rgba(255,34,85,0.18)');
+  g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g;ctx.fill();
+  ctx.fillStyle='rgba(132,142,156,0.6)';ctx.font='8px monospace';
+  ctx.fillText('€'+Math.round(capital).toLocaleString('fr-FR'),3,yS(capital)-2);
+  ctx.fillStyle=lastUp?'#00ffaa':'#ff2255';
+  const last=equity[equity.length-1];
+  ctx.fillText('€'+Math.round(last).toLocaleString('fr-FR'),3,yS(last)-2);
+}
+function btExportCSV(){
+  const trades=window._btLastTrades||[];
+  if(!trades.length){toast('Aucun trade à exporter','warn');return;}
+  const hdr='Date entrée,Date sortie,Symbole,Direction,Entrée,Sortie,SL,TP,P&L (€),Résultat\n';
+  const rows=trades.map(t=>`${t.entryTime},${t.exitTime},${t.sym},${t.dir},${t.entry?.toFixed(5)||''},${t.exit?.toFixed(5)||''},${t.sl?.toFixed(5)||''},${t.tp?.toFixed(5)||''},${t.pnl?.toFixed(2)||''},${t.result}`).join('\n');
+  const blob=new Blob([hdr+rows],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`backtest_${window._btLastAsset?.replace('/','')}_${Date.now()}.csv`;a.click();URL.revokeObjectURL(url);
+  toast('📥 Export CSV backtest téléchargé','buy');
+}
+function btUpdateParams(){
+  const s=document.getElementById('bt-strategy').value;
+  ['bt-p-ichi','bt-p-ichirsi','bt-p-ema','bt-p-rsi','bt-p-bb'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  const map={ichimoku:'bt-p-ichi',ichi_rsi:'bt-p-ichirsi',ema:'bt-p-ema',rsi:'bt-p-rsi',bb:'bt-p-bb'};
+  const p=document.getElementById(map[s]);if(p)p.style.display='';
+}
 
 // ══════════════════════════════════════════════════════════════════
 //  SERVICE WORKER — PWA
