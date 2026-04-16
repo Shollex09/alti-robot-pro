@@ -413,6 +413,7 @@ select{background:#141820;color:var(--text);border:1px solid #252d3d;border-radi
         <div class="alex-row">
           <span class="alex-lbl">Drawdown max</span>
           <select class="alex-inp" id="alex-drawdown" onchange="alexSaveConfig()" style="width:80px;padding:2px 4px">
+            <option value="0">OFF</option>
             <option value="10">10 %</option>
             <option value="15" selected>15 %</option>
             <option value="20">20 %</option>
@@ -1693,11 +1694,13 @@ function alexOpenPosition(asset,sig){
   // ── Max positions simultanées ─────────────────────────────────────
   if(alex.openPositions.length>=alex.maxPos) return;
 
-  // ── Protection drawdown ───────────────────────────────────────────
-  const ddPct=(alex.peakEquity-alex.equity)/alex.peakEquity*100;
-  if(ddPct>=alex.drawdownMax){
-    toast(`⚠ Alex bloqué — drawdown ${ddPct.toFixed(1)}% (max ${alex.drawdownMax}%)`,'warn');
-    return;
+  // ── Protection drawdown (0 = désactivé) ──────────────────────────
+  if(alex.drawdownMax>0){
+    const ddPct=(alex.peakEquity-alex.equity)/alex.peakEquity*100;
+    if(ddPct>=alex.drawdownMax){
+      toast(`⚠ Alex bloqué — drawdown ${ddPct.toFixed(1)}% (max ${alex.drawdownMax}%)`,'warn');
+      return;
+    }
   }
 
   // ── Filtre de corrélation ─────────────────────────────────────────
@@ -1984,9 +1987,14 @@ function alexRenderStats(){
   // Drawdown courant
   const ddEl=document.getElementById('alex-drawdown-val');
   if(ddEl){
-    const dd=(alex.peakEquity-alex.equity)/alex.peakEquity*100;
-    ddEl.textContent=dd.toFixed(1)+' %';
-    ddEl.style.color=dd>=alex.drawdownMax?'var(--red)':dd>=alex.drawdownMax*0.7?'var(--yellow)':'var(--green)';
+    if(alex.drawdownMax===0){
+      ddEl.textContent='OFF';
+      ddEl.style.color='var(--muted)';
+    } else {
+      const dd=(alex.peakEquity-alex.equity)/alex.peakEquity*100;
+      ddEl.textContent=dd.toFixed(1)+' %';
+      ddEl.style.color=dd>=alex.drawdownMax?'var(--red)':dd>=alex.drawdownMax*0.7?'var(--yellow)':'var(--green)';
+    }
   }
   // Avertissement NFP
   const nfpEl=document.getElementById('alex-nfp-warn');
