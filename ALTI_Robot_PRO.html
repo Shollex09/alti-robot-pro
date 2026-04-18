@@ -513,6 +513,25 @@ select:focus{outline:none;border-color:rgba(96,165,250,.4)}
 .rbot-pair-btn.on{background:rgba(0,229,153,.08);border-color:rgba(0,229,153,.35);color:var(--green)}
 .rbot-pair-btn.crypto.on{background:rgba(96,165,250,.08);border-color:rgba(96,165,250,.35);color:var(--blue)}
 
+/* ── ROBOT TF BUTTONS ─────────────────────────────── */
+.rbot-tf-btn{
+  font-size:9px;font-family:var(--mono);padding:3px 7px;border-radius:4px;cursor:pointer;
+  border:1px solid var(--border2);background:rgba(255,255,255,.02);color:var(--muted);
+  transition:all .15s;line-height:1.5;font-weight:500;white-space:nowrap;
+}
+.rbot-tf-btn.on{background:rgba(167,139,250,.1);border-color:rgba(167,139,250,.4);color:var(--purple)}
+
+/* ── SIDEBAR TOGGLE ──────────────────────────────── */
+#sb-toggle{
+  width:26px;height:26px;border-radius:var(--r-sm);cursor:pointer;
+  background:rgba(255,255,255,.04);border:1px solid var(--border2);
+  color:var(--muted);font-size:12px;display:flex;align-items:center;
+  justify-content:center;transition:all .18s;flex-shrink:0;
+}
+#sb-toggle:hover{background:rgba(255,255,255,.08);color:var(--text)}
+#sidebar{transition:width .25s cubic-bezier(.4,0,.2,1)}
+#sidebar.collapsed{width:0;min-width:0;overflow:hidden;border-right:none}
+
 /* ── TOASTS ──────────────────────────────────────── */
 #toasts{position:fixed;bottom:14px;right:290px;display:flex;flex-direction:column;gap:5px;z-index:999;pointer-events:none}
 .toast{
@@ -682,6 +701,7 @@ select:focus{outline:none;border-color:rgba(96,165,250,.4)}
 
 <!-- CTRL BAR -->
 <div id="ctrl">
+  <button id="sb-toggle" onclick="toggleSidebar()" title="Masquer/Afficher la sidebar">‹</button>
   <button class="btn" id="btn-start" onclick="startRobot()">▶ DÉMARRER</button>
   <button class="btn" id="btn-stop"  onclick="stopRobot()">■ ARRÊTER</button>
   <span id="status-txt">Appuyez sur Démarrer</span>
@@ -859,6 +879,11 @@ select:focus{outline:none;border-color:rgba(96,165,250,.4)}
             <option value="6mo">6 mois</option>
             <option value="1y" selected>1 an</option>
             <option value="2y">2 ans</option>
+            <option value="3y">3 ans</option>
+            <option value="4y">4 ans</option>
+            <option value="5y">5 ans</option>
+            <option value="7y">7 ans</option>
+            <option value="10y">10 ans</option>
           </select>
         </div>
         <div class="bt-param-row">
@@ -1110,6 +1135,15 @@ function toast(msg,type='info'){
 // ══════════════════════════════════════════════════════════════════
 //  SIDEBAR — construction dynamique
 // ══════════════════════════════════════════════════════════════════
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const btn=document.getElementById('sb-toggle');
+  sb.classList.toggle('collapsed');
+  const collapsed=sb.classList.contains('collapsed');
+  if(btn) btn.textContent=collapsed?'›':'‹';
+  localStorage.setItem('alti_sb_collapsed',collapsed?'1':'0');
+}
+
 function buildSidebar(){
   // Actifs forex
   FOREX.forEach(a=>{
@@ -2429,6 +2463,7 @@ function makeRobot(overrides={}){
     equityHistory:overrides.equityHistory||[],
     pairs:overrides.pairs||[],          // [] = utilise market (all/forex/crypto)
     commPerLot:overrides.commPerLot!==undefined?overrides.commPerLot:7, // ICMarkets Raw
+    tfMode:overrides.tfMode||'all',     // 'all' | 'daytrader' | 'scalping' | 'ultra'
   };
 }
 
@@ -2503,6 +2538,14 @@ function toggleRobotPair(id, pair){
   renderRobotPanel();
 }
 
+function setRobotTF(id, mode){
+  const r=window.robots.find(x=>x.id===id);
+  if(!r) return;
+  r.tfMode=mode;
+  saveRobots();
+  renderRobotPanel();
+}
+
 function resetRobotPairs(id){
   const r=window.robots.find(x=>x.id===id);
   if(!r) return;
@@ -2570,6 +2613,7 @@ function saveRobotConfig(id){
   r.bbMult=parseFloat(g('rbbmult')?.value)||2;
   r.utConvMin=parseInt(g('rutconv')?.value)||2;
   r.commPerLot=parseFloat(g('rcomm')?.value)||0;
+  r.tfMode=g('rtfmode')?.value||'all';
   // Lire les paires sélectionnées depuis les boutons
   const allPairs=['EUR/USD','GBP/USD','USD/JPY','AUD/USD','EUR/GBP','USD/CAD','NZD/USD','USD/CHF','BTC/USD','ETH/USD','XRP/USD','SOL/USD','BNB/USD','ADA/USD'];
   const selectedPairs=allPairs.filter(p=>{
@@ -2668,6 +2712,8 @@ function robotOpenPosition(robot, asset, sig){
     if(robot.market==='crypto'&&!isCrypto) return;
   }
   if((sig.utConv||0)<robot.utConvMin) return;
+  // Filtre timeframe : le robot ne trade que dans son mode configuré
+  if(robot.tfMode&&robot.tfMode!=='all'&&robot.tfMode!==activeMode) return;
   if(robot.openPositions.length>=robot.maxPos) return;
 
   // Protection drawdown
@@ -2921,6 +2967,17 @@ function renderRobotCard(r){
       </select>
     </div>
 
+    <div class="rbot-row" style="align-items:center">
+      <span class="rbot-lbl">Timeframes</span>
+      <div style="display:flex;gap:3px;flex-wrap:wrap;flex:1">
+        ${['all','daytrader','scalping','ultra'].map(m=>{
+          const labels={all:'Tous',daytrader:'H4›H1›m15',scalping:'H1›m15›m5',ultra:'m15›m5›m1'};
+          const on=(r.tfMode||'all')===m;
+          return `<button class="rbot-tf-btn ${on?'on':''}" id="rtf_${m}_${sid}" onclick="setRobotTF('${r.id}','${m}')">${labels[m]}</button>`;
+        }).join('')}
+      </div>
+    </div>
+
     <div class="rbot-row">
       <span class="rbot-lbl">MaxPos</span>
       <input class="rbot-inp" id="rmaxpos${sid}" type="number" value="${r.maxPos}" min="1" max="20" style="width:44px" onchange="saveRobotConfig('${r.id}')">
@@ -3095,6 +3152,13 @@ function alexInit(){
 //  INIT
 // ══════════════════════════════════════════════════════════════════
 buildSidebar();
+// Restaurer état sidebar
+if(localStorage.getItem('alti_sb_collapsed')==='1'){
+  const sb=document.getElementById('sidebar');
+  const btn=document.getElementById('sb-toggle');
+  if(sb) sb.classList.add('collapsed');
+  if(btn) btn.textContent='›';
+}
 // Restaurer le compteur d'alertes au démarrage
 document.getElementById('ap-count').textContent=alertCount;
 document.getElementById('h-sigs').textContent=alertCount;
@@ -3289,7 +3353,7 @@ async function btFetchCandles(assetSym,tf,period){
       const d=await r.json();
       if(d.ok&&d.candles&&d.candles.length>=52){
         // Filtrer selon la période demandée
-        const daysMap={'1mo':30,'3mo':90,'6mo':180,'1y':365,'2y':730};
+        const daysMap={'1mo':30,'3mo':90,'6mo':180,'1y':365,'2y':730,'3y':1095,'4y':1460,'5y':1825,'7y':2555,'10y':3650};
         const days=daysMap[period]||365;
         const from=Date.now()-days*86400000;
         candles=d.candles.filter(c=>c.t>=from);
@@ -3334,7 +3398,7 @@ async function btFetchCandles(assetSym,tf,period){
 async function btFetchTwelveData(asset,tf,period){
   // TwelveData : OHLCV intraday réel, CORS OK depuis file://, clé gratuite
   const ivMap={'m1':'1min','m5':'5min','m15':'15min','H1':'1h','H4':'4h','D1':'1day'};
-  const daysMap={'1mo':30,'3mo':90,'6mo':180,'1y':365,'2y':730};
+  const daysMap={'1mo':30,'3mo':90,'6mo':180,'1y':365,'2y':730,'3y':1095,'4y':1460,'5y':1825,'7y':2555,'10y':3650};
   const interval=ivMap[tf]||'1h';
   const days=daysMap[period]||365;
   // Calcul du outputsize selon TF (max 5000 par requête)
@@ -3360,7 +3424,7 @@ async function btFetchTwelveData(asset,tf,period){
 
 async function btFetchFrankfurter(asset,period){
   // BCE/Frankfurter : taux journaliers officiels, gratuit, aucun CORS
-  const daysMap={'1mo':30,'3mo':90,'6mo':180,'1y':365,'2y':730};
+  const daysMap={'1mo':30,'3mo':90,'6mo':180,'1y':365,'2y':730,'3y':1095,'4y':1460,'5y':1825,'7y':2555,'10y':3650};
   const days=daysMap[period]||365;
   const fromD=new Date(Date.now()-days*86400000).toISOString().split('T')[0];
   const toD=new Date().toISOString().split('T')[0];
@@ -3423,7 +3487,7 @@ async function btFetchFinnhubCandles(asset,tf,period){
   const sym=FH_SYM[asset.sym];
   if(!sym) throw new Error('Finnhub: symbole inconnu pour '+asset.sym);
   const resMap={'m1':'1','m5':'5','m15':'15','H1':'60','H4':'240','D1':'D'};
-  const daysMap={'1mo':30,'3mo':90,'6mo':180,'1y':365,'2y':730};
+  const daysMap={'1mo':30,'3mo':90,'6mo':180,'1y':365,'2y':730,'3y':1095,'4y':1460,'5y':1825,'7y':2555,'10y':3650};
   const res=resMap[tf]||'60', days=daysMap[period]||365;
   const to=Math.floor(Date.now()/1000);
   const from=to-days*86400;
@@ -3439,7 +3503,7 @@ async function btFetchFinnhubCandles(asset,tf,period){
 }
 async function btFetchBinance(asset,tf,period){
   const intMap={'m1':'1m','m5':'5m','m15':'15m','H1':'1h','H4':'4h','D1':'1d'};
-  const daysMap={'1mo':30,'3mo':90,'6mo':180,'1y':365,'2y':730};
+  const daysMap={'1mo':30,'3mo':90,'6mo':180,'1y':365,'2y':730,'3y':1095,'4y':1460,'5y':1825,'7y':2555,'10y':3650};
   const interval=intMap[tf]||'1h', days=daysMap[period]||365;
   let candles=[], from=Date.now()-days*86400000;
   for(let page=0;page<15;page++){
