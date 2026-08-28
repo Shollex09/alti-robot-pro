@@ -19,6 +19,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Marketplace Jardin utilise ta position pour situer ton secteur (jamais ton adresse exacte)."
+        }
+      ]
+    ]
   }
 }
