@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
@@ -50,6 +51,13 @@ export default function MonProfilScreen({ navigation }) {
     }, [charger])
   );
 
+  function seDeconnecter() {
+    Alert.alert('Se déconnecter ?', 'Tu devras ressaisir ton email et ton mot de passe.', [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Se déconnecter', style: 'destructive', onPress: () => supabase.auth.signOut() },
+    ]);
+  }
+
   if (loading || !profile) {
     return (
       <View style={styles.center}>
@@ -84,6 +92,10 @@ export default function MonProfilScreen({ navigation }) {
         onPress={() => navigation.navigate('ReglagesProfil')}
       >
         <Text style={styles.modifierTexte}>Modifier mon profil</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.deconnexionBtn} onPress={seDeconnecter}>
+        <Text style={styles.deconnexionTexte}>Se déconnecter</Text>
       </TouchableOpacity>
 
       {estVendeur && (
@@ -135,6 +147,17 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   modifierTexte: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  deconnexionBtn: {
+    borderWidth: 1,
+    borderColor: COULEURS.rouge,
+    borderRadius: 26,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 10,
+    backgroundColor: '#fff',
+  },
+  deconnexionTexte: { color: COULEURS.rouge, fontWeight: '600', fontSize: 15 },
   sectionTitre: {
     fontSize: 15,
     fontWeight: 'bold',
