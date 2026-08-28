@@ -14,6 +14,7 @@ import { useAuth } from '../../lib/AuthContext';
 import { distanceKm } from '../../lib/geo';
 import { COULEURS, categorieLabel, formatEuros } from '../../lib/constants';
 import EnteteProfil from '../../components/EnteteProfil';
+import CarteSecteur from '../../components/CarteSecteur';
 
 export default function SellerProfileScreen({ route, navigation }) {
   const { vendeurId } = route.params;
@@ -76,7 +77,14 @@ export default function SellerProfileScreen({ route, navigation }) {
           distance={distance}
           nbMisesEnRelation={nbVentes}
           enfant={
-            <Text style={styles.sectionTitre}>Ses produits ({produits.length})</Text>
+            <>
+              <CarteSecteur
+                latitude={vendeur.latitude}
+                longitude={vendeur.longitude}
+                titre={`Où se situe ${vendeur.prenom}`}
+              />
+              <Text style={styles.sectionTitre}>Ses produits ({produits.length})</Text>
+            </>
           }
         />
       }

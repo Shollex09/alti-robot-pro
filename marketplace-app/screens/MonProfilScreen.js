@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import { COULEURS, categorieLabel, formatEuros } from '../lib/constants';
 import EnteteProfil from '../components/EnteteProfil';
+import CarteSecteur from '../components/CarteSecteur';
 
 export default function MonProfilScreen({ navigation }) {
   const { session, profile, estVendeur } = useAuth();
@@ -65,6 +66,13 @@ export default function MonProfilScreen({ navigation }) {
           profile.latitude != null ? 'Ton secteur est enregistré' : 'Secteur non renseigné'
         }
         nbMisesEnRelation={nbMisesEnRelation}
+        enfant={
+          <CarteSecteur
+            latitude={profile.latitude}
+            longitude={profile.longitude}
+            titre="Le secteur que les autres voient"
+          />
+        }
       />
 
       <Text style={styles.apercu}>

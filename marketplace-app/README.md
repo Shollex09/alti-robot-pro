@@ -103,6 +103,10 @@ décrémenté automatiquement à chaque commande, et règles de confidentialité
 (Row Level Security) — l'adresse exacte n'est jamais stockée, seulement une
 position GPS arrondie au centième de degré (~1 km).
 
+Sur les fiches profil, cette position n'est jamais montrée comme un point : la
+carte affiche un cercle de 1,8 km de rayon, plus large que l'imprécision déjà
+appliquée, et la carte n'est ni déplaçable ni zoomable.
+
 ## Reporté à la v2 (volontairement)
 
 Paiement en ligne (Stripe Connect), abonnement Pro, notifications push, avis /
