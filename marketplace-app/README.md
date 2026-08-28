@@ -121,6 +121,12 @@ Sur les fiches profil, cette position n'est jamais montrée comme un point : la
 carte affiche un cercle de 1,8 km de rayon, plus large que l'imprécision déjà
 appliquée, et la carte n'est ni déplaçable ni zoomable.
 
+## Avant de publier
+
+Voir `AVANT-PUBLICATION.md` : la liste de tout ce qu'il reste à faire le jour de
+la mise sur le Play Store (build EAS, clé Google Maps, suppression de compte,
+politique de confidentialité, notifications à distance...).
+
 ## Reporté à la v2 (volontairement)
 
 Paiement en ligne (Stripe Connect), abonnement Pro, notifications push, avis /
