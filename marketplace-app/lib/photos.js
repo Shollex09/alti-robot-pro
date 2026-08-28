@@ -30,7 +30,20 @@ export async function envoyerPhoto(asset, dossier, userId) {
   const { error } = await supabase.storage
     .from(BUCKET_PHOTOS)
     .upload(nomFichier, decode(asset.base64), { contentType, upsert: false });
-  if (error) throw error;
+  if (error) {
+    // Messages Supabase traduits pour rester compréhensibles dans l'appli.
+    if (/bucket not found/i.test(error.message)) {
+      throw new Error(
+        "L'espace de stockage des photos n'existe pas encore. Crée un bucket public nommé « photos » dans Supabase (Storage → New bucket)."
+      );
+    }
+    if (/row-level security|not authorized/i.test(error.message)) {
+      throw new Error(
+        "Envoi de photo refusé. Exécute le script supabase/02-marketplace.sql pour autoriser le dépôt des photos."
+      );
+    }
+    throw error;
+  }
 
   const { data } = supabase.storage.from(BUCKET_PHOTOS).getPublicUrl(nomFichier);
   return data.publicUrl;
