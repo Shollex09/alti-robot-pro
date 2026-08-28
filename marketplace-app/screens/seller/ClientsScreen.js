@@ -1,23 +1,16 @@
 import { useCallback, useMemo, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
+import { chargerDonneesVendeur, classementClients } from '../../lib/gestion';
 import { COULEURS, formatEuros } from '../../lib/constants';
 
 export default function ClientsScreen() {
   const { session } = useAuth();
-  const [ventes, setVentes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [donnees, setDonnees] = useState(null);
 
   const charger = useCallback(async () => {
-    const { data } = await supabase
-      .from('orders')
-      .select('*, acheteur:profiles!orders_acheteur_id_fkey(id, prenom)')
-      .eq('vendeur_id', session.user.id)
-      .neq('statut', 'annulee');
-    setVentes(data ?? []);
-    setLoading(false);
+    setDonnees(await chargerDonneesVendeur(session.user.id));
   }, [session.user.id]);
 
   useFocusEffect(
@@ -27,30 +20,10 @@ export default function ClientsScreen() {
   );
 
   // Le classement se calcule tout seul à partir des ventes, comme dans le poulailler.
-  const clients = useMemo(() => {
-    const parClient = new Map();
-    for (const vente of ventes) {
-      const id = vente.acheteur_id;
-      const actuel = parClient.get(id) ?? {
-        id,
-        prenom: vente.acheteur?.prenom ?? 'Inconnu',
-        nbAchats: 0,
-        quantite: 0,
-        total: 0,
-        derniere: null,
-      };
-      actuel.nbAchats += 1;
-      actuel.quantite += Number(vente.quantite);
-      actuel.total += Number(vente.prix_total);
-      if (!actuel.derniere || vente.created_at > actuel.derniere) actuel.derniere = vente.created_at;
-      parClient.set(id, actuel);
-    }
-    return [...parClient.values()].sort((a, b) => b.total - a.total);
-  }, [ventes]);
-
+  const clients = useMemo(() => (donnees ? classementClients(donnees) : []), [donnees]);
   const caTotal = useMemo(() => clients.reduce((s, c) => s + c.total, 0), [clients]);
 
-  if (loading) {
+  if (!donnees) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={COULEURS.vert} />
@@ -75,7 +48,9 @@ export default function ClientsScreen() {
             <Text style={styles.rangTexte}>{index + 1}</Text>
           </View>
           <View style={styles.infos}>
-            <Text style={styles.prenom}>{item.prenom}</Text>
+            <Text style={styles.prenom}>
+              {item.nom} {item.source === 'directe' ? '🤝' : '📱'}
+            </Text>
             <Text style={styles.meta}>
               {item.nbAchats} achat(s) · {item.quantite} article(s)
             </Text>

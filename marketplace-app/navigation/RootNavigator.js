@@ -16,6 +16,11 @@ import ProductFormScreen from '../screens/seller/ProductFormScreen';
 import StockScreen from '../screens/seller/StockScreen';
 import SalesScreen from '../screens/seller/SalesScreen';
 import ClientsScreen from '../screens/seller/ClientsScreen';
+import DashboardScreen from '../screens/seller/DashboardScreen';
+import CoutsScreen from '../screens/seller/CoutsScreen';
+import ConsommationScreen from '../screens/seller/ConsommationScreen';
+import InvestissementsScreen from '../screens/seller/InvestissementsScreen';
+import PlusScreen from '../screens/seller/PlusScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
@@ -45,6 +50,27 @@ function MesProduitsStack() {
   );
 }
 
+// Gestion : ce qui ne tient pas dans la barre d'onglets du vendeur.
+function GestionStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="PlusMenu" component={PlusScreen} options={{ title: 'Gestion' }} />
+      <Stack.Screen name="Clients" component={ClientsScreen} options={{ title: 'Mes clients' }} />
+      <Stack.Screen name="Couts" component={CoutsScreen} options={{ title: 'Coûts' }} />
+      <Stack.Screen
+        name="Consommation"
+        component={ConsommationScreen}
+        options={{ title: 'Consommation personnelle' }}
+      />
+      <Stack.Screen
+        name="Investissements"
+        component={InvestissementsScreen}
+        options={{ title: 'Investissements' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 function EspaceVendeur() {
   return (
     <VendeurTab.Navigator
@@ -54,6 +80,11 @@ function EspaceVendeur() {
         headerShown: false,
       }}
     >
+      <VendeurTab.Screen
+        name="Dashboard"
+        component={DashboardScreen}
+        options={{ title: 'Bilan', headerShown: true, tabBarIcon: icone('📊') }}
+      />
       <VendeurTab.Screen
         name="MyProducts"
         component={MesProduitsStack}
@@ -70,9 +101,9 @@ function EspaceVendeur() {
         options={{ title: 'Ventes', headerShown: true, tabBarIcon: icone('💶') }}
       />
       <VendeurTab.Screen
-        name="Clients"
-        component={ClientsScreen}
-        options={{ title: 'Clients', headerShown: true, tabBarIcon: icone('👥') }}
+        name="Gestion"
+        component={GestionStack}
+        options={{ title: 'Gestion', tabBarIcon: icone('⋯') }}
       />
     </VendeurTab.Navigator>
   );

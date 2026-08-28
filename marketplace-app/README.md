@@ -68,15 +68,35 @@ screens/
     MyOrdersScreen.js      historique de mes commandes
     FavorisScreen.js       produits mis en favori
   seller/
+    DashboardScreen.js     bilan : CA, coûts, bénéfice, rentabilité, bilan annuel
     MyProductsScreen.js    mes annonces (créer / modifier / retirer)
     ProductFormScreen.js   formulaire d'annonce avec photo
-    StockScreen.js         stock par produit et valeur totale
-    SalesScreen.js         historique des ventes, confirmer / annuler
+    StockScreen.js         stock par produit, valeur, réapprovisionnement
+    SalesScreen.js         ventes appli + ventes en direct, confirmer / annuler
     ClientsScreen.js       classement automatique des clients
+    CoutsScreen.js         dépenses par catégorie
+    ConsommationScreen.js  ce que le producteur garde pour lui (économies)
+    InvestissementsScreen.js  matériel, serre, outillage
+    PlusScreen.js          menu de gestion + export CSV
 supabase/
   01-schema-initial.sql   schéma de départ (référence)
-  02-marketplace.sql      complément à exécuter
+  02-marketplace.sql      commandes, anti-survente, photos
+  03-gestion-vendeur.sql  coûts, consommation, investissements, ventes directes
 ```
+
+## Espace vendeur : la logique du poulailler
+
+L'onglet « Vendre » reprend le fonctionnement de l'app Gestion du Poulailler,
+avec les mêmes formules calculées automatiquement :
+
+- **bénéfice** = ventes − coûts
+- **valeur créée** = ventes + économies − coûts
+- **solde** = valeur créée − investissements
+- **rentabilité** = valeur créée / investissements
+
+Le stock est tenu par la base de données, pas par l'appli : chaque commande,
+vente en direct, consommation personnelle ou réapprovisionnement le met à jour
+tout seul, et une commande annulée remet la quantité en stock.
 
 Base de données : 4 tables (`profiles`, `products`, `orders`, `favoris`), stock
 décrémenté automatiquement à chaque commande, et règles de confidentialité
