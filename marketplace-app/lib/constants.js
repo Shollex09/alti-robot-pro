@@ -36,6 +36,9 @@ export const COULEURS = {
   bord: '#e0e0e0',
   fond: '#fff',
   fondDoux: '#f7f7f7',
+  // Fond bleuté des pages de profil, dans l'esprit d'AlloVoisins
+  fondProfil: '#f2f7fd',
+  encre: '#16283c',
 };
 
 export function formatEuros(montant) {

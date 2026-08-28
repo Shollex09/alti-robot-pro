@@ -10,15 +10,18 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../lib/supabase';
+import { COULEURS } from '../lib/constants';
 
 const ROLES = [
-  { value: 'acheteur', label: 'Acheteur' },
-  { value: 'vendeur', label: 'Vendeur' },
+  { value: 'acheteur', label: 'Acheter', aide: 'Trouver des produits près de chez moi' },
+  { value: 'vendeur', label: 'Vendre', aide: 'Écouler mes surplus de jardin' },
 ];
 
 export default function AuthScreen() {
-  const [mode, setMode] = useState('connexion'); // 'connexion' | 'inscription'
+  // 'accueil' = page de présentation, puis le formulaire choisi.
+  const [vue, setVue] = useState('accueil');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [prenom, setPrenom] = useState('');
@@ -50,7 +53,7 @@ export default function AuthScreen() {
       // de créer le profil maintenant (protégé par la sécurité de la base).
       setLoading(false);
       Alert.alert('Compte créé', 'Vérifie ta boîte mail pour confirmer ton compte, puis connecte-toi.');
-      setMode('connexion');
+      setVue('connexion');
       return;
     }
 
@@ -65,17 +68,79 @@ export default function AuthScreen() {
     }
   }
 
+  if (vue === 'accueil') {
+    return (
+      <ScrollView contentContainerStyle={styles.accueil}>
+        <View style={styles.entete}>
+          <Text style={styles.logo}>
+            <Text style={styles.logoVert}>marketplace</Text>
+            <Text style={styles.logoRose}>jardin</Text>
+          </Text>
+          <Text style={styles.baseline}>LE JARDIN DU VOISIN</Text>
+        </View>
+
+        <LinearGradient colors={['#e8f5e9', '#f6fbf4']} style={styles.illustration}>
+          <Text style={styles.illustrationEmoji}>🥕</Text>
+          <Text style={styles.illustrationEmoji2}>🍎</Text>
+          <Text style={styles.illustrationEmoji3}>🥚</Text>
+        </LinearGradient>
+
+        <View style={styles.hero}>
+          <Text style={styles.heroTitre}>Les produits du jardin,{'\n'}près de chez vous</Text>
+          <Text style={styles.heroTexte}>
+            Des producteurs particuliers autour de vous, sans gaspillage et sans intermédiaire.
+          </Text>
+
+          <TouchableOpacity style={styles.ctaPrincipal} onPress={() => setVue('inscription')}>
+            <Text style={styles.ctaPrincipalTexte}>Créer un compte</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => setVue('connexion')}>
+            <Text style={styles.ctaSecondaire}>Déjà inscrit ? Me connecter</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.arguments}>
+          {[
+            { emoji: '📍', titre: 'Tout près', texte: 'Uniquement les producteurs dans votre rayon' },
+            { emoji: '🤝', titre: 'En direct', texte: 'Vous réglez au producteur, au retrait' },
+            { emoji: '🔒', titre: 'Discret', texte: 'Prénom et secteur, jamais votre adresse' },
+          ].map((a) => (
+            <View key={a.titre} style={styles.argument}>
+              <Text style={styles.argumentEmoji}>{a.emoji}</Text>
+              <View style={styles.argumentTexte}>
+                <Text style={styles.argumentTitre}>{a.titre}</Text>
+                <Text style={styles.argumentAide}>{a.texte}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    );
+  }
+
+  const inscription = vue === 'inscription';
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>🌱 Marketplace Jardin</Text>
-        <Text style={styles.subtitle}>{mode === 'connexion' ? 'Connexion' : 'Créer un compte'}</Text>
+      <ScrollView contentContainerStyle={styles.formulaire} keyboardShouldPersistTaps="handled">
+        <TouchableOpacity onPress={() => setVue('accueil')}>
+          <Text style={styles.retour}>← Retour</Text>
+        </TouchableOpacity>
 
-        {mode === 'inscription' && (
+        <Text style={styles.formTitre}>{inscription ? 'Créer un compte' : 'Se connecter'}</Text>
+        <Text style={styles.formAide}>
+          {inscription
+            ? 'Quelques secondes suffisent, aucune carte bancaire.'
+            : 'Content de te revoir !'}
+        </Text>
+
+        {inscription && (
           <>
+            <Text style={styles.label}>Ton prénom</Text>
             <TextInput
               style={styles.input}
               placeholder="Prénom"
@@ -83,52 +148,62 @@ export default function AuthScreen() {
               onChangeText={setPrenom}
               autoCapitalize="words"
             />
-            <Text style={styles.label}>Je suis :</Text>
-            <View style={styles.roleRow}>
+
+            <Text style={styles.label}>Je veux surtout…</Text>
+            <View style={styles.roles}>
               {ROLES.map((r) => (
                 <TouchableOpacity
                   key={r.value}
-                  style={[styles.roleBtn, role === r.value && styles.roleBtnActive]}
+                  style={[styles.role, role === r.value && styles.roleActif]}
                   onPress={() => setRole(r.value)}
                 >
-                  <Text style={[styles.roleBtnText, role === r.value && styles.roleBtnTextActive]}>
+                  <Text style={[styles.roleLabel, role === r.value && styles.roleLabelActif]}>
                     {r.label}
+                  </Text>
+                  <Text style={[styles.roleAide, role === r.value && styles.roleAideActif]}>
+                    {r.aide}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
+            <Text style={styles.noteRole}>
+              Un compte vendeur peut aussi acheter. Tu pourras changer plus tard.
+            </Text>
           </>
         )}
 
+        <Text style={styles.label}>Email</Text>
         <TextInput
           style={styles.input}
-          placeholder="Email"
+          placeholder="ton@email.fr"
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
         />
+
+        <Text style={styles.label}>Mot de passe</Text>
         <TextInput
           style={styles.input}
-          placeholder="Mot de passe"
+          placeholder="6 caractères minimum"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
         />
 
         <TouchableOpacity
-          style={styles.submitBtn}
-          onPress={mode === 'connexion' ? handleConnexion : handleInscription}
+          style={styles.ctaPrincipal}
+          onPress={inscription ? handleInscription : handleConnexion}
           disabled={loading}
         >
-          <Text style={styles.submitBtnText}>
-            {loading ? '...' : mode === 'connexion' ? 'Se connecter' : "S'inscrire"}
+          <Text style={styles.ctaPrincipalTexte}>
+            {loading ? '...' : inscription ? 'Créer mon compte' : 'Me connecter'}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => setMode(mode === 'connexion' ? 'inscription' : 'connexion')}>
-          <Text style={styles.switchText}>
-            {mode === 'connexion' ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
+        <TouchableOpacity onPress={() => setVue(inscription ? 'connexion' : 'inscription')}>
+          <Text style={styles.ctaSecondaire}>
+            {inscription ? 'Déjà inscrit ? Me connecter' : "Pas encore de compte ? M'inscrire"}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -138,37 +213,90 @@ export default function AuthScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  container: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-  title: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', marginBottom: 4 },
-  subtitle: { fontSize: 16, textAlign: 'center', color: '#666', marginBottom: 24 },
-  label: { marginBottom: 8, color: '#333' },
+  accueil: { paddingBottom: 40, backgroundColor: '#fff' },
+  entete: { alignItems: 'center', paddingTop: 60, paddingBottom: 24 },
+  logo: { fontSize: 26, fontWeight: 'bold', letterSpacing: -0.5 },
+  logoVert: { color: COULEURS.vert },
+  logoRose: { color: '#e91e63' },
+  baseline: {
+    fontSize: 10,
+    letterSpacing: 3,
+    color: '#9aa5b1',
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  illustration: {
+    height: 170,
+    marginHorizontal: 20,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  illustrationEmoji: { fontSize: 64 },
+  illustrationEmoji2: { fontSize: 36, position: 'absolute', top: 28, right: 46 },
+  illustrationEmoji3: { fontSize: 32, position: 'absolute', bottom: 30, left: 50 },
+  hero: { paddingHorizontal: 24, paddingTop: 32, alignItems: 'center' },
+  heroTitre: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: COULEURS.encre,
+    textAlign: 'center',
+    lineHeight: 36,
+  },
+  heroTexte: {
+    fontSize: 15,
+    color: COULEURS.texteDoux,
+    textAlign: 'center',
+    marginTop: 12,
+    lineHeight: 22,
+  },
+  ctaPrincipal: {
+    backgroundColor: COULEURS.encre,
+    borderRadius: 28,
+    paddingVertical: 16,
+    paddingHorizontal: 40,
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    marginTop: 28,
+  },
+  ctaPrincipalTexte: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  ctaSecondaire: {
+    color: COULEURS.encre,
+    fontWeight: '600',
+    fontSize: 14,
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  arguments: { paddingHorizontal: 24, paddingTop: 40, gap: 18 },
+  argument: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  argumentEmoji: { fontSize: 26 },
+  argumentTexte: { flex: 1 },
+  argumentTitre: { fontSize: 15, fontWeight: 'bold', color: COULEURS.encre },
+  argumentAide: { fontSize: 13, color: COULEURS.texteDoux, marginTop: 2 },
+  formulaire: { padding: 24, paddingTop: 60, backgroundColor: '#fff', flexGrow: 1 },
+  retour: { color: COULEURS.texteDoux, fontSize: 15, marginBottom: 20 },
+  formTitre: { fontSize: 26, fontWeight: 'bold', color: COULEURS.encre },
+  formAide: { fontSize: 14, color: COULEURS.texteDoux, marginTop: 6, marginBottom: 8 },
+  label: { marginTop: 20, marginBottom: 8, fontWeight: '600', color: COULEURS.encre, fontSize: 14 },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+    borderColor: COULEURS.bord,
+    borderRadius: 12,
+    padding: 14,
     fontSize: 16,
   },
-  roleRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  roleBtn: {
+  roles: { flexDirection: 'row', gap: 10 },
+  role: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    alignItems: 'center',
-  },
-  roleBtnActive: { backgroundColor: '#2e7d32', borderColor: '#2e7d32' },
-  roleBtnText: { color: '#333', fontWeight: '600' },
-  roleBtnTextActive: { color: '#fff' },
-  submitBtn: {
-    backgroundColor: '#2e7d32',
-    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: COULEURS.bord,
+    borderRadius: 12,
     padding: 14,
-    alignItems: 'center',
-    marginTop: 8,
   },
-  submitBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  switchText: { textAlign: 'center', marginTop: 16, color: '#2e7d32' },
+  roleActif: { borderColor: COULEURS.vert, backgroundColor: COULEURS.vertClair },
+  roleLabel: { fontSize: 15, fontWeight: 'bold', color: COULEURS.encre },
+  roleLabelActif: { color: COULEURS.vert },
+  roleAide: { fontSize: 11, color: COULEURS.texteDoux, marginTop: 4, lineHeight: 15 },
+  roleAideActif: { color: '#33691e' },
+  noteRole: { fontSize: 11, color: '#9aa5b1', marginTop: 8 },
 });

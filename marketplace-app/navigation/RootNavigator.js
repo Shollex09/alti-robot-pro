@@ -22,6 +22,7 @@ import ConsommationScreen from '../screens/seller/ConsommationScreen';
 import InvestissementsScreen from '../screens/seller/InvestissementsScreen';
 import PlusScreen from '../screens/seller/PlusScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import MonProfilScreen from '../screens/MonProfilScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -46,6 +47,19 @@ function MesProduitsStack() {
     <Stack.Navigator>
       <Stack.Screen name="MyProductsList" component={MyProductsScreen} options={{ title: 'Mes annonces' }} />
       <Stack.Screen name="ProductForm" component={ProductFormScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function ProfilStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="MonProfil" component={MonProfilScreen} options={{ title: 'Mon profil' }} />
+      <Stack.Screen
+        name="ReglagesProfil"
+        component={SettingsScreen}
+        options={{ title: 'Modifier mon profil' }}
+      />
     </Stack.Navigator>
   );
 }
@@ -143,9 +157,9 @@ export default function RootNavigator() {
           />
         )}
         <Tab.Screen
-          name="Réglages"
-          component={SettingsScreen}
-          options={{ title: 'Réglages', tabBarIcon: icone('⚙️') }}
+          name="Profil"
+          component={ProfilStack}
+          options={{ headerShown: false, tabBarIcon: icone('👤') }}
         />
       </Tab.Navigator>
     </NavigationContainer>

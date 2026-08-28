@@ -8,12 +8,14 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
 import SelecteurCategories from '../components/SelecteurCategories';
-import { parseTypeProduction } from '../lib/constants';
+import { choisirPhoto, envoyerPhoto } from '../lib/photos';
+import { COULEURS, parseTypeProduction } from '../lib/constants';
 
 // On arrondit la position pour ne jamais stocker une adresse précise,
 // seulement un secteur approximatif (~1 km).
@@ -35,8 +37,19 @@ export default function ProfileScreen({ session, profile, onSaved }) {
   const [position, setPosition] = useState(
     profile?.latitude != null ? { latitude: profile.latitude, longitude: profile.longitude } : null
   );
+  const [photoUrl, setPhotoUrl] = useState(profile?.photo_url ?? null);
+  const [nouvellePhoto, setNouvellePhoto] = useState(null);
   const [locating, setLocating] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  async function selectionnerPhoto() {
+    try {
+      const asset = await choisirPhoto();
+      if (asset) setNouvellePhoto(asset);
+    } catch (e) {
+      Alert.alert('Photo', e.message);
+    }
+  }
 
   // Un compte créé avant que sa fiche n'ait pu être enregistrée arrive ici sans
   // profil : on lui redemande alors son prénom et son rôle.
@@ -76,6 +89,19 @@ export default function ProfileScreen({ session, profile, onSaved }) {
       return;
     }
     setSaving(true);
+
+    let url = photoUrl;
+    if (nouvellePhoto) {
+      try {
+        url = await envoyerPhoto(nouvellePhoto, 'profils', session.user.id);
+        setPhotoUrl(url);
+        setNouvellePhoto(null);
+      } catch (e) {
+        // Une photo qui ne part pas ne doit pas bloquer la création du profil.
+        Alert.alert('Photo non envoyée', `${e.message}\n\nLe reste du profil est enregistré.`);
+      }
+    }
+
     // upsert (et non update) : crée la fiche si elle n'existe pas encore.
     const { data, error } = await supabase
       .from('profiles')
@@ -83,6 +109,7 @@ export default function ProfileScreen({ session, profile, onSaved }) {
         id: session.user.id,
         prenom: prenom.trim(),
         role,
+        photo_url: url,
         description: description.trim() || null,
         type_production: role === 'vendeur' && typeProduction.length > 0 ? typeProduction.join(',') : null,
         rayon_recherche_km: rayon,
@@ -111,6 +138,19 @@ export default function ProfileScreen({ session, profile, onSaved }) {
           ? 'Ces infos apparaîtront sur ta vitrine publique.'
           : 'Ces infos servent à te montrer les produits proches de toi.'}
       </Text>
+
+      <TouchableOpacity style={styles.avatarZone} onPress={selectionnerPhoto}>
+        {nouvellePhoto?.uri ?? photoUrl ? (
+          <Image source={{ uri: nouvellePhoto?.uri ?? photoUrl }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, styles.avatarVide]}>
+            <Text style={styles.avatarInitiale}>{prenom?.[0]?.toUpperCase() ?? '📷'}</Text>
+          </View>
+        )}
+        <Text style={styles.avatarLien}>
+          {nouvellePhoto || photoUrl ? 'Changer la photo' : 'Ajouter une photo'}
+        </Text>
+      </TouchableOpacity>
 
       {profilManquant && (
         <>
@@ -214,6 +254,15 @@ const styles = StyleSheet.create({
   locateBtnText: { color: '#fff', fontWeight: 'bold' },
   positionHint: { marginTop: 8, color: '#888', fontSize: 12 },
   aide: { fontSize: 13, color: '#888', marginBottom: 4 },
+  avatarZone: { alignItems: 'center', marginBottom: 8 },
+  avatar: { width: 92, height: 92, borderRadius: 46 },
+  avatarVide: {
+    backgroundColor: COULEURS.vertClair,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitiale: { fontSize: 34, fontWeight: 'bold', color: COULEURS.vert },
+  avatarLien: { color: COULEURS.vert, fontWeight: '600', marginTop: 8, fontSize: 13 },
   roleRow: { flexDirection: 'row', gap: 12 },
   roleBtn: {
     flex: 1,
