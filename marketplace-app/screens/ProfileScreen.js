@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
 
@@ -21,7 +22,7 @@ function arrondirPosition(valeur) {
 export default function ProfileScreen({ session, profile, onSaved }) {
   const [description, setDescription] = useState(profile?.description ?? '');
   const [typeProduction, setTypeProduction] = useState(profile?.type_production ?? '');
-  const [rayon, setRayon] = useState(String(profile?.rayon_recherche_km ?? 10));
+  const [rayon, setRayon] = useState(profile?.rayon_recherche_km ?? 10);
   const [position, setPosition] = useState(
     profile?.latitude != null ? { latitude: profile.latitude, longitude: profile.longitude } : null
   );
@@ -65,7 +66,7 @@ export default function ProfileScreen({ session, profile, onSaved }) {
       .update({
         description: description.trim() || null,
         type_production: role === 'vendeur' ? typeProduction.trim() || null : null,
-        rayon_recherche_km: role === 'acheteur' ? Number(rayon) || 10 : null,
+        rayon_recherche_km: role === 'acheteur' ? rayon : null,
         latitude: position.latitude,
         longitude: position.longitude,
       })
@@ -117,12 +118,15 @@ export default function ProfileScreen({ session, profile, onSaved }) {
 
       {role === 'acheteur' && (
         <>
-          <Text style={styles.label}>Rayon de recherche (km)</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
+          <Text style={styles.label}>Rayon de recherche : {rayon} km</Text>
+          <Slider
+            minimumValue={1}
+            maximumValue={50}
+            step={1}
             value={rayon}
-            onChangeText={setRayon}
+            onValueChange={setRayon}
+            minimumTrackTintColor="#2e7d32"
+            thumbTintColor="#2e7d32"
           />
         </>
       )}
