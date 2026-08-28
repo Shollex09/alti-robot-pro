@@ -12,12 +12,14 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
+import { useCommandes } from '../../lib/CommandesContext';
 import { chargerDonneesVendeur, toutesLesVentes } from '../../lib/gestion';
 import { COULEURS, formatEuros } from '../../lib/constants';
 import ChampDate from '../../components/ChampDate';
 
 export default function SalesScreen() {
   const { session } = useAuth();
+  const { rafraichir: rafraichirPastille } = useCommandes();
   const [donnees, setDonnees] = useState(null);
   const [commandesBrutes, setCommandesBrutes] = useState([]);
 
@@ -33,7 +35,8 @@ export default function SalesScreen() {
     const d = await chargerDonneesVendeur(session.user.id);
     setDonnees(d);
     setCommandesBrutes(d.commandes);
-  }, [session.user.id]);
+    rafraichirPastille();
+  }, [session.user.id, rafraichirPastille]);
 
   useFocusEffect(
     useCallback(() => {

@@ -82,7 +82,21 @@ supabase/
   01-schema-initial.sql   schéma de départ (référence)
   02-marketplace.sql      commandes, anti-survente, photos
   03-gestion-vendeur.sql  coûts, consommation, investissements, ventes directes
+  04-notifications.sql    temps réel sur les commandes
 ```
+
+## Notifications
+
+Le vendeur est prévenu dès qu'une commande arrive : notification sur le
+téléphone et pastille sur les onglets Vendre et Ventes. L'acheteur est prévenu
+quand sa commande est confirmée ou annulée. Tout passe par le temps réel de
+Supabase (`04-notifications.sql`).
+
+⚠️ Depuis le SDK 53, les notifications **à distance** (appli fermée) ne
+fonctionnent plus dans Expo Go : il faut un build de développement. Les
+notifications **locales** utilisées ici marchent tant que l'appli tourne, y
+compris en arrière-plan récent. Le passage aux notifications à distance se fera
+au moment de préparer la publication.
 
 ## Espace vendeur : la logique du poulailler
 

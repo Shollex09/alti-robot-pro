@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { useAuth } from '../lib/AuthContext';
+import { useCommandes } from '../lib/CommandesContext';
 import { COULEURS } from '../lib/constants';
 
 import ProductsListScreen from '../screens/buyer/ProductsListScreen';
@@ -86,6 +87,7 @@ function GestionStack() {
 }
 
 function EspaceVendeur() {
+  const { enAttente } = useCommandes();
   return (
     <VendeurTab.Navigator
       screenOptions={{
@@ -112,7 +114,12 @@ function EspaceVendeur() {
       <VendeurTab.Screen
         name="Sales"
         component={SalesScreen}
-        options={{ title: 'Ventes', headerShown: true, tabBarIcon: icone('💶') }}
+        options={{
+          title: 'Ventes',
+          headerShown: true,
+          tabBarIcon: icone('💶'),
+          tabBarBadge: enAttente > 0 ? enAttente : undefined,
+        }}
       />
       <VendeurTab.Screen
         name="Gestion"
@@ -125,6 +132,7 @@ function EspaceVendeur() {
 
 export default function RootNavigator() {
   const { estVendeur } = useAuth();
+  const { enAttente, misesAJourAchats, marquerAchatsVus } = useCommandes();
 
   return (
     <NavigationContainer>
@@ -142,7 +150,12 @@ export default function RootNavigator() {
         <Tab.Screen
           name="Achats"
           component={MyOrdersScreen}
-          options={{ title: 'Mes achats', tabBarIcon: icone('🧺') }}
+          options={{
+            title: 'Mes achats',
+            tabBarIcon: icone('🧺'),
+            tabBarBadge: misesAJourAchats > 0 ? misesAJourAchats : undefined,
+          }}
+          listeners={{ tabPress: marquerAchatsVus }}
         />
         <Tab.Screen
           name="Favoris"
@@ -153,7 +166,11 @@ export default function RootNavigator() {
           <Tab.Screen
             name="Vendre"
             component={EspaceVendeur}
-            options={{ headerShown: false, tabBarIcon: icone('🌾') }}
+            options={{
+              headerShown: false,
+              tabBarIcon: icone('🌾'),
+              tabBarBadge: enAttente > 0 ? enAttente : undefined,
+            }}
           />
         )}
         <Tab.Screen

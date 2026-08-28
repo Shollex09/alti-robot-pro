@@ -2,6 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './lib/AuthContext';
+import { CommandesProvider } from './lib/CommandesContext';
 import { COULEURS } from './lib/constants';
 import AuthScreen from './screens/AuthScreen';
 import ProfileScreen from './screens/ProfileScreen';
@@ -30,10 +31,12 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <View style={styles.container}>
-          <Racine />
-          <StatusBar style="auto" />
-        </View>
+        <CommandesProvider>
+          <View style={styles.container}>
+            <Racine />
+            <StatusBar style="auto" />
+          </View>
+        </CommandesProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
