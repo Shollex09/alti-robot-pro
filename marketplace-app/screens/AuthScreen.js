@@ -45,24 +45,23 @@ export default function AuthScreen() {
       return;
     }
 
-    const userId = data.user?.id;
-    if (userId) {
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: userId,
-        prenom: prenom.trim(),
-        role,
-      });
-      if (profileError) {
-        Alert.alert(
-          'Compte créé, mais...',
-          `Impossible de créer le profil : ${profileError.message}`
-        );
-      }
-    }
-    setLoading(false);
     if (!data.session) {
+      // Compte créé mais pas encore confirmé : pas de session, donc impossible
+      // de créer le profil maintenant (protégé par la sécurité de la base).
+      setLoading(false);
       Alert.alert('Compte créé', 'Vérifie ta boîte mail pour confirmer ton compte, puis connecte-toi.');
       setMode('connexion');
+      return;
+    }
+
+    const { error: profileError } = await supabase.from('profiles').insert({
+      id: data.user.id,
+      prenom: prenom.trim(),
+      role,
+    });
+    setLoading(false);
+    if (profileError) {
+      Alert.alert('Compte créé, mais...', `Impossible de créer le profil : ${profileError.message}`);
     }
   }
 
