@@ -19,7 +19,14 @@ function arrondirPosition(valeur) {
   return Math.round(valeur * 100) / 100;
 }
 
+const ROLES = [
+  { value: 'acheteur', label: 'Acheteur' },
+  { value: 'vendeur', label: 'Vendeur' },
+];
+
 export default function ProfileScreen({ session, profile, onSaved }) {
+  const [prenom, setPrenom] = useState(profile?.prenom ?? '');
+  const [role, setRole] = useState(profile?.role ?? 'acheteur');
   const [description, setDescription] = useState(profile?.description ?? '');
   const [typeProduction, setTypeProduction] = useState(profile?.type_production ?? '');
   const [rayon, setRayon] = useState(profile?.rayon_recherche_km ?? 10);
@@ -29,7 +36,9 @@ export default function ProfileScreen({ session, profile, onSaved }) {
   const [locating, setLocating] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const role = profile?.role ?? 'acheteur';
+  // Un compte créé avant que sa fiche n'ait pu être enregistrée arrive ici sans
+  // profil : on lui redemande alors son prénom et son rôle.
+  const profilManquant = !profile;
 
   async function handleLocaliser() {
     setLocating(true);
@@ -56,24 +65,37 @@ export default function ProfileScreen({ session, profile, onSaved }) {
   }
 
   async function handleSauvegarder() {
+    if (!prenom.trim()) {
+      Alert.alert('Prénom manquant', 'Indique ton prénom.');
+      return;
+    }
     if (!position) {
       Alert.alert('Position manquante', 'Indique ta position approximative avant de continuer.');
       return;
     }
     setSaving(true);
-    const { error } = await supabase
+    // upsert (et non update) : crée la fiche si elle n'existe pas encore.
+    const { data, error } = await supabase
       .from('profiles')
-      .update({
+      .upsert({
+        id: session.user.id,
+        prenom: prenom.trim(),
+        role,
         description: description.trim() || null,
         type_production: role === 'vendeur' ? typeProduction.trim() || null : null,
-        rayon_recherche_km: role === 'acheteur' ? rayon : null,
+        rayon_recherche_km: rayon,
         latitude: position.latitude,
         longitude: position.longitude,
       })
-      .eq('id', session.user.id);
+      .select()
+      .single();
     setSaving(false);
     if (error) {
       Alert.alert('Erreur', "Impossible d'enregistrer ton profil : " + error.message);
+      return;
+    }
+    if (!data) {
+      Alert.alert('Erreur', "Le profil n'a pas pu être enregistré. Réessaie.");
       return;
     }
     onSaved();
@@ -87,6 +109,33 @@ export default function ProfileScreen({ session, profile, onSaved }) {
           ? 'Ces infos apparaîtront sur ta vitrine publique.'
           : 'Ces infos servent à te montrer les produits proches de toi.'}
       </Text>
+
+      {profilManquant && (
+        <>
+          <Text style={styles.label}>Ton prénom</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Prénom"
+            value={prenom}
+            onChangeText={setPrenom}
+            autoCapitalize="words"
+          />
+          <Text style={styles.label}>Je suis :</Text>
+          <View style={styles.roleRow}>
+            {ROLES.map((r) => (
+              <TouchableOpacity
+                key={r.value}
+                style={[styles.roleBtn, role === r.value && styles.roleBtnActive]}
+                onPress={() => setRole(r.value)}
+              >
+                <Text style={[styles.roleBtnText, role === r.value && styles.roleBtnTextActive]}>
+                  {r.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
 
       <Text style={styles.label}>Ta position (secteur approximatif)</Text>
       <TouchableOpacity style={styles.locateBtn} onPress={handleLocaliser} disabled={locating}>
@@ -116,20 +165,17 @@ export default function ProfileScreen({ session, profile, onSaved }) {
         </>
       )}
 
-      {role === 'acheteur' && (
-        <>
-          <Text style={styles.label}>Rayon de recherche : {rayon} km</Text>
-          <Slider
-            minimumValue={1}
-            maximumValue={50}
-            step={1}
-            value={rayon}
-            onValueChange={setRayon}
-            minimumTrackTintColor="#2e7d32"
-            thumbTintColor="#2e7d32"
-          />
-        </>
-      )}
+      {/* Un vendeur peut aussi acheter : le rayon sert donc aux deux rôles. */}
+      <Text style={styles.label}>Rayon de recherche : {rayon} km</Text>
+      <Slider
+        minimumValue={1}
+        maximumValue={50}
+        step={1}
+        value={rayon}
+        onValueChange={setRayon}
+        minimumTrackTintColor="#2e7d32"
+        thumbTintColor="#2e7d32"
+      />
 
       <Text style={styles.label}>Description</Text>
       <TextInput
@@ -169,6 +215,18 @@ const styles = StyleSheet.create({
   },
   locateBtnText: { color: '#fff', fontWeight: 'bold' },
   positionHint: { marginTop: 8, color: '#888', fontSize: 12 },
+  roleRow: { flexDirection: 'row', gap: 12 },
+  roleBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  roleBtnActive: { backgroundColor: '#2e7d32', borderColor: '#2e7d32' },
+  roleBtnText: { color: '#333', fontWeight: '600' },
+  roleBtnTextActive: { color: '#fff' },
   saveBtn: {
     backgroundColor: '#1565c0',
     borderRadius: 8,
