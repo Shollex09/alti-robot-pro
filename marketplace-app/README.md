@@ -36,12 +36,18 @@ Si ça fonctionne, on peut passer à la suite (création du projet Supabase, pui
 
 ## Structure actuelle
 
-- `App.js` — écran de démarrage (provisoire, à remplacer écran par écran)
+- `App.js` — point d'entrée : affiche l'écran de connexion ou l'écran d'accueil selon que l'utilisateur est connecté
+- `lib/supabase.js` — connexion à la base Supabase (URL + clé publique lues dans `.env`)
+- `screens/AuthScreen.js` — inscription / connexion, avec choix du rôle (vendeur / acheteur)
+- `screens/HomeScreen.js` — écran d'accueil provisoire après connexion
+- `.env` — URL et clé publique du projet Supabase (clé "publishable", sans danger à committer)
 - `app.json` — configuration Expo (nom de l'appli, icône...)
+
+Base de données Supabase : 4 tables (`profiles`, `products`, `orders`, `favoris`), avec décrément automatique du stock à chaque commande et règles de confidentialité (Row Level Security).
+
+⚠️ Pour tester l'inscription sans confirmation par email, désactive "Confirm email" dans le dashboard Supabase : **Authentication → Sign In / Providers → Email**.
 
 ## Prochaines étapes (pas encore faites)
 
-- Création du projet Supabase (base de données, authentification, stockage photos)
-- Écran inscription / connexion avec choix du rôle (vendeur / acheteur)
-- Écran de création de profil (géolocalisation)
+- Écran de création/édition de profil (géolocalisation, photo, description)
 - Écrans produits, stock, ventes, clients (v1), voir le cahier des charges
