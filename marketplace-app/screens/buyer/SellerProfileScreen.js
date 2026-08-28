@@ -12,7 +12,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 import { distanceKm, formatDistance } from '../../lib/geo';
-import { COULEURS, categorieLabel, formatEuros } from '../../lib/constants';
+import { COULEURS, categorieLabel, formatEuros, formatTypeProduction } from '../../lib/constants';
 
 export default function SellerProfileScreen({ route, navigation }) {
   const { vendeurId } = route.params;
@@ -72,7 +72,7 @@ export default function SellerProfileScreen({ route, navigation }) {
           )}
           <Text style={styles.prenom}>{vendeur.prenom}</Text>
           {vendeur.type_production ? (
-            <Text style={styles.production}>{vendeur.type_production}</Text>
+            <Text style={styles.production}>{formatTypeProduction(vendeur.type_production)}</Text>
           ) : null}
           <Text style={styles.secteur}>📍 Secteur à {formatDistance(distance)}</Text>
           {vendeur.description ? <Text style={styles.description}>{vendeur.description}</Text> : null}

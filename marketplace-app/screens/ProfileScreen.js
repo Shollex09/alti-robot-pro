@@ -12,6 +12,8 @@ import {
 import Slider from '@react-native-community/slider';
 import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
+import SelecteurCategories from '../components/SelecteurCategories';
+import { parseTypeProduction } from '../lib/constants';
 
 // On arrondit la position pour ne jamais stocker une adresse précise,
 // seulement un secteur approximatif (~1 km).
@@ -28,7 +30,7 @@ export default function ProfileScreen({ session, profile, onSaved }) {
   const [prenom, setPrenom] = useState(profile?.prenom ?? '');
   const [role, setRole] = useState(profile?.role ?? 'acheteur');
   const [description, setDescription] = useState(profile?.description ?? '');
-  const [typeProduction, setTypeProduction] = useState(profile?.type_production ?? '');
+  const [typeProduction, setTypeProduction] = useState(parseTypeProduction(profile?.type_production));
   const [rayon, setRayon] = useState(profile?.rayon_recherche_km ?? 10);
   const [position, setPosition] = useState(
     profile?.latitude != null ? { latitude: profile.latitude, longitude: profile.longitude } : null
@@ -82,7 +84,7 @@ export default function ProfileScreen({ session, profile, onSaved }) {
         prenom: prenom.trim(),
         role,
         description: description.trim() || null,
-        type_production: role === 'vendeur' ? typeProduction.trim() || null : null,
+        type_production: role === 'vendeur' && typeProduction.length > 0 ? typeProduction.join(',') : null,
         rayon_recherche_km: rayon,
         latitude: position.latitude,
         longitude: position.longitude,
@@ -155,13 +157,9 @@ export default function ProfileScreen({ session, profile, onSaved }) {
 
       {role === 'vendeur' && (
         <>
-          <Text style={styles.label}>Type de production</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex : légumes de saison, poules pondeuses..."
-            value={typeProduction}
-            onChangeText={setTypeProduction}
-          />
+          <Text style={styles.label}>Ce que tu produis</Text>
+          <Text style={styles.aide}>Coche tout ce qui te concerne.</Text>
+          <SelecteurCategories valeurs={typeProduction} onChange={setTypeProduction} />
         </>
       )}
 
@@ -215,6 +213,7 @@ const styles = StyleSheet.create({
   },
   locateBtnText: { color: '#fff', fontWeight: 'bold' },
   positionHint: { marginTop: 8, color: '#888', fontSize: 12 },
+  aide: { fontSize: 13, color: '#888', marginBottom: 4 },
   roleRow: { flexDirection: 'row', gap: 12 },
   roleBtn: {
     flex: 1,

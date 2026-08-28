@@ -15,7 +15,8 @@ import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import { choisirPhoto, envoyerPhoto } from '../lib/photos';
-import { COULEURS } from '../lib/constants';
+import SelecteurCategories from '../components/SelecteurCategories';
+import { COULEURS, parseTypeProduction } from '../lib/constants';
 
 function arrondirPosition(valeur) {
   return Math.round(valeur * 100) / 100;
@@ -25,7 +26,7 @@ export default function SettingsScreen() {
   const { session, profile, rechargerProfil, estVendeur } = useAuth();
   const [prenom, setPrenom] = useState(profile?.prenom ?? '');
   const [description, setDescription] = useState(profile?.description ?? '');
-  const [typeProduction, setTypeProduction] = useState(profile?.type_production ?? '');
+  const [typeProduction, setTypeProduction] = useState(parseTypeProduction(profile?.type_production));
   const [rayon, setRayon] = useState(profile?.rayon_recherche_km ?? 10);
   const [photoUrl, setPhotoUrl] = useState(profile?.photo_url ?? null);
   const [nouvellePhoto, setNouvellePhoto] = useState(null);
@@ -80,7 +81,7 @@ export default function SettingsScreen() {
         .update({
           prenom: prenom.trim(),
           description: description.trim() || null,
-          type_production: estVendeur ? typeProduction.trim() || null : null,
+          type_production: estVendeur && typeProduction.length > 0 ? typeProduction.join(',') : null,
           rayon_recherche_km: rayon,
           photo_url: url,
           latitude: position?.latitude ?? null,
@@ -147,13 +148,8 @@ export default function SettingsScreen() {
 
       {estVendeur && (
         <>
-          <Text style={styles.label}>Type de production</Text>
-          <TextInput
-            style={styles.input}
-            value={typeProduction}
-            onChangeText={setTypeProduction}
-            placeholder="Ex : légumes de saison, œufs..."
-          />
+          <Text style={styles.label}>Ce que tu produis</Text>
+          <SelecteurCategories valeurs={typeProduction} onChange={setTypeProduction} />
         </>
       )}
 

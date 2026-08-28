@@ -13,7 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 import { distanceKm, formatDistance } from '../../lib/geo';
-import { COULEURS, categorieLabel, formatEuros } from '../../lib/constants';
+import { COULEURS, categorieLabel, formatEuros, formatTypeProduction } from '../../lib/constants';
 
 export default function ProductDetailScreen({ route, navigation }) {
   const { productId } = route.params;
@@ -125,7 +125,9 @@ export default function ProductDetailScreen({ route, navigation }) {
         >
           <Text style={styles.vendeurNom}>👤 {produit.vendeur?.prenom}</Text>
           <Text style={styles.vendeurMeta}>
-            {produit.vendeur?.type_production ? `${produit.vendeur.type_production} · ` : ''}
+            {produit.vendeur?.type_production
+              ? `${formatTypeProduction(produit.vendeur.type_production)} · `
+              : ''}
             {formatDistance(distance)}
           </Text>
           <Text style={styles.vendeurLien}>Voir sa vitrine →</Text>

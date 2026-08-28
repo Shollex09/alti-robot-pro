@@ -10,6 +10,22 @@ export function categorieLabel(value) {
   return c ? `${c.emoji} ${c.label}` : value;
 }
 
+// Le type de production est stocké en texte : "legume,oeuf".
+export function parseTypeProduction(valeur) {
+  if (!valeur) return [];
+  return valeur
+    .split(',')
+    .map((v) => v.trim())
+    .filter((v) => CATEGORIES.some((c) => c.value === v));
+}
+
+export function formatTypeProduction(valeur) {
+  const choisies = parseTypeProduction(valeur);
+  if (choisies.length > 0) return choisies.map(categorieLabel).join(' · ');
+  // Ancien format libre saisi à la main : on l'affiche tel quel.
+  return valeur || null;
+}
+
 export const COULEURS = {
   vert: '#2e7d32',
   vertClair: '#e8f5e9',
