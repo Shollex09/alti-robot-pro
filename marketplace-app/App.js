@@ -1,70 +1,45 @@
-import { useCallback, useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
-import { supabase } from './lib/supabase';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider, useAuth } from './lib/AuthContext';
+import { COULEURS } from './lib/constants';
 import AuthScreen from './screens/AuthScreen';
 import ProfileScreen from './screens/ProfileScreen';
-import HomeScreen from './screens/HomeScreen';
+import RootNavigator from './navigation/RootNavigator';
 
-export default function App() {
-  const [session, setSession] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  const loadProfile = useCallback(async (userId) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-    setProfile(data);
-  }, []);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      if (session) await loadProfile(session.user.id);
-      setLoading(false);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      if (session) {
-        await loadProfile(session.user.id);
-      } else {
-        setProfile(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [loadProfile]);
+function Racine() {
+  const { session, profile, loading, rechargerProfil } = useAuth();
 
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={COULEURS.vert} />
       </View>
     );
   }
 
-  let content;
-  if (!session) {
-    content = <AuthScreen />;
-  } else if (!profile || profile.latitude == null) {
-    content = (
-      <ProfileScreen session={session} profile={profile} onSaved={() => loadProfile(session.user.id)} />
-    );
-  } else {
-    content = <HomeScreen profile={profile} />;
+  // Trois états : pas connecté → profil incomplet (pas de position) → l'appli complète.
+  if (!session) return <AuthScreen />;
+  if (!profile || profile.latitude == null) {
+    return <ProfileScreen session={session} profile={profile} onSaved={rechargerProfil} />;
   }
+  return <RootNavigator />;
+}
 
+export default function App() {
   return (
-    <View style={styles.container}>
-      {content}
-      <StatusBar style="auto" />
-    </View>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <View style={styles.container}>
+          <Racine />
+          <StatusBar style="auto" />
+        </View>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: COULEURS.fond },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });
