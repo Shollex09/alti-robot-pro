@@ -129,7 +129,6 @@ tout re-cloner.
 
 ## Rappel : les scripts SQL
 
-Un nouveau projet Supabase doit rejouer, dans l'ordre, les fichiers de
-`marketplace-app/supabase/` : `01` (schéma), `02` (commandes, photos), `03`
-(gestion vendeur), `04` (temps réel), `05` (messagerie), `06` (suppression de
-compte et signalements).
+Un nouveau projet Supabase n'a qu'un seul fichier à exécuter :
+`marketplace-app/supabase/00-tout-en-un.sql`. Il contient tout et se rejoue
+sans risque.

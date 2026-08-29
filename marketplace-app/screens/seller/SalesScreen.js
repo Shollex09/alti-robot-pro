@@ -50,8 +50,21 @@ export default function SalesScreen() {
   const produits = (donnees?.produits ?? []).filter((p) => p.statut !== 'retire');
 
   async function changerStatut(commandeId, statut) {
-    const { error } = await supabase.from('orders').update({ statut }).eq('id', commandeId);
+    // .select() renvoie les lignes réellement modifiées : sans ça, un refus
+    // des règles de sécurité passe pour un succès et le bouton semble mort.
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ statut })
+      .eq('id', commandeId)
+      .select('id');
     if (error) return Alert.alert('Erreur', error.message);
+    if (!data || data.length === 0) {
+      Alert.alert(
+        'Modification refusée',
+        "La base n'autorise pas encore le vendeur à confirmer une commande. Exécute le script supabase/00-tout-en-un.sql dans Supabase, puis réessaie."
+      );
+      return;
+    }
     charger();
   }
 

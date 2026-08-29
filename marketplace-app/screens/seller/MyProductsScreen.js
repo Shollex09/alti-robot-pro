@@ -48,7 +48,11 @@ export default function MyProductsScreen({ navigation }) {
         text: 'Retirer',
         style: 'destructive',
         onPress: async () => {
-          await supabase.from('products').update({ statut: 'retire' }).eq('id', produit.id);
+          const { error } = await supabase
+            .from('products')
+            .update({ statut: 'retire' })
+            .eq('id', produit.id);
+          if (error) return Alert.alert('Erreur', error.message);
           charger();
         },
       },
@@ -63,7 +67,11 @@ export default function MyProductsScreen({ navigation }) {
       );
       return;
     }
-    await supabase.from('products').update({ statut: 'disponible' }).eq('id', produit.id);
+    const { error } = await supabase
+      .from('products')
+      .update({ statut: 'disponible' })
+      .eq('id', produit.id);
+    if (error) return Alert.alert('Erreur', error.message);
     charger();
   }
 

@@ -36,11 +36,20 @@ Si ça fonctionne, on peut passer à la suite (création du projet Supabase, pui
 
 ## Étape 3 — mettre à jour la base Supabase
 
-Avant de lancer la version complète, exécute une fois le script
-`supabase/02-marketplace.sql` dans **Supabase → SQL Editor → New query → Run**.
-Il ajoute le droit pour un vendeur de confirmer/annuler une commande, le
-garde-fou anti-survente, le retour du stock à l'annulation, et le stockage des
-photos.
+Un seul script à connaître : **`supabase/00-tout-en-un.sql`**. Copie-le entier
+dans **Supabase → SQL Editor → New query → Run**.
+
+Il contient tout (tables, sécurité, automatismes, photos, temps réel) et se
+rejoue sans risque : ce qui existe est laissé tel quel, ce qui manque est
+ajouté. En cas de doute sur l'état de la base — un bouton qui ne fait rien, une
+photo qui ne part pas — relancer ce script est le premier réflexe.
+
+Supabase affiche un avertissement à cause des `drop policy` : c'est normal, ces
+lignes ne suppriment que des règles aussitôt recréées. Aucune donnée n'est
+touchée.
+
+Les fichiers `01` à `07` restent comme historique, mais n'ont plus à être joués
+un par un.
 
 ⚠️ Pour tester l'inscription sans confirmation par email, désactive "Confirm email"
 dans **Authentication → Sign In / Providers → Email**.
@@ -82,6 +91,7 @@ screens/
     InvestissementsScreen.js  matériel, serre, outillage
     PlusScreen.js          menu de gestion + export CSV
 supabase/
+  00-tout-en-un.sql       ⭐ le seul à exécuter — tout, rejouable
   01-schema-initial.sql   schéma de départ (référence)
   02-marketplace.sql      commandes, anti-survente, photos
   03-gestion-vendeur.sql  coûts, consommation, investissements, ventes directes
