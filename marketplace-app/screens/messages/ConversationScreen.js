@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 import { useMessages } from '../../lib/MessagesContext';
@@ -25,6 +26,7 @@ export default function ConversationScreen({ route, navigation }) {
   const { conversationId, prenom } = route.params;
   const { session } = useAuth();
   const { definirConversationOuverte, rafraichir } = useMessages();
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState([]);
   const [texte, setTexte] = useState('');
   const [loading, setLoading] = useState(true);
@@ -53,7 +55,10 @@ export default function ConversationScreen({ route, navigation }) {
   }, []);
 
   const fenetreReduite = hauteurVue != null && hauteurVue < hauteurMax.current - 40;
-  const decalage = hauteurClavier > 0 && !fenetreReduite ? hauteurClavier : 0;
+  const decalageClavier = hauteurClavier > 0 && !fenetreReduite ? hauteurClavier : 0;
+  // En edge-to-edge, l'écran s'étend derrière la barre de navigation : sans ce
+  // second décalage, la barre de saisie passe dessous, clavier ouvert ou non.
+  const decalage = decalageClavier + insets.bottom;
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: prenom });
@@ -129,7 +134,9 @@ export default function ConversationScreen({ route, navigation }) {
     <View
       style={[styles.page, { paddingBottom: decalage }]}
       onLayout={(e) => {
-        const hauteur = e.nativeEvent.layout.height + decalage;
+        // Hauteur brute de la vue : le rembourrage ne la change pas, donc une
+        // baisse signifie que la fenêtre s'est réduite pour le clavier.
+        const hauteur = e.nativeEvent.layout.height;
         hauteurMax.current = Math.max(hauteurMax.current, hauteur);
         setHauteurVue(hauteur);
       }}
