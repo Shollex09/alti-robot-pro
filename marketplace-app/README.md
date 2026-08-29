@@ -120,6 +120,16 @@ pour ajuster une quantité ou convenir d'un retrait. Une seule conversation par
 paire, quel que soit le produit ; les messages arrivent en direct et déclenchent
 une notification (`05-messagerie.sql`).
 
+## Le retrait
+
+Confirmer une commande sans dire où venir la chercher ne sert à rien : le
+vendeur renseigne donc le lieu et le créneau au moment où il accepte, et
+l'acheteur les retrouve dans « Mes achats » et dans la notification. Ces
+informations sont stockées sur la commande, visibles du seul acheteur concerné —
+c'est le seul endroit où une adresse précise circule, une fois la vente
+convenue. Le lieu saisi est réutilisé par défaut la fois suivante
+(`parametres_vendeur`, lisible par son seul propriétaire).
+
 ## Espace vendeur : la logique du poulailler
 
 L'onglet « Vendre » reprend le fonctionnement de l'app Gestion du Poulailler,

@@ -60,6 +60,18 @@ create table if not exists public.orders (
   statut text not null default 'commande' check (statut in ('commande', 'confirmee', 'annulee')),
   created_at timestamptz not null default now()
 );
+-- Où et quand venir chercher la commande. Renseigné par le vendeur au moment
+-- où il confirme, et visible du seul acheteur concerné : c'est le seul endroit
+-- où une adresse précise circule, une fois la vente convenue.
+alter table public.orders add column if not exists infos_retrait text;
+
+-- Réglages privés du vendeur. Table à part, car les profils sont lisibles par
+-- tous les inscrits : l'adresse de retrait n'a rien à y faire.
+create table if not exists public.parametres_vendeur (
+  vendeur_id uuid primary key references public.profiles(id) on delete cascade,
+  retrait_defaut text,
+  updated_at timestamptz not null default now()
+);
 
 create table if not exists public.favoris (
   id uuid primary key default gen_random_uuid(),
@@ -320,6 +332,7 @@ alter table public.reapprovisionnements enable row level security;
 alter table public.conversations enable row level security;
 alter table public.messages enable row level security;
 alter table public.signalements enable row level security;
+alter table public.parametres_vendeur enable row level security;
 
 drop policy if exists "Profils visibles par tous les connectés" on public.profiles;
 create policy "Profils visibles par tous les connectés"
@@ -411,6 +424,10 @@ create policy "Marquer ses messages reçus comme lus" on public.messages for upd
 drop policy if exists "Signaler" on public.signalements;
 create policy "Signaler" on public.signalements for insert to authenticated
   with check (auth.uid() = auteur_id);
+
+drop policy if exists "Chacun gère ses réglages de retrait" on public.parametres_vendeur;
+create policy "Chacun gère ses réglages de retrait" on public.parametres_vendeur for all to authenticated
+  using (auth.uid() = vendeur_id) with check (auth.uid() = vendeur_id);
 
 drop policy if exists "Voir ses signalements" on public.signalements;
 create policy "Voir ses signalements" on public.signalements for select to authenticated

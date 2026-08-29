@@ -16,6 +16,7 @@ import { useCommandes } from '../../lib/CommandesContext';
 import { chargerDonneesVendeur, toutesLesVentes } from '../../lib/gestion';
 import { COULEURS, formatEuros } from '../../lib/constants';
 import ChampDate from '../../components/ChampDate';
+import ModaleRetrait from '../../components/ModaleRetrait';
 
 export default function SalesScreen() {
   const { session } = useAuth();
@@ -30,6 +31,7 @@ export default function SalesScreen() {
   const [prix, setPrix] = useState('');
   const [formulaireOuvert, setFormulaireOuvert] = useState(false);
   const [enregistrement, setEnregistrement] = useState(false);
+  const [commandeAConfirmer, setCommandeAConfirmer] = useState(null);
 
   const charger = useCallback(async () => {
     const d = await chargerDonneesVendeur(session.user.id);
@@ -49,12 +51,14 @@ export default function SalesScreen() {
   const enAttente = commandesBrutes.filter((c) => c.statut === 'commande');
   const produits = (donnees?.produits ?? []).filter((p) => p.statut !== 'retire');
 
-  async function changerStatut(commandeId, statut) {
+  async function changerStatut(commandeId, statut, infosRetrait = undefined) {
+    const valeurs = { statut };
+    if (infosRetrait !== undefined) valeurs.infos_retrait = infosRetrait;
     // .select() renvoie les lignes réellement modifiées : sans ça, un refus
     // des règles de sécurité passe pour un succès et le bouton semble mort.
     const { data, error } = await supabase
       .from('orders')
-      .update({ statut })
+      .update(valeurs)
       .eq('id', commandeId)
       .select('id');
     if (error) return Alert.alert('Erreur', error.message);
@@ -154,7 +158,7 @@ export default function SalesScreen() {
                   <View style={styles.attenteActions}>
                     <TouchableOpacity
                       style={[styles.action, styles.actionValider]}
-                      onPress={() => changerStatut(c.id, 'confirmee')}
+                      onPress={() => setCommandeAConfirmer(c)}
                     >
                       <Text style={styles.actionValiderTexte}>Confirmer</Text>
                     </TouchableOpacity>
@@ -274,11 +278,22 @@ export default function SalesScreen() {
         </TouchableOpacity>
       )}
       ListFooterComponent={
-        ventes.length > 0 ? (
-          <Text style={styles.astuce}>
-            Appui long sur une vente en direct pour la supprimer.
-          </Text>
-        ) : null
+        <>
+          {ventes.length > 0 ? (
+            <Text style={styles.astuce}>
+              Appui long sur une vente en direct pour la supprimer.
+            </Text>
+          ) : null}
+          <ModaleRetrait
+            visible={!!commandeAConfirmer}
+            commande={commandeAConfirmer}
+            onAnnuler={() => setCommandeAConfirmer(null)}
+            onConfirmer={async (infosRetrait) => {
+              await changerStatut(commandeAConfirmer.id, 'confirmee', infosRetrait);
+              setCommandeAConfirmer(null);
+            }}
+          />
+        </>
       }
     />
   );

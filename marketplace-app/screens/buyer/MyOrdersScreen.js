@@ -21,7 +21,9 @@ export default function MyOrdersScreen({ navigation }) {
   const charger = useCallback(async () => {
     const { data, error } = await supabase
       .from('orders')
-      .select('*, product:products(id, nom, photo_url), vendeur:profiles!orders_vendeur_id_fkey(prenom)')
+      .select(
+        '*, product:products(id, nom, photo_url), vendeur:profiles!orders_vendeur_id_fkey(prenom)'
+      )
       .eq('acheteur_id', session.user.id)
       .order('created_at', { ascending: false });
     setErreur(error ?? null);
@@ -92,6 +94,20 @@ export default function MyOrdersScreen({ navigation }) {
               </Text>
               <Text style={styles.total}>{formatEuros(item.prix_total)}</Text>
             </View>
+
+            {item.statut === 'confirmee' ? (
+              <View style={styles.retrait}>
+                <Text style={styles.retraitTitre}>Où venir chercher</Text>
+                <Text style={styles.retraitTexte}>
+                  {item.infos_retrait?.trim()
+                    ? item.infos_retrait
+                    : `${item.vendeur?.prenom ?? 'Le producteur'} n'a pas précisé le lieu — écris-lui pour convenir du retrait.`}
+                </Text>
+                <Text style={styles.retraitNote}>
+                  Le règlement se fait sur place, directement au producteur.
+                </Text>
+              </View>
+            ) : null}
           </TouchableOpacity>
         );
       }}
@@ -115,6 +131,15 @@ const styles = StyleSheet.create({
   meta: { fontSize: 13, color: COULEURS.texteDoux },
   date: { fontSize: 12, color: COULEURS.texteDoux },
   total: { fontSize: 15, fontWeight: '600', color: COULEURS.vert },
+  retrait: {
+    backgroundColor: COULEURS.vertClair,
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 8,
+  },
+  retraitTitre: { fontSize: 12, fontWeight: '700', color: COULEURS.vertProfond },
+  retraitTexte: { fontSize: 14, color: COULEURS.texte, marginTop: 5, lineHeight: 20 },
+  retraitNote: { fontSize: 11, color: COULEURS.texteDoux, marginTop: 8 },
   vide: { padding: 40, alignItems: 'center' },
   videTitre: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
   videTexte: { color: COULEURS.texteDoux },

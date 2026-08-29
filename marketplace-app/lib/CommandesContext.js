@@ -77,7 +77,12 @@ export function CommandesProvider({ children }) {
         if (commande.statut === old?.statut) return;
         setMisesAJourAchats((n) => n + 1);
         if (commande.statut === 'confirmee') {
-          prevenir('Commande confirmée ✅', 'Le producteur a confirmé ta réservation.');
+          prevenir(
+            'Commande confirmée',
+            commande.infos_retrait?.trim()
+              ? `Retrait : ${commande.infos_retrait.trim().slice(0, 140)}`
+              : 'Le producteur a confirmé ta réservation. Ouvre « Mes achats » pour le retrait.'
+          );
         } else if (commande.statut === 'annulee') {
           prevenir('Commande annulée', 'Le producteur n\'a pas pu honorer ta réservation.');
         }
