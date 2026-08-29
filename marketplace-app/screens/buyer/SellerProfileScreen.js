@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
+import { ouvrirConversation } from '../../lib/messagerie';
 import { distanceKm } from '../../lib/geo';
 import { COULEURS, categorieLabel, formatEuros } from '../../lib/constants';
 import EnteteProfil from '../../components/EnteteProfil';
@@ -18,7 +20,7 @@ import CarteSecteur from '../../components/CarteSecteur';
 
 export default function SellerProfileScreen({ route, navigation }) {
   const { vendeurId } = route.params;
-  const { profile } = useAuth();
+  const { session, profile } = useAuth();
   const [vendeur, setVendeur] = useState(null);
   const [produits, setProduits] = useState([]);
   const [nbVentes, setNbVentes] = useState(0);
@@ -50,6 +52,22 @@ export default function SellerProfileScreen({ route, navigation }) {
     }, [charger])
   );
 
+  async function contacter() {
+    try {
+      const conversationId = await ouvrirConversation({
+        acheteurId: session.user.id,
+        vendeurId,
+        productId: null,
+      });
+      navigation.navigate('Messages', {
+        screen: 'Conversation',
+        params: { conversationId, prenom: vendeur.prenom },
+      });
+    } catch (e) {
+      Alert.alert('Messagerie indisponible', e.message);
+    }
+  }
+
   if (!vendeur) {
     return (
       <View style={styles.center}>
@@ -78,6 +96,11 @@ export default function SellerProfileScreen({ route, navigation }) {
           nbMisesEnRelation={nbVentes}
           enfant={
             <>
+              {vendeurId !== session.user.id && (
+                <TouchableOpacity style={styles.contacterBtn} onPress={contacter}>
+                  <Text style={styles.contacterTexte}>💬 Contacter {vendeur.prenom}</Text>
+                </TouchableOpacity>
+              )}
               <CarteSecteur
                 latitude={vendeur.latitude}
                 longitude={vendeur.longitude}
@@ -124,6 +147,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginHorizontal: 16,
   },
+  contacterBtn: {
+    backgroundColor: COULEURS.vert,
+    borderRadius: 26,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 16,
+  },
+  contacterTexte: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
   vide: { textAlign: 'center', color: COULEURS.texteDoux, padding: 20 },
   carte: {
     flexDirection: 'row',

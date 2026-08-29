@@ -50,7 +50,7 @@ dans **Authentication → Sign In / Providers → Email**.
 ```
 App.js                    point d'entrée : connexion → profil → appli
 navigation/
-  RootNavigator.js        onglets (Découvrir, Achats, Favoris, Vendre, Réglages)
+  RootNavigator.js        onglets (Découvrir, Achats, Favoris, Messages, Vendre, Profil)
 lib/
   supabase.js             connexion à Supabase (URL + clé publique dans .env)
   AuthContext.js          session et profil partagés dans toute l'appli
@@ -67,6 +67,9 @@ screens/
     SellerProfileScreen.js vitrine publique d'un producteur
     MyOrdersScreen.js      historique de mes commandes
     FavorisScreen.js       produits mis en favori
+  messages/
+    ConversationsScreen.js liste des discussions
+    ConversationScreen.js  fil de discussion
   seller/
     DashboardScreen.js     bilan : CA, coûts, bénéfice, rentabilité, bilan annuel
     MyProductsScreen.js    mes annonces (créer / modifier / retirer)
@@ -83,6 +86,7 @@ supabase/
   02-marketplace.sql      commandes, anti-survente, photos
   03-gestion-vendeur.sql  coûts, consommation, investissements, ventes directes
   04-notifications.sql    temps réel sur les commandes
+  05-messagerie.sql       conversations acheteur / producteur
 ```
 
 ## Notifications
@@ -97,6 +101,13 @@ fonctionnent plus dans Expo Go : il faut un build de développement. Les
 notifications **locales** utilisées ici marchent tant que l'appli tourne, y
 compris en arrière-plan récent. Le passage aux notifications à distance se fera
 au moment de préparer la publication.
+
+## Messagerie
+
+Un acheteur peut contacter un producteur depuis une fiche produit ou sa vitrine,
+pour ajuster une quantité ou convenir d'un retrait. Une seule conversation par
+paire, quel que soit le produit ; les messages arrivent en direct et déclenchent
+une notification (`05-messagerie.sql`).
 
 ## Espace vendeur : la logique du poulailler
 
@@ -130,4 +141,4 @@ politique de confidentialité, notifications à distance...).
 ## Reporté à la v2 (volontairement)
 
 Paiement en ligne (Stripe Connect), abonnement Pro, notifications push, avis /
-notation, messagerie interne.
+notation.

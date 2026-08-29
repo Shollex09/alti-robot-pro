@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { useAuth } from '../lib/AuthContext';
 import { useCommandes } from '../lib/CommandesContext';
+import { useMessages } from '../lib/MessagesContext';
 import { COULEURS } from '../lib/constants';
 
 import ProductsListScreen from '../screens/buyer/ProductsListScreen';
@@ -24,6 +25,8 @@ import InvestissementsScreen from '../screens/seller/InvestissementsScreen';
 import PlusScreen from '../screens/seller/PlusScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import MonProfilScreen from '../screens/MonProfilScreen';
+import ConversationsScreen from '../screens/messages/ConversationsScreen';
+import ConversationScreen from '../screens/messages/ConversationScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -48,6 +51,19 @@ function MesProduitsStack() {
     <Stack.Navigator>
       <Stack.Screen name="MyProductsList" component={MyProductsScreen} options={{ title: 'Mes annonces' }} />
       <Stack.Screen name="ProductForm" component={ProductFormScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function MessagesStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="Conversations"
+        component={ConversationsScreen}
+        options={{ title: 'Messages' }}
+      />
+      <Stack.Screen name="Conversation" component={ConversationScreen} />
     </Stack.Navigator>
   );
 }
@@ -133,6 +149,7 @@ function EspaceVendeur() {
 export default function RootNavigator() {
   const { estVendeur } = useAuth();
   const { enAttente, misesAJourAchats, marquerAchatsVus } = useCommandes();
+  const { nonLus } = useMessages();
 
   return (
     <NavigationContainer>
@@ -161,6 +178,15 @@ export default function RootNavigator() {
           name="Favoris"
           component={FavorisScreen}
           options={{ title: 'Favoris', tabBarIcon: icone('★') }}
+        />
+        <Tab.Screen
+          name="Messages"
+          component={MessagesStack}
+          options={{
+            headerShown: false,
+            tabBarIcon: icone('💬'),
+            tabBarBadge: nonLus > 0 ? nonLus : undefined,
+          }}
         />
         {estVendeur && (
           <Tab.Screen

@@ -3,6 +3,7 @@ import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import { CommandesProvider } from './lib/CommandesContext';
+import { MessagesProvider } from './lib/MessagesContext';
 import { COULEURS } from './lib/constants';
 import AuthScreen from './screens/AuthScreen';
 import ProfileScreen from './screens/ProfileScreen';
@@ -32,10 +33,12 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <CommandesProvider>
-          <View style={styles.container}>
-            <Racine />
-            <StatusBar style="auto" />
-          </View>
+          <MessagesProvider>
+            <View style={styles.container}>
+              <Racine />
+              <StatusBar style="auto" />
+            </View>
+          </MessagesProvider>
         </CommandesProvider>
       </AuthProvider>
     </SafeAreaProvider>

@@ -13,6 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 import { distanceKm, formatDistance } from '../../lib/geo';
+import { ouvrirConversation } from '../../lib/messagerie';
 import { COULEURS, categorieLabel, formatEuros, formatTypeProduction } from '../../lib/constants';
 
 export default function ProductDetailScreen({ route, navigation }) {
@@ -57,6 +58,22 @@ export default function ProductDetailScreen({ route, navigation }) {
         .select('id')
         .single();
       setFavori(data?.id ?? null);
+    }
+  }
+
+  async function contacterProducteur() {
+    try {
+      const conversationId = await ouvrirConversation({
+        acheteurId: session.user.id,
+        vendeurId: produit.vendeur_id,
+        productId: produit.id,
+      });
+      navigation.navigate('Messages', {
+        screen: 'Conversation',
+        params: { conversationId, prenom: produit.vendeur?.prenom ?? 'Producteur' },
+      });
+    } catch (e) {
+      Alert.alert('Messagerie indisponible', e.message);
     }
   }
 
@@ -137,11 +154,14 @@ export default function ProductDetailScreen({ route, navigation }) {
           <Text style={styles.info}>C'est ton propre produit.</Text>
         ) : (
           <>
-            <TouchableOpacity style={styles.favoriBtn} onPress={basculerFavori}>
-              <Text style={styles.favoriTexte}>
-                {favori ? '★ Retirer des favoris' : '☆ Ajouter aux favoris'}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.actionsSecondaires}>
+              <TouchableOpacity style={styles.favoriBtn} onPress={basculerFavori}>
+                <Text style={styles.favoriTexte}>{favori ? '★ En favori' : '☆ Favori'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.contacterBtn} onPress={contacterProducteur}>
+                <Text style={styles.favoriTexte}>💬 Contacter</Text>
+              </TouchableOpacity>
+            </View>
 
             <Text style={styles.label}>Quantité</Text>
             <View style={styles.quantiteRow}>
@@ -196,8 +216,17 @@ const styles = StyleSheet.create({
   vendeurNom: { fontSize: 16, fontWeight: '600' },
   vendeurMeta: { fontSize: 13, color: COULEURS.texteDoux, marginTop: 4 },
   vendeurLien: { fontSize: 13, color: COULEURS.vert, marginTop: 8, fontWeight: '600' },
+  actionsSecondaires: { flexDirection: 'row', gap: 10, marginTop: 20 },
   favoriBtn: {
-    marginTop: 20,
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COULEURS.vert,
+    alignItems: 'center',
+  },
+  contacterBtn: {
+    flex: 1,
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,

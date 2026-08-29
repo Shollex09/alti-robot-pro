@@ -98,6 +98,14 @@ qu'il y a de vrais utilisateurs.
 
 ---
 
+### Sortir le projet du dépôt `alti-robot-pro`
+
+L'appli vit aujourd'hui dans un dépôt créé pour le robot de trading, qui héberge
+aussi le poulailler. Le nom n'apparaît nulle part pour l'utilisateur, mais un
+projet destiné au Play Store mérite son propre dépôt, avec son historique et ses
+réglages à lui. À faire au moment de la réorganisation, pas avant : ça oblige à
+tout re-cloner.
+
 ## 🟢 Confort
 
 - Tester sur plusieurs tailles d'écran et sur un petit téléphone
