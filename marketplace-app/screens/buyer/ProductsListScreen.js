@@ -14,6 +14,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 import { distanceKm, formatDistance } from '../../lib/geo';
 import { CATEGORIES, COULEURS, categorieLabel, formatEuros } from '../../lib/constants';
+import EtatErreur from '../../components/EtatErreur';
 
 export default function ProductsListScreen({ navigation }) {
   const { profile } = useAuth();
@@ -21,15 +22,17 @@ export default function ProductsListScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [categorie, setCategorie] = useState(null);
+  const [erreur, setErreur] = useState(null);
 
   const charger = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('products')
       .select('*, vendeur:profiles!products_vendeur_id_fkey(id, prenom, latitude, longitude)')
       .eq('statut', 'disponible')
       .gt('quantite_disponible', 0)
       .order('created_at', { ascending: false });
-    setProduits(data ?? []);
+    setErreur(error ?? null);
+    if (!error) setProduits(data ?? []);
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -63,6 +66,18 @@ export default function ProductsListScreen({ navigation }) {
       <View style={styles.center}>
         <ActivityIndicator size="large" color={COULEURS.vert} />
       </View>
+    );
+  }
+
+  if (erreur) {
+    return (
+      <EtatErreur
+        erreur={erreur}
+        onReessayer={() => {
+          setLoading(true);
+          charger();
+        }}
+      />
     );
   }
 

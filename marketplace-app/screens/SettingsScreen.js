@@ -35,6 +35,7 @@ export default function SettingsScreen() {
   );
   const [locating, setLocating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [suppression, setSuppression] = useState(false);
 
   async function actualiserPosition() {
     setLocating(true);
@@ -96,6 +97,38 @@ export default function SettingsScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function confirmerSuppression() {
+    // Deux confirmations : l'action est définitive et sans retour possible.
+    Alert.alert(
+      'Supprimer ton compte ?',
+      'Ton profil, tes annonces, tes commandes et tes messages seront effacés définitivement.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Continuer',
+          style: 'destructive',
+          onPress: () =>
+            Alert.alert('Dernière confirmation', 'Cette action est irréversible. Confirmer ?', [
+              { text: 'Annuler', style: 'cancel' },
+              { text: 'Supprimer', style: 'destructive', onPress: supprimerCompte },
+            ]),
+        },
+      ]
+    );
+  }
+
+  async function supprimerCompte() {
+    setSuppression(true);
+    const { error } = await supabase.rpc('supprimer_mon_compte');
+    setSuppression(false);
+    if (error) {
+      Alert.alert('Suppression impossible', error.message);
+      return;
+    }
+    // Le compte n'existe plus : on referme la session pour revenir à l'accueil.
+    await supabase.auth.signOut();
   }
 
   async function devenirVendeur() {
@@ -192,6 +225,23 @@ export default function SettingsScreen() {
       <TouchableOpacity style={styles.deconnexionBtn} onPress={() => supabase.auth.signOut()}>
         <Text style={styles.deconnexionTexte}>Se déconnecter</Text>
       </TouchableOpacity>
+
+      <View style={styles.zoneDanger}>
+        <Text style={styles.dangerTitre}>Supprimer mon compte</Text>
+        <Text style={styles.dangerTexte}>
+          Efface définitivement ton profil, tes annonces, tes commandes et tes messages. Cette
+          action est irréversible.
+        </Text>
+        <TouchableOpacity
+          style={styles.supprimerBtn}
+          onPress={confirmerSuppression}
+          disabled={suppression}
+        >
+          <Text style={styles.supprimerTexte}>
+            {suppression ? 'Suppression...' : 'Supprimer définitivement mon compte'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -238,4 +288,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   deconnexionTexte: { color: COULEURS.rouge, fontWeight: '600' },
+  zoneDanger: {
+    marginTop: 32,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f0c9c9',
+    backgroundColor: '#fdf5f5',
+  },
+  dangerTitre: { fontSize: 14, fontWeight: 'bold', color: COULEURS.rouge },
+  dangerTexte: { fontSize: 12, color: COULEURS.texteDoux, marginTop: 6, lineHeight: 18 },
+  supprimerBtn: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: COULEURS.rouge,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  supprimerTexte: { color: COULEURS.rouge, fontWeight: '600', fontSize: 13 },
 });

@@ -14,6 +14,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 import { distanceKm, formatDistance } from '../../lib/geo';
 import { ouvrirConversation } from '../../lib/messagerie';
+import BoutonSignaler from '../../components/BoutonSignaler';
 import { COULEURS, categorieLabel, formatEuros, formatTypeProduction } from '../../lib/constants';
 
 export default function ProductDetailScreen({ route, navigation }) {
@@ -188,6 +189,7 @@ export default function ProductDetailScreen({ route, navigation }) {
             <Text style={styles.paiementNote}>
               Pas de paiement en ligne : tu régles directement avec le producteur au retrait.
             </Text>
+            <BoutonSignaler productId={produit.id} />
           </>
         )}
       </View>

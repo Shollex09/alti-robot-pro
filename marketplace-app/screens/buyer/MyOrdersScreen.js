@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 import { COULEURS, formatEuros } from '../../lib/constants';
+import EtatErreur from '../../components/EtatErreur';
 
 const STATUTS = {
   commande: { label: 'En attente', couleur: '#ef6c00' },
@@ -15,14 +16,16 @@ export default function MyOrdersScreen({ navigation }) {
   const { session } = useAuth();
   const [commandes, setCommandes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [erreur, setErreur] = useState(null);
 
   const charger = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('orders')
       .select('*, product:products(id, nom, photo_url), vendeur:profiles!orders_vendeur_id_fkey(prenom)')
       .eq('acheteur_id', session.user.id)
       .order('created_at', { ascending: false });
-    setCommandes(data ?? []);
+    setErreur(error ?? null);
+    if (!error) setCommandes(data ?? []);
     setLoading(false);
   }, [session.user.id]);
 
@@ -37,6 +40,18 @@ export default function MyOrdersScreen({ navigation }) {
       <View style={styles.center}>
         <ActivityIndicator size="large" color={COULEURS.vert} />
       </View>
+    );
+  }
+
+  if (erreur) {
+    return (
+      <EtatErreur
+        erreur={erreur}
+        onReessayer={() => {
+          setLoading(true);
+          charger();
+        }}
+      />
     );
   }
 

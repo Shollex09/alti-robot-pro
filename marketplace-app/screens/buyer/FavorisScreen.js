@@ -12,19 +12,22 @@ import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 import { COULEURS, categorieLabel, formatEuros } from '../../lib/constants';
+import EtatErreur from '../../components/EtatErreur';
 
 export default function FavorisScreen({ navigation }) {
   const { session } = useAuth();
   const [favoris, setFavoris] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [erreur, setErreur] = useState(null);
 
   const charger = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('favoris')
       .select('id, product:products(id, nom, categorie, prix, photo_url, statut, quantite_disponible)')
       .eq('acheteur_id', session.user.id)
       .order('created_at', { ascending: false });
-    setFavoris((data ?? []).filter((f) => f.product));
+    setErreur(error ?? null);
+    if (!error) setFavoris((data ?? []).filter((f) => f.product));
     setLoading(false);
   }, [session.user.id]);
 
@@ -44,6 +47,18 @@ export default function FavorisScreen({ navigation }) {
       <View style={styles.center}>
         <ActivityIndicator size="large" color={COULEURS.vert} />
       </View>
+    );
+  }
+
+  if (erreur) {
+    return (
+      <EtatErreur
+        erreur={erreur}
+        onReessayer={() => {
+          setLoading(true);
+          charger();
+        }}
+      />
     );
   }
 

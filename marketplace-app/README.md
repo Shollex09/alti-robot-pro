@@ -87,6 +87,7 @@ supabase/
   03-gestion-vendeur.sql  coûts, consommation, investissements, ventes directes
   04-notifications.sql    temps réel sur les commandes
   05-messagerie.sql       conversations acheteur / producteur
+  06-compte-et-signalements.sql  suppression de compte, signalements
 ```
 
 ## Notifications
@@ -135,8 +136,15 @@ appliquée, et la carte n'est ni déplaçable ni zoomable.
 ## Avant de publier
 
 Voir `AVANT-PUBLICATION.md` : la liste de tout ce qu'il reste à faire le jour de
-la mise sur le Play Store (build EAS, clé Google Maps, suppression de compte,
-politique de confidentialité, notifications à distance...).
+la mise sur le Play Store (build EAS, clé Google Maps, politique de
+confidentialité, notifications à distance...).
+
+## Compte et signalements
+
+Chacun peut supprimer définitivement son compte depuis les réglages — profil,
+annonces, commandes et messages partent en cascade. Une annonce peut être
+signalée depuis sa fiche ; les signalements se relisent dans Supabase
+(`06-compte-et-signalements.sql`).
 
 ## Reporté à la v2 (volontairement)
 

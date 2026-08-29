@@ -40,11 +40,11 @@ Android*) :
 
 Sans ça : carte grise sur les fiches profil.
 
-### Suppression de compte
+### Page web de suppression de compte
 
-Google Play l'exige pour toute appli permettant de créer un compte : il faut un
-moyen de supprimer son compte **depuis l'appli**, plus une page web expliquant
-la démarche. Rien n'existe encore — à ajouter dans Réglages.
+La suppression depuis l'appli est faite (Réglages → zone rouge, avec double
+confirmation). Google Play demande **en plus** une page web publique expliquant
+la démarche, à renseigner dans la fiche du Play Store.
 
 ### Politique de confidentialité
 
@@ -96,8 +96,6 @@ L'offre gratuite met le projet **en pause après une semaine sans activité** �
 l'appli tomberait en panne. Prévoir le passage au plan payant (~25 $/mois) dès
 qu'il y a de vrais utilisateurs.
 
----
-
 ### Sortir le projet du dépôt `alti-robot-pro`
 
 L'appli vit aujourd'hui dans un dépôt créé pour le robot de trading, qui héberge
@@ -106,13 +104,15 @@ projet destiné au Play Store mérite son propre dépôt, avec son historique et
 réglages à lui. À faire au moment de la réorganisation, pas avant : ça oblige à
 tout re-cloner.
 
+---
+
 ## 🟢 Confort
 
 - Tester sur plusieurs tailles d'écran et sur un petit téléphone
-- Message clair quand le téléphone n'a pas de réseau
 - Conditions d'utilisation (CGU) et âge minimum
 - Écran d'aide « comment ça marche » pour les nouveaux venus
-- Signalement d'une annonce abusive
+- Traiter les signalements reçus (table `signalements` dans Supabase) : prévoir
+  qui les relit, et à quelle fréquence
 - Limiter le nombre d'annonces par compte, pour éviter le spam
 
 ---
@@ -123,7 +123,6 @@ tout re-cloner.
 - Abonnement « Pro » vendeur : mise en avant, statistiques avancées, boost
   d'annonce
 - Système d'avis et de notation
-- Messagerie interne entre acheteur et vendeur
 - Alertes push ciblées (« un nouveau producteur près de chez toi »)
 
 ---
@@ -132,4 +131,5 @@ tout re-cloner.
 
 Un nouveau projet Supabase doit rejouer, dans l'ordre, les fichiers de
 `marketplace-app/supabase/` : `01` (schéma), `02` (commandes, photos), `03`
-(gestion vendeur), `04` (temps réel).
+(gestion vendeur), `04` (temps réel), `05` (messagerie), `06` (suppression de
+compte et signalements).
