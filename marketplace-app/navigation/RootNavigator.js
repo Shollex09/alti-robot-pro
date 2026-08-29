@@ -1,5 +1,5 @@
 import { Text } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
@@ -182,11 +182,17 @@ export default function RootNavigator() {
         <Tab.Screen
           name="Messages"
           component={MessagesStack}
-          options={{
+          options={({ route }) => ({
             headerShown: false,
             tabBarIcon: icone('💬'),
             tabBarBadge: nonLus > 0 ? nonLus : undefined,
-          }}
+            // Dans un fil de discussion, la barre d'onglets laisse la place
+            // au clavier et à la barre de saisie.
+            tabBarStyle:
+              getFocusedRouteNameFromRoute(route) === 'Conversation'
+                ? { display: 'none' }
+                : undefined,
+          })}
         />
         {estVendeur && (
           <Tab.Screen

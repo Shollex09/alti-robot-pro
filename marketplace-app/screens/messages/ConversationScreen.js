@@ -6,7 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ActivityIndicator,
   Alert,
@@ -30,6 +30,30 @@ export default function ConversationScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [envoi, setEnvoi] = useState(false);
   const liste = useRef(null);
+
+  // Depuis Android 15 (et le mode edge-to-edge du SDK 54), la fenêtre ne se
+  // réduit plus quand le clavier s'ouvre : la barre de saisie passe dessous.
+  // On mesure donc le clavier et on décale nous-mêmes — sauf si la fenêtre
+  // se réduit encore (Android plus anciens, iOS), auquel cas ce serait double.
+  const [hauteurClavier, setHauteurClavier] = useState(0);
+  const [hauteurVue, setHauteurVue] = useState(null);
+  const hauteurMax = useRef(0);
+
+  useEffect(() => {
+    const evenementOuverture = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const evenementFermeture = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const ouverture = Keyboard.addListener(evenementOuverture, (e) =>
+      setHauteurClavier(e.endCoordinates.height)
+    );
+    const fermeture = Keyboard.addListener(evenementFermeture, () => setHauteurClavier(0));
+    return () => {
+      ouverture.remove();
+      fermeture.remove();
+    };
+  }, []);
+
+  const fenetreReduite = hauteurVue != null && hauteurVue < hauteurMax.current - 40;
+  const decalage = hauteurClavier > 0 && !fenetreReduite ? hauteurClavier : 0;
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: prenom });
@@ -102,10 +126,13 @@ export default function ConversationScreen({ route, navigation }) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.page}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    <View
+      style={[styles.page, { paddingBottom: decalage }]}
+      onLayout={(e) => {
+        const hauteur = e.nativeEvent.layout.height + decalage;
+        hauteurMax.current = Math.max(hauteurMax.current, hauteur);
+        setHauteurVue(hauteur);
+      }}
     >
       <FlatList
         ref={liste}
@@ -150,7 +177,7 @@ export default function ConversationScreen({ route, navigation }) {
           <Text style={styles.envoyerTexte}>➤</Text>
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
