@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Modal, TextInput, Alert } fro
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import { COULEURS } from '../lib/constants';
+import Icone from './Icone';
 
 const MOTIFS = [
   'Produit interdit à la vente',
@@ -49,8 +50,9 @@ export default function BoutonSignaler({ productId = null, profilId = null }) {
 
   return (
     <>
-      <TouchableOpacity onPress={() => setOuvert(true)}>
-        <Text style={styles.lien}>⚑ Signaler cette annonce</Text>
+      <TouchableOpacity style={styles.lienZone} onPress={() => setOuvert(true)}>
+        <Icone nom="signaler" taille={13} couleur={COULEURS.texteDoux} />
+        <Text style={styles.lien}>Signaler cette annonce</Text>
       </TouchableOpacity>
 
       <Modal visible={ouvert} transparent animationType="fade" onRequestClose={() => setOuvert(false)}>
@@ -95,7 +97,8 @@ export default function BoutonSignaler({ productId = null, profilId = null }) {
 }
 
 const styles = StyleSheet.create({
-  lien: { color: COULEURS.texteDoux, fontSize: 12, textAlign: 'center', marginTop: 24 },
+  lienZone: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 24 },
+  lien: { color: COULEURS.texteDoux, fontSize: 12 },
   fond: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },
   boite: { backgroundColor: '#fff', borderRadius: 14, padding: 20 },
   titre: { fontSize: 18, fontWeight: 'bold', color: COULEURS.encre },

@@ -15,6 +15,7 @@ import { useAuth } from '../../lib/AuthContext';
 import { distanceKm, formatDistance } from '../../lib/geo';
 import { ouvrirConversation } from '../../lib/messagerie';
 import BoutonSignaler from '../../components/BoutonSignaler';
+import Icone from '../../components/Icone';
 import { COULEURS, categorieLabel, formatEuros, formatTypeProduction } from '../../lib/constants';
 
 export default function ProductDetailScreen({ route, navigation }) {
@@ -125,7 +126,7 @@ export default function ProductDetailScreen({ route, navigation }) {
         <Image source={{ uri: produit.photo_url }} style={styles.photo} />
       ) : (
         <View style={[styles.photo, styles.photoVide]}>
-          <Text style={styles.photoVideTexte}>🌱</Text>
+          <Icone nom="photo" taille={34} couleur={COULEURS.vert} />
         </View>
       )}
 
@@ -141,7 +142,7 @@ export default function ProductDetailScreen({ route, navigation }) {
           style={styles.vendeurCarte}
           onPress={() => navigation.navigate('SellerProfile', { vendeurId: produit.vendeur_id })}
         >
-          <Text style={styles.vendeurNom}>👤 {produit.vendeur?.prenom}</Text>
+          <Text style={styles.vendeurNom}>{produit.vendeur?.prenom}</Text>
           <Text style={styles.vendeurMeta}>
             {produit.vendeur?.type_production
               ? `${formatTypeProduction(produit.vendeur.type_production)} · `
@@ -157,10 +158,12 @@ export default function ProductDetailScreen({ route, navigation }) {
           <>
             <View style={styles.actionsSecondaires}>
               <TouchableOpacity style={styles.favoriBtn} onPress={basculerFavori}>
-                <Text style={styles.favoriTexte}>{favori ? '★ En favori' : '☆ Favori'}</Text>
+                <Icone nom="favoris" taille={16} couleur={COULEURS.vert} />
+                <Text style={styles.favoriTexte}>{favori ? 'En favori' : 'Favori'}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.contacterBtn} onPress={contacterProducteur}>
-                <Text style={styles.favoriTexte}>💬 Contacter</Text>
+                <Icone nom="messages" taille={16} couleur={COULEURS.vert} />
+                <Text style={styles.favoriTexte}>Contacter</Text>
               </TouchableOpacity>
             </View>
 
@@ -202,7 +205,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   photo: { width: '100%', height: 240 },
   photoVide: { backgroundColor: COULEURS.vertClair, justifyContent: 'center', alignItems: 'center' },
-  photoVideTexte: { fontSize: 64 },
+
   corps: { padding: 20 },
   nom: { fontSize: 24, fontWeight: 'bold', color: COULEURS.texte },
   categorie: { fontSize: 14, color: COULEURS.texteDoux, marginTop: 4 },
@@ -221,6 +224,9 @@ const styles = StyleSheet.create({
   actionsSecondaires: { flexDirection: 'row', gap: 10, marginTop: 20 },
   favoriBtn: {
     flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
@@ -229,6 +235,9 @@ const styles = StyleSheet.create({
   },
   contacterBtn: {
     flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,

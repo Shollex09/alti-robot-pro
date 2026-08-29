@@ -5,7 +5,7 @@ import { supabase } from './supabase';
 export const BUCKET_PHOTOS = 'photos';
 
 // Ouvre la galerie du téléphone et renvoie l'image choisie (ou null si annulé).
-export async function choisirPhoto() {
+export async function choisirPhoto({ aspect = [4, 3] } = {}) {
   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (status !== 'granted') {
     throw new Error("Autorisation refusée pour accéder aux photos du téléphone.");
@@ -13,7 +13,7 @@ export async function choisirPhoto() {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     allowsEditing: true,
-    aspect: [4, 3],
+    aspect,
     quality: 0.6,
     base64: true,
   });

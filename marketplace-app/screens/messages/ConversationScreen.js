@@ -17,6 +17,7 @@ import { useAuth } from '../../lib/AuthContext';
 import { useMessages } from '../../lib/MessagesContext';
 import { chargerMessages, envoyerMessage, marquerLus } from '../../lib/messagerie';
 import { COULEURS } from '../../lib/constants';
+import Icone from '../../components/Icone';
 
 function heure(iso) {
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -181,7 +182,7 @@ export default function ConversationScreen({ route, navigation }) {
           onPress={envoyer}
           disabled={!texte.trim() || envoi}
         >
-          <Text style={styles.envoyerTexte}>➤</Text>
+          <Icone nom="envoyer" taille={18} couleur="#fff" />
         </TouchableOpacity>
       </View>
     </View>

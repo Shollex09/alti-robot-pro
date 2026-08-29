@@ -10,9 +10,9 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../lib/supabase';
-import { COULEURS } from '../lib/constants';
+import { COULEURS, RAYON } from '../lib/constants';
+import Icone from '../components/Icone';
 
 const ROLES = [
   { value: 'acheteur', label: 'Acheter', aide: 'Trouver des produits près de chez moi' },
@@ -79,12 +79,6 @@ export default function AuthScreen() {
           <Text style={styles.baseline}>LE JARDIN DU VOISIN</Text>
         </View>
 
-        <LinearGradient colors={['#e8f5e9', '#f6fbf4']} style={styles.illustration}>
-          <Text style={styles.illustrationEmoji}>🥕</Text>
-          <Text style={styles.illustrationEmoji2}>🍎</Text>
-          <Text style={styles.illustrationEmoji3}>🥚</Text>
-        </LinearGradient>
-
         <View style={styles.hero}>
           <Text style={styles.heroTitre}>Les produits du jardin,{'\n'}près de chez vous</Text>
           <Text style={styles.heroTexte}>
@@ -102,12 +96,14 @@ export default function AuthScreen() {
 
         <View style={styles.arguments}>
           {[
-            { emoji: '📍', titre: 'Tout près', texte: 'Uniquement les producteurs dans votre rayon' },
-            { emoji: '🤝', titre: 'En direct', texte: 'Vous réglez au producteur, au retrait' },
-            { emoji: '🔒', titre: 'Discret', texte: 'Prénom et secteur, jamais votre adresse' },
+            { icone: 'position', titre: 'Tout près', texte: 'Uniquement les producteurs dans votre rayon' },
+            { icone: 'panier', titre: 'En direct', texte: 'Vous réglez au producteur, au retrait' },
+            { icone: 'profil', titre: 'Discret', texte: 'Prénom et secteur, jamais votre adresse' },
           ].map((a) => (
             <View key={a.titre} style={styles.argument}>
-              <Text style={styles.argumentEmoji}>{a.emoji}</Text>
+              <View style={styles.argumentPuce}>
+                <Icone nom={a.icone} taille={18} couleur={COULEURS.vert} />
+              </View>
               <View style={styles.argumentTexte}>
                 <Text style={styles.argumentTitre}>{a.titre}</Text>
                 <Text style={styles.argumentAide}>{a.texte}</Text>
@@ -214,7 +210,7 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   accueil: { paddingBottom: 40, backgroundColor: '#fff' },
-  entete: { alignItems: 'center', paddingTop: 60, paddingBottom: 24 },
+  entete: { alignItems: 'center', paddingTop: 96, paddingBottom: 8 },
   logo: { fontSize: 26, fontWeight: 'bold', letterSpacing: -0.5 },
   logoVert: { color: COULEURS.vert },
   logoRose: { color: '#e91e63' },
@@ -225,17 +221,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: '600',
   },
-  illustration: {
-    height: 170,
-    marginHorizontal: 20,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  illustrationEmoji: { fontSize: 64 },
-  illustrationEmoji2: { fontSize: 36, position: 'absolute', top: 28, right: 46 },
-  illustrationEmoji3: { fontSize: 32, position: 'absolute', bottom: 30, left: 50 },
-  hero: { paddingHorizontal: 24, paddingTop: 32, alignItems: 'center' },
+  hero: { paddingHorizontal: 24, paddingTop: 44, alignItems: 'center' },
   heroTitre: {
     fontSize: 28,
     fontWeight: 'bold',
@@ -252,7 +238,7 @@ const styles = StyleSheet.create({
   },
   ctaPrincipal: {
     backgroundColor: COULEURS.encre,
-    borderRadius: 28,
+    borderRadius: RAYON.pilule,
     paddingVertical: 16,
     paddingHorizontal: 40,
     alignItems: 'center',
@@ -269,7 +255,14 @@ const styles = StyleSheet.create({
   },
   arguments: { paddingHorizontal: 24, paddingTop: 40, gap: 18 },
   argument: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  argumentEmoji: { fontSize: 26 },
+  argumentPuce: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COULEURS.vertClair,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   argumentTexte: { flex: 1 },
   argumentTitre: { fontSize: 15, fontWeight: 'bold', color: COULEURS.encre },
   argumentAide: { fontSize: 13, color: COULEURS.texteDoux, marginTop: 2 },
@@ -290,7 +283,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1.5,
     borderColor: COULEURS.bord,
-    borderRadius: 12,
+    borderRadius: RAYON.petit,
     padding: 14,
   },
   roleActif: { borderColor: COULEURS.vert, backgroundColor: COULEURS.vertClair },

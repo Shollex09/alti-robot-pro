@@ -13,6 +13,7 @@ import { useAuth } from '../../lib/AuthContext';
 import { useMessages } from '../../lib/MessagesContext';
 import { chargerConversations } from '../../lib/messagerie';
 import { COULEURS } from '../../lib/constants';
+import Icone from '../../components/Icone';
 
 function quand(iso) {
   const date = new Date(iso);
@@ -74,7 +75,7 @@ export default function ConversationsScreen({ navigation }) {
       contentContainerStyle={conversations.length === 0 ? styles.videConteneur : null}
       ListEmptyComponent={
         <View style={styles.vide}>
-          <Text style={styles.videEmoji}>💬</Text>
+          <Icone nom="messages" taille={38} couleur={COULEURS.texteDoux} />
           <Text style={styles.videTitre}>Aucune conversation</Text>
           <Text style={styles.videTexte}>
             Depuis la fiche d'un produit, appuie sur « Contacter » pour poser une question au
@@ -120,8 +121,8 @@ const styles = StyleSheet.create({
   erreurTexte: { textAlign: 'center', color: COULEURS.texteDoux, lineHeight: 20 },
   videConteneur: { flexGrow: 1, justifyContent: 'center' },
   vide: { alignItems: 'center', padding: 40 },
-  videEmoji: { fontSize: 44, marginBottom: 12 },
-  videTitre: { fontSize: 17, fontWeight: '600', marginBottom: 8 },
+
+  videTitre: { fontSize: 17, fontWeight: '600', marginTop: 12, marginBottom: 8 },
   videTexte: { color: COULEURS.texteDoux, textAlign: 'center', lineHeight: 20 },
   ligne: {
     flexDirection: 'row',

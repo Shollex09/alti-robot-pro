@@ -8,20 +8,21 @@ import {
   toutesLesVentes,
   economieConsommation,
 } from '../../lib/gestion';
-import { COULEURS } from '../../lib/constants';
+import { COULEURS, OMBRE, RAYON } from '../../lib/constants';
+import Icone from '../../components/Icone';
 
 const ENTREES = [
-  { ecran: 'Clients', emoji: '👥', titre: 'Mes clients', aide: 'Classement automatique des acheteurs' },
-  { ecran: 'Couts', emoji: '💸', titre: 'Coûts', aide: 'Semences, nourriture, matériel...' },
+  { ecran: 'Clients', icone: 'clients', titre: 'Mes clients', aide: 'Classement automatique des acheteurs' },
+  { ecran: 'Couts', icone: 'couts', titre: 'Coûts', aide: 'Semences, nourriture, matériel...' },
   {
     ecran: 'Consommation',
-    emoji: '🏠',
+    icone: 'consommation',
     titre: 'Consommation personnelle',
     aide: 'Ce que tu gardes pour toi, valorisé en économies',
   },
   {
     ecran: 'Investissements',
-    emoji: '🔧',
+    icone: 'investissements',
     titre: 'Investissements',
     aide: 'Serre, poulailler, outillage...',
   },
@@ -143,19 +144,22 @@ export default function PlusScreen({ navigation }) {
           style={styles.entree}
           onPress={() => navigation.navigate(e.ecran)}
         >
-          <Text style={styles.emoji}>{e.emoji}</Text>
+          <View style={styles.puce}>
+            <Icone nom={e.icone} taille={18} couleur={COULEURS.vert} />
+          </View>
           <View style={styles.entreeTexte}>
             <Text style={styles.entreeTitre}>{e.titre}</Text>
             <Text style={styles.entreeAide}>{e.aide}</Text>
           </View>
-          <Text style={styles.fleche}>›</Text>
+          <Icone nom="fleche" taille={18} couleur={COULEURS.texteDoux} />
         </TouchableOpacity>
       ))}
 
       <Text style={styles.section}>Sauvegarde</Text>
       <TouchableOpacity style={styles.exportBtn} onPress={exporter} disabled={exportEnCours}>
+        <Icone nom="export" taille={17} couleur="#fff" />
         <Text style={styles.exportTexte}>
-          {exportEnCours ? 'Préparation...' : '💾 Exporter mes données (CSV)'}
+          {exportEnCours ? 'Préparation...' : 'Exporter mes données (CSV)'}
         </Text>
       </TouchableOpacity>
       <Text style={styles.exportAide}>
@@ -171,23 +175,33 @@ const styles = StyleSheet.create({
   entree: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COULEURS.bord,
-    borderRadius: 12,
+    borderRadius: RAYON.carte,
+    backgroundColor: '#fff',
     padding: 16,
     gap: 14,
+    ...OMBRE,
   },
-  emoji: { fontSize: 24 },
+  puce: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COULEURS.vertClair,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   entreeTexte: { flex: 1 },
   entreeTitre: { fontSize: 15, fontWeight: '600' },
   entreeAide: { fontSize: 12, color: COULEURS.texteDoux, marginTop: 2 },
-  fleche: { fontSize: 24, color: COULEURS.texteDoux },
+
   section: { fontSize: 16, fontWeight: 'bold', marginTop: 20 },
   exportBtn: {
-    backgroundColor: COULEURS.bleu,
-    borderRadius: 8,
-    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 8,
+    backgroundColor: COULEURS.encre,
+    borderRadius: RAYON.pilule,
+    padding: 16,
   },
   exportTexte: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
   exportAide: { fontSize: 12, color: COULEURS.texteDoux, lineHeight: 18 },

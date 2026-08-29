@@ -1,7 +1,7 @@
 import { View, Text, Image, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { COULEURS, formatTypeProduction } from '../lib/constants';
+import { COULEURS, OMBRE, RAYON, parseTypeProduction, categorieLabel } from '../lib/constants';
 import { formatDistance } from '../lib/geo';
+import Icone from './Icone';
 
 function initiale(prenom) {
   return prenom?.[0]?.toUpperCase() ?? '?';
@@ -9,15 +9,12 @@ function initiale(prenom) {
 
 function moisAnnee(iso) {
   if (!iso) return null;
-  return new Date(iso).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
+  return new Date(iso).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 }
 
-// En-tête de fiche profil : bannière, photo ronde qui déborde dessus,
-// nom, badge de rôle, secteur, puis une carte de statistiques.
+// En-tête de fiche profil : photo de couverture, photo ronde qui déborde
+// dessus, nom, ce que la personne produit, secteur, puis les repères de
+// confiance (ancienneté, nombre de ventes).
 export default function EnteteProfil({
   profil,
   distance,
@@ -26,15 +23,16 @@ export default function EnteteProfil({
   enfant,
 }) {
   const estVendeur = profil.role === 'vendeur';
-  const production = formatTypeProduction(profil.type_production);
+  const productions = parseTypeProduction(profil.type_production);
 
   return (
     <View>
       <View style={styles.banniereZone}>
-        <LinearGradient
-          colors={estVendeur ? ['#9dc88d', '#cfe3c4'] : ['#a8c0d8', '#d3e0ec']}
-          style={styles.banniere}
-        />
+        {profil.couverture_url ? (
+          <Image source={{ uri: profil.couverture_url }} style={styles.banniere} />
+        ) : (
+          <View style={[styles.banniere, styles.banniereVide]} />
+        )}
         <View style={styles.avatarCadre}>
           {profil.photo_url ? (
             <Image source={{ uri: profil.photo_url }} style={styles.avatar} />
@@ -44,26 +42,33 @@ export default function EnteteProfil({
             </View>
           )}
         </View>
-        <View style={styles.badge}>
-          <Text style={styles.badgeTexte}>{estVendeur ? 'Producteur' : 'Acheteur'}</Text>
-        </View>
       </View>
 
       <View style={styles.identite}>
         <Text style={styles.prenom}>{profil.prenom}</Text>
-        {production ? <Text style={styles.metier}>{production}</Text> : null}
-        <Text style={styles.secteur}>
-          📍{' '}
-          {secteurTexte ??
-            (distance == null ? 'Secteur non renseigné' : `Secteur à ${formatDistance(distance)}`)}
-        </Text>
-        <Text style={styles.confidentialite}>L'adresse exacte n'est jamais partagée.</Text>
+        <View style={styles.ligneSecteur}>
+          <Icone nom="position" taille={14} couleur={COULEURS.texteDoux} />
+          <Text style={styles.secteur}>
+            {secteurTexte ??
+              (distance == null ? 'Secteur non renseigné' : `À ${formatDistance(distance)}`)}
+          </Text>
+        </View>
+
+        {estVendeur && productions.length > 0 ? (
+          <View style={styles.etiquettes}>
+            {productions.map((p) => (
+              <View key={p} style={styles.etiquette}>
+                <Text style={styles.etiquetteTexte}>{categorieLabel(p)}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.stats}>
         <View style={styles.stat}>
           <Text style={styles.statValeur}>{moisAnnee(profil.created_at) ?? '—'}</Text>
-          <Text style={styles.statLabel}>date d'inscription</Text>
+          <Text style={styles.statLabel}>inscrit depuis</Text>
         </View>
         <View style={styles.separateur} />
         <View style={styles.stat}>
@@ -76,7 +81,6 @@ export default function EnteteProfil({
 
       {profil.description ? (
         <View style={styles.carte}>
-          <Text style={styles.carteTitre}>Présentation</Text>
           <Text style={styles.description}>{profil.description}</Text>
         </View>
       ) : null}
@@ -87,58 +91,54 @@ export default function EnteteProfil({
 }
 
 const styles = StyleSheet.create({
-  banniereZone: { marginBottom: 52 },
-  banniere: { height: 120 },
+  banniereZone: { marginBottom: 50 },
+  banniere: { height: 165, width: '100%' },
+  banniereVide: { backgroundColor: COULEURS.vertClair },
   avatarCadre: {
     position: 'absolute',
     left: 20,
-    bottom: -46,
-    padding: 5,
+    bottom: -44,
+    padding: 4,
     backgroundColor: '#fff',
-    borderRadius: 55,
+    borderRadius: 52,
+    ...OMBRE,
   },
-  avatar: { width: 92, height: 92, borderRadius: 46 },
+  avatar: { width: 88, height: 88, borderRadius: 44 },
   avatarVide: { backgroundColor: COULEURS.vertClair, justifyContent: 'center', alignItems: 'center' },
-  avatarInitiale: { fontSize: 38, fontWeight: 'bold', color: COULEURS.vert },
-  badge: {
-    position: 'absolute',
-    right: 16,
-    bottom: 12,
-    backgroundColor: '#f3e6ff',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-  },
-  badgeTexte: { fontSize: 12, fontWeight: '600', color: '#6a1b9a' },
+  avatarInitiale: { fontSize: 36, fontWeight: '700', color: COULEURS.vert },
   identite: { paddingHorizontal: 20 },
-  prenom: { fontSize: 22, fontWeight: 'bold', color: COULEURS.encre },
-  metier: { fontSize: 14, color: COULEURS.texteDoux, marginTop: 3 },
-  secteur: { fontSize: 14, color: COULEURS.texteDoux, marginTop: 6 },
-  confidentialite: { fontSize: 11, color: '#9aa5b1', marginTop: 4 },
+  prenom: { fontSize: 23, fontWeight: '700', color: COULEURS.encre, letterSpacing: -0.3 },
+  ligneSecteur: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 },
+  secteur: { fontSize: 14, color: COULEURS.texteDoux },
+  etiquettes: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
+  etiquette: {
+    backgroundColor: COULEURS.vertClair,
+    borderRadius: RAYON.pilule,
+    paddingVertical: 5,
+    paddingHorizontal: 11,
+  },
+  etiquetteTexte: { fontSize: 12, color: COULEURS.vertProfond, fontWeight: '600' },
   stats: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: RAYON.carte,
     marginHorizontal: 16,
     marginTop: 18,
     paddingVertical: 16,
-    borderWidth: 1,
-    borderColor: COULEURS.bord,
+    ...OMBRE,
   },
   stat: { flex: 1, alignItems: 'center', paddingHorizontal: 8 },
-  statValeur: { fontSize: 14, fontWeight: '600', color: COULEURS.encre, textAlign: 'center' },
+  statValeur: { fontSize: 14, fontWeight: '700', color: COULEURS.encre, textAlign: 'center' },
   statLabel: { fontSize: 11, color: COULEURS.texteDoux, marginTop: 3, textAlign: 'center' },
-  separateur: { width: 1, height: 34, backgroundColor: COULEURS.bord },
+  separateur: { width: 1, height: 32, backgroundColor: COULEURS.bord },
   carte: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: RAYON.carte,
     marginHorizontal: 16,
     marginTop: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COULEURS.bord,
+    padding: 18,
+    ...OMBRE,
   },
-  carteTitre: { fontSize: 13, fontWeight: 'bold', color: COULEURS.encre, marginBottom: 8 },
-  description: { fontSize: 14, color: COULEURS.texte, lineHeight: 21 },
+  description: { fontSize: 14, color: COULEURS.texte, lineHeight: 22 },
 });

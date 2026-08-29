@@ -5,16 +5,16 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Image,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
-import { distanceKm, formatDistance } from '../../lib/geo';
-import { CATEGORIES, COULEURS, categorieLabel, formatEuros } from '../../lib/constants';
+import { distanceKm } from '../../lib/geo';
+import { CATEGORIES, COULEURS, RAYON } from '../../lib/constants';
 import EtatErreur from '../../components/EtatErreur';
+import CarteProduit from '../../components/CarteProduit';
 
 export default function ProductsListScreen({ navigation }) {
   const { profile } = useAuth();
@@ -125,28 +125,12 @@ export default function ProductsListScreen({ navigation }) {
           </View>
         }
         renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.carte}
+          <CarteProduit
+            produit={item}
+            distance={item.distance}
+            vendeurPrenom={item.vendeur?.prenom}
             onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
-          >
-            {item.photo_url ? (
-              <Image source={{ uri: item.photo_url }} style={styles.photo} />
-            ) : (
-              <View style={[styles.photo, styles.photoVide]}>
-                <Text style={styles.photoVideTexte}>🌱</Text>
-              </View>
-            )}
-            <View style={styles.carteInfos}>
-              <Text style={styles.carteNom} numberOfLines={1}>
-                {item.nom}
-              </Text>
-              <Text style={styles.carteCategorie}>{categorieLabel(item.categorie)}</Text>
-              <Text style={styles.cartePrix}>{formatEuros(item.prix)}</Text>
-              <Text style={styles.carteMeta}>
-                {item.vendeur?.prenom} · {formatDistance(item.distance)}
-              </Text>
-            </View>
-          </TouchableOpacity>
+          />
         )}
       />
     </View>
@@ -165,31 +149,15 @@ const styles = StyleSheet.create({
     borderBottomColor: COULEURS.bord,
   },
   filtre: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
+    paddingVertical: 7,
+    paddingHorizontal: 13,
+    borderRadius: RAYON.pilule,
     backgroundColor: COULEURS.fondDoux,
   },
   filtreActif: { backgroundColor: COULEURS.vert },
   filtreTexte: { fontSize: 13, color: COULEURS.texte },
   filtreTexteActif: { color: '#fff', fontWeight: '600' },
   liste: { padding: 12, gap: 12 },
-  carte: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: COULEURS.bord,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: COULEURS.fond,
-  },
-  photo: { width: 100, height: 100 },
-  photoVide: { backgroundColor: COULEURS.vertClair, justifyContent: 'center', alignItems: 'center' },
-  photoVideTexte: { fontSize: 32 },
-  carteInfos: { flex: 1, padding: 12, justifyContent: 'center' },
-  carteNom: { fontSize: 16, fontWeight: 'bold', color: COULEURS.texte },
-  carteCategorie: { fontSize: 13, color: COULEURS.texteDoux, marginTop: 2 },
-  cartePrix: { fontSize: 15, fontWeight: '600', color: COULEURS.vert, marginTop: 4 },
-  carteMeta: { fontSize: 12, color: COULEURS.texteDoux, marginTop: 4 },
   vide: { padding: 40, alignItems: 'center' },
   videTitre: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
   videTexte: { color: COULEURS.texteDoux, textAlign: 'center' },

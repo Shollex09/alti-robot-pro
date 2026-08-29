@@ -3,7 +3,6 @@ import {
   View,
   Text,
   FlatList,
-  Image,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -14,9 +13,11 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 import { ouvrirConversation } from '../../lib/messagerie';
 import { distanceKm } from '../../lib/geo';
-import { COULEURS, categorieLabel, formatEuros } from '../../lib/constants';
+import { COULEURS, RAYON } from '../../lib/constants';
 import EnteteProfil from '../../components/EnteteProfil';
 import CarteSecteur from '../../components/CarteSecteur';
+import CarteProduit from '../../components/CarteProduit';
+import Icone from '../../components/Icone';
 
 export default function SellerProfileScreen({ route, navigation }) {
   const { vendeurId } = route.params;
@@ -98,7 +99,8 @@ export default function SellerProfileScreen({ route, navigation }) {
             <>
               {vendeurId !== session.user.id && (
                 <TouchableOpacity style={styles.contacterBtn} onPress={contacter}>
-                  <Text style={styles.contacterTexte}>💬 Contacter {vendeur.prenom}</Text>
+                  <Icone nom="messages" taille={17} couleur="#fff" />
+                  <Text style={styles.contacterTexte}>Contacter {vendeur.prenom}</Text>
                 </TouchableOpacity>
               )}
               <CarteSecteur
@@ -113,23 +115,11 @@ export default function SellerProfileScreen({ route, navigation }) {
       }
       ListEmptyComponent={<Text style={styles.vide}>Aucun produit disponible en ce moment.</Text>}
       renderItem={({ item }) => (
-        <TouchableOpacity
-          style={styles.carte}
+        <CarteProduit
+          style={styles.carteProduit}
+          produit={item}
           onPress={() => navigation.push('ProductDetail', { productId: item.id })}
-        >
-          {item.photo_url ? (
-            <Image source={{ uri: item.photo_url }} style={styles.photo} />
-          ) : (
-            <View style={[styles.photo, styles.photoVide]}>
-              <Text style={{ fontSize: 28 }}>🌱</Text>
-            </View>
-          )}
-          <View style={styles.carteInfos}>
-            <Text style={styles.carteNom}>{item.nom}</Text>
-            <Text style={styles.carteCategorie}>{categorieLabel(item.categorie)}</Text>
-            <Text style={styles.cartePrix}>{formatEuros(item.prix)}</Text>
-          </View>
-        </TouchableOpacity>
+        />
       )}
     />
   );
@@ -138,7 +128,7 @@ export default function SellerProfileScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   page: { backgroundColor: COULEURS.fondProfil },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  liste: { paddingBottom: 24 },
+  liste: { paddingBottom: 24, gap: 12 },
   sectionTitre: {
     fontSize: 15,
     fontWeight: 'bold',
@@ -148,29 +138,17 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   contacterBtn: {
-    backgroundColor: COULEURS.vert,
-    borderRadius: 26,
-    paddingVertical: 14,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 8,
+    backgroundColor: COULEURS.vert,
+    borderRadius: RAYON.pilule,
+    paddingVertical: 14,
     marginHorizontal: 16,
     marginTop: 16,
   },
   contacterTexte: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  carteProduit: { marginHorizontal: 16 },
   vide: { textAlign: 'center', color: COULEURS.texteDoux, padding: 20 },
-  carte: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: COULEURS.bord,
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginHorizontal: 16,
-    marginBottom: 10,
-  },
-  photo: { width: 84, height: 84 },
-  photoVide: { backgroundColor: COULEURS.vertClair, justifyContent: 'center', alignItems: 'center' },
-  carteInfos: { flex: 1, padding: 12, justifyContent: 'center' },
-  carteNom: { fontSize: 15, fontWeight: 'bold', color: COULEURS.encre },
-  carteCategorie: { fontSize: 12, color: COULEURS.texteDoux, marginTop: 2 },
-  cartePrix: { fontSize: 14, fontWeight: '600', color: COULEURS.vert, marginTop: 4 },
 });

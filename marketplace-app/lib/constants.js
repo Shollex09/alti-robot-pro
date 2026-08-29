@@ -26,19 +26,34 @@ export function formatTypeProduction(valeur) {
   return valeur || null;
 }
 
+// Palette volontairement à l'écart du vert Material par défaut : un vert
+// végétal plus chaud, beaucoup de blanc, et des gris légèrement verdis.
 export const COULEURS = {
-  vert: '#2e7d32',
-  vertClair: '#e8f5e9',
+  vert: '#2f8f46',
+  vertVif: '#43a047',
+  vertClair: '#eaf5ec',
+  vertProfond: '#1f5c30',
   bleu: '#1565c0',
-  rouge: '#c62828',
-  texte: '#1a1a1a',
-  texteDoux: '#666',
-  bord: '#e0e0e0',
-  fond: '#fff',
-  fondDoux: '#f7f7f7',
-  // Fond bleuté des pages de profil, dans l'esprit d'AlloVoisins
-  fondProfil: '#f2f7fd',
-  encre: '#16283c',
+  rouge: '#c0392b',
+  ambre: '#e08b17',
+  texte: '#1c2b21',
+  texteDoux: '#6b7770',
+  bord: '#e4eae5',
+  fond: '#ffffff',
+  fondDoux: '#f4f7f4',
+  fondProfil: '#f7faf7',
+  encre: '#1c2b21',
+};
+
+// Rayons et ombres partagés, pour que toutes les cartes se ressemblent.
+export const RAYON = { carte: 16, petit: 10, pilule: 999 };
+
+export const OMBRE = {
+  shadowColor: '#1c2b21',
+  shadowOpacity: 0.07,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 3 },
+  elevation: 2,
 };
 
 export function formatEuros(montant) {
