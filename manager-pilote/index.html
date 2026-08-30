@@ -1021,6 +1021,13 @@ function demarrerSaison(catId, ecurieId){
 
 const actionsParSemaine = ()=> 3;
 
+/* Temps de piste disponible sur un week-end. Un bon ingénieur en dégage davantage :
+   c'est la deuxième raison d'investir dans le staff, après la précision du retour. */
+function runsDisponibles(){
+  const base = CAT[S.saison.catId].format==='f1' ? 6 : 5;
+  return base + Math.floor(staffNiv('ingenieur')/2);
+}
+
 /* ------------------------------------ 9. RÉGLAGES (GDD §18) */
 function optimalCircuit(course, k){
   // valeur cachée 1..20, stable pour un circuit / une saison / un paramètre
@@ -1048,8 +1055,10 @@ function retourPilote(course, setup, pilote){
   }).sort((a,b)=>b.abs-a.abs);
 
   const lignes = [];
-  const nbSymptomes = niv>=4?3 : niv>=2?2 : 1;
-  const seuil = niv>=4?1 : niv>=2?2 : 3;
+  // Sans ingénieur, on a moins de direction — mais autant de sensations :
+  // le pilote décrit plusieurs symptômes, c'est au manager de les traduire.
+  const nbSymptomes = niv>=4?4 : niv>=2?3 : 2;
+  const seuil = niv>=4?1 : 2;
 
   for(const it of detail.slice(0,nbSymptomes)){
     if(it.abs<seuil) continue;
@@ -1223,7 +1232,7 @@ function ouvrirWeekend(){
   S.weekend = {
     courseIdx:S.saison.courseIndex, meteoId:meteo.id,
     etapes: etapesWeekend(S.saison.catId), etape:0,
-    setup, runs:[], runsRestants: CAT[S.saison.catId].format==='f1'?4:3,
+    setup, runs:[], runsRestants: runsDisponibles(),
     grille:null, resultat:null, strat:'equi', debrief:null, presse:null,
   };
   S.phase='weekend';
@@ -1757,34 +1766,241 @@ function parlerAuPilote(tonId, contexteBon){
   return {txt, dm, dr, dagr, ton:t.nom};
 }
 
-/* 20.2 — Conférence de presse */
-function genererQuestionPresse(pos, dnf, c){
-  const p=S.pilote, att=positionAttendue();
-  let q;
-  if(dnf) q = `${p.nom} abandonne encore. Est-ce le pilote, la voiture, ou votre gestion ?`;
-  else if(pos===1) q = `Belle victoire. Certains disent que c’est surtout la voiture. Vous répondez quoi ?`;
-  else if(pos<=3) q = `Un podium solide. Objectif titre assumé, ou vous restez prudent ?`;
-  else if(pos>att+4) q = `${p.nom} a terminé ${ordinal(pos)}. Est-ce qu’il a vraiment le niveau pour cette catégorie ?`;
-  else q = `Course sans relief pour ${p.nom}. Que manque-t-il exactement ?`;
-  return {q, pos, dnf, repondu:false};
-}
-const REPONSES_PRESSE = [
-  {id:'defendre', lab:'Défendre le pilote',        desc:'« Il fait ce qu’il peut avec ce qu’on lui donne. »',   moral:+9, relation:-7, image:-5},
-  {id:'admettre', lab:'Reconnaître l’échec',       desc:'« Ce n’est pas assez bon, et nous le savons. »',       moral:-8, relation:+3, image:+8},
-  {id:'blamer',   lab:'Blâmer la voiture / l’écurie',desc:'« Le matériel n’est pas au niveau, point. »',        moral:+6, relation:-16,image:+2},
-  {id:'eluder',   lab:'Éluder la question',        desc:'« On regarde déjà la prochaine course. »',             moral:0,  relation:0,  image:-1},
+/* 20.2 — Conférence de presse (GDD §20.2)
+   Le barème d'effets reste celui du GDD — moral du pilote, relation avec
+   l'écurie, image médiatique — mais chaque question a ses propres réponses,
+   rédigées pour la situation. Une victoire n'appelle pas « reconnaître l'échec ». */
+const PRESSE_EFFETS = {
+  defendre:    {moral:+9,  ecurie:-7,  image:-5, relation:+4},
+  admettre:    {moral:-8,  ecurie:+3,  image:+8, relation:-3},
+  blamer:      {moral:+6,  ecurie:-16, image:+2, relation:+5},
+  eluder:      {moral:0,   ecurie:0,   image:-1, relation:0},
+  creditPilote:{moral:+11, ecurie:-5,  image:+1, relation:+5},
+  creditEcurie:{moral:-4,  ecurie:+12, image:+4, relation:-2},
+  ambition:    {moral:+7,  ecurie:-2,  image:+9, relation:+2, repPilote:+1.5},
+  humilite:    {moral:+3,  ecurie:+6,  image:+5, relation:+1},
+};
+
+/* Chaque entrée : à quel type de résultat elle s'applique, la question, et 4 réponses.
+   ctx = {nom, pos, cat, circuit, ecurie, coequipier, att, serie} */
+const PRESSE_QUESTIONS = [
+  /* ---------------------------------------------------------------- VICTOIRE */
+  {id:'v1', cat:'victoire',
+   q:c=>`Belle victoire à ${c.circuit}. Certains disent dans le paddock que c’est surtout la voiture. Vous répondez quoi ?`,
+   reps:[
+     {t:'creditPilote', lab:'Créditer le pilote',   d:'« Mettez n’importe qui dedans, vous verrez la différence. »'},
+     {t:'creditEcurie', lab:'Créditer l’écurie',    d:'« L’équipe lui a donné une voiture parfaite. Il l’a juste bien pilotée. »'},
+     {t:'blamer',       lab:'Retourner la question',d:'« Curieux, personne ne disait ça quand il finissait 12e avec la même. »'},
+     {t:'eluder',       lab:'Ne pas entrer dedans', d:'« On a gagné. Le reste, ça ne m’intéresse pas. »'},
+   ]},
+  {id:'v2', cat:'victoire',
+   q:c=>`Une victoire en ${c.cat}, à son âge. Vous visez le titre, ou vous restez prudent ?`,
+   reps:[
+     {t:'ambition',  lab:'Annoncer le titre',      d:'« On est là pour ça. Écrivez-le. »'},
+     {t:'humilite',  lab:'Rester mesuré',          d:'« Une course ne fait pas une saison. On prend les points. »'},
+     {t:'creditPilote',lab:'Renvoyer vers le pilote',d:'« Demandez-lui. Moi je le suis, c’est tout. »'},
+     {t:'eluder',    lab:'Botter en touche',       d:'« La prochaine course, déjà. »'},
+   ]},
+  {id:'v3', cat:'victoire',
+   q:c=>`Il a dominé tout le week-end. Est-ce qu’il n’est pas déjà trop fort pour cette catégorie ?`,
+   reps:[
+     {t:'ambition',   lab:'Confirmer',             d:'« Franchement, oui. On regarde déjà au-dessus. »'},
+     {t:'humilite',   lab:'Tempérer',              d:'« Il a encore beaucoup à apprendre ici. »'},
+     {t:'creditEcurie',lab:'Mettre l’équipe en avant',d:'« C’est le travail de toute l’équipe, pas un exploit solitaire. »'},
+     {t:'eluder',     lab:'Éluder',                d:'« Une course à la fois. »'},
+   ]},
+  {id:'v4', cat:'victoire',
+   q:c=>`On vous a vu très calme au muret pendant les derniers tours. Vous n’y croyiez plus ?`,
+   reps:[
+     {t:'creditPilote',lab:'Dire votre confiance', d:'« Quand c’est lui devant, je ne m’inquiète pas. »'},
+     {t:'humilite',   lab:'Avouer la tension',     d:'« J’étais mort de trouille, comme tout le monde. »'},
+     {t:'ambition',   lab:'Jouer l’assurance',     d:'« On avait la course en main depuis le départ. »'},
+     {t:'eluder',     lab:'Sourire et passer',     d:'« Je garde ça pour moi. »'},
+   ]},
+
+  /* ------------------------------------------------------------------ PODIUM */
+  {id:'p1', cat:'podium',
+   q:c=>`${ordinal(c.pos)} aujourd’hui. La victoire s’est jouée à peu. Frustration ou satisfaction ?`,
+   reps:[
+     {t:'ambition',   lab:'Afficher la frustration',d:'« On ne vient pas pour finir deuxième. »'},
+     {t:'humilite',   lab:'Prendre le positif',    d:'« C’est un très bon week-end. On construit. »'},
+     {t:'blamer',     lab:'Pointer le matériel',   d:'« Avec la voiture qu’il fallait, on gagnait. »'},
+     {t:'eluder',     lab:'Rester neutre',         d:'« Le résultat est là, c’est déjà ça. »'},
+   ]},
+  {id:'p2', cat:'podium',
+   q:c=>`Ce podium, il le doit à sa course ou aux abandons devant ?`,
+   reps:[
+     {t:'creditPilote',lab:'Défendre sa course',   d:'« Regardez ses temps au tour, vous aurez la réponse. »'},
+     {t:'admettre',   lab:'Reconnaître la chance', d:'« Il y a eu de l’aide, c’est vrai. On la prend. »'},
+     {t:'blamer',     lab:'Répondre sèchement',    d:'« Encore faut-il être là quand les autres tombent. »'},
+     {t:'eluder',     lab:'Éluder',                d:'« Le classement, c’est le classement. »'},
+   ]},
+  {id:'p3', cat:'podium',
+   q:c=>`Un podium après un début de saison compliqué. C’est le déclic ?`,
+   reps:[
+     {t:'ambition',   lab:'Annoncer la suite',     d:'« Ce n’est que le début. Vous allez le revoir là-haut. »'},
+     {t:'humilite',   lab:'Rester prudent',        d:'« Un bon week-end. On verra si ça se confirme. »'},
+     {t:'creditEcurie',lab:'Remercier l’équipe',   d:'« L’équipe n’a jamais lâché. Ça paie. »'},
+     {t:'eluder',     lab:'Ne rien promettre',     d:'« On avisera course après course. »'},
+   ]},
+
+  /* ------------------------------------------------------------------ POINTS */
+  {id:'t1', cat:'points',
+   q:c=>`Des points, mais loin du podium. C’est suffisant pour vous ?`,
+   reps:[
+     {t:'defendre',   lab:'Défendre le pilote',    d:'« Avec ce qu’on lui donne, c’est déjà un bon résultat. »'},
+     {t:'admettre',   lab:'Dire que non',          d:'« Non. On vaut mieux que ça, et il le sait. »'},
+     {t:'blamer',     lab:'Viser le matériel',     d:'« Le problème n’est pas dans le baquet. »'},
+     {t:'eluder',     lab:'Rester factuel',        d:'« Des points, c’est des points. »'},
+   ]},
+  {id:'t2', cat:'points',
+   q:c=>`${c.coequipier} a de nouveau fini devant lui, avec la même voiture. Comment vous l’expliquez ?`,
+   reps:[
+     {t:'defendre',   lab:'Défendre votre pilote', d:'« Il apprend le circuit, l’autre le connaît par cœur. »'},
+     {t:'admettre',   lab:'Reconnaître l’écart',   d:'« Il est devant, point. À nous de combler. »'},
+     {t:'blamer',     lab:'Suggérer un traitement inégal',d:'« Posez la question à l’équipe, pas à moi. »'},
+     {t:'eluder',     lab:'Refuser la comparaison',d:'« Je ne commente pas les autres pilotes. »'},
+   ]},
+  {id:'t3', cat:'points',
+   q:c=>`Où est le plafond de ce pilote, selon vous ?`,
+   reps:[
+     {t:'ambition',   lab:'Viser haut, publiquement',d:'« Il n’y en a pas. Il ira au sommet. »'},
+     {t:'humilite',   lab:'Rester factuel',        d:'« Trop tôt pour le dire. Il progresse, c’est tout. »'},
+     {t:'creditPilote',lab:'Parler de son travail',d:'« Personne ne bosse plus que lui. Ça finit toujours par payer. »'},
+     {t:'eluder',     lab:'Ne pas s’avancer',      d:'« Je ne fais pas de pronostic. »'},
+   ]},
+
+  /* ------------------------------------------------------------------ NEUTRE */
+  {id:'n1', cat:'neutre',
+   q:c=>`Course sans relief pour ${c.nom}. Que manque-t-il exactement ?`,
+   reps:[
+     {t:'defendre',   lab:'Le protéger',           d:'« Rien de sa faute. On ne lui donne pas les moyens. »'},
+     {t:'admettre',   lab:'Reconnaître le vide',   d:'« Il manque un cran, et on va le chercher. »'},
+     {t:'blamer',     lab:'Mettre la voiture en cause',d:'« Regardez les vitesses de pointe, vous aurez la réponse. »'},
+     {t:'eluder',     lab:'Passer à autre chose',  d:'« Ce genre de week-end arrive. On avance. »'},
+   ]},
+  {id:'n2', cat:'neutre',
+   q:c=>`On ne l’a pas vu de la course. C’est le pilote, ou la stratégie ?`,
+   reps:[
+     {t:'defendre',   lab:'Assumer la stratégie',  d:'« La stratégie, c’est moi. Ne lui mettez pas ça sur le dos. »'},
+     {t:'admettre',   lab:'Reconnaître l’erreur',  d:'« On s’est trompés, tout simplement. »'},
+     {t:'blamer',     lab:'Renvoyer sur l’équipe', d:'« Il aurait fallu une voiture capable de dépasser. »'},
+     {t:'eluder',     lab:'Éluder',                d:'« On analysera à froid. »'},
+   ]},
+  {id:'n3', cat:'neutre',
+   q:c=>`À ${c.circuit}, vous étiez censés être mieux placés. La saison est déjà pliée ?`,
+   reps:[
+     {t:'ambition',   lab:'Refuser le constat',    d:'« Rien n’est plié. On va les rattraper. »'},
+     {t:'admettre',   lab:'Être lucide',           d:'« Au rythme actuel, ce sera difficile. »'},
+     {t:'blamer',     lab:'Désigner un responsable',d:'« Demandez à l’écurie ce qu’elle compte faire. »'},
+     {t:'eluder',     lab:'Botter en touche',      d:'« Il reste des courses. »'},
+   ]},
+
+  /* --------------------------------------------------------------- DÉCEPTION */
+  {id:'d1', cat:'deception',
+   q:c=>`${c.nom} a terminé ${ordinal(c.pos)}. Est-ce qu’il a vraiment le niveau pour cette catégorie ?`,
+   reps:[
+     {t:'defendre',   lab:'Défendre le pilote',    d:'« Il fait ce qu’il peut avec ce qu’on lui donne. »'},
+     {t:'admettre',   lab:'Reconnaître l’échec',   d:'« Ce n’est pas assez bon, et nous le savons. »'},
+     {t:'blamer',     lab:'Blâmer la voiture',     d:'« Le matériel n’est pas au niveau, point. »'},
+     {t:'eluder',     lab:'Éluder la question',    d:'« On regarde déjà la prochaine course. »'},
+   ]},
+  {id:'d2', cat:'deception',
+   q:c=>`Troisième week-end décevant d’affilée. Combien de temps le gardez-vous ?`,
+   reps:[
+     {t:'defendre',   lab:'Le soutenir sans réserve',d:'« Aussi longtemps qu’il le faudra. Question suivante. »'},
+     {t:'admettre',   lab:'Mettre la pression',    d:'« Il sait ce qu’on attend. Ça ne peut pas durer. »'},
+     {t:'blamer',     lab:'Renvoyer sur l’écurie', d:'« La vraie question, c’est ce que l’équipe lui donne. »'},
+     {t:'eluder',     lab:'Refuser de répondre',   d:'« Ce sont des discussions internes. »'},
+   ]},
+  {id:'d3', cat:'deception',
+   q:c=>`${c.coequipier} finit largement devant avec la même voiture. Que dites-vous à votre pilote ce soir ?`,
+   reps:[
+     {t:'defendre',   lab:'Refuser la comparaison',d:'« Rien. Ils n’ont pas eu la même course. »'},
+     {t:'admettre',   lab:'Assumer publiquement',  d:'« Qu’il doit faire mieux. Je ne vais pas mentir. »'},
+     {t:'blamer',     lab:'Évoquer le matériel',   d:'« Je vais surtout demander à voir les données des deux voitures. »'},
+     {t:'eluder',     lab:'Garder ça privé',       d:'« Ça restera entre lui et moi. »'},
+   ]},
+  {id:'d4', cat:'deception',
+   q:c=>`Dans le paddock, certains disent que vous l’avez fait monter trop vite en ${c.cat}.`,
+   reps:[
+     {t:'defendre',   lab:'Assumer le choix',      d:'« C’est ma décision, et je la referais. »'},
+     {t:'admettre',   lab:'Reconnaître le doute',  d:'« Peut-être. On le saura dans deux ans. »'},
+     {t:'blamer',     lab:'Renvoyer les critiques',d:'« Ceux qui disent ça n’ont jamais monté un budget. »'},
+     {t:'eluder',     lab:'Ignorer',               d:'« Je n’écoute pas le paddock. »'},
+   ]},
+
+  /* ----------------------------------------------------------------- ABANDON */
+  {id:'a1', cat:'abandon',
+   q:c=>`Encore un abandon. Le pilote, la voiture, ou votre gestion ?`,
+   reps:[
+     {t:'defendre',   lab:'Protéger le pilote',    d:'« Certainement pas lui. Il subit. »'},
+     {t:'admettre',   lab:'Prendre votre part',    d:'« Il y a de tout là-dedans, y compris de ma faute. »'},
+     {t:'blamer',     lab:'Mettre la mécanique en cause',d:'« Comptez les pannes depuis le début de saison. »'},
+     {t:'eluder',     lab:'Couper court',          d:'« On débriefera en interne. »'},
+   ]},
+  {id:'a2', cat:'abandon',
+   q:c=>`Il a attaqué là où il ne fallait pas. Vous lui dites quoi ?`,
+   reps:[
+     {t:'defendre',   lab:'Défendre l’audace',     d:'« Je ne veux pas d’un pilote qui n’essaie rien. »'},
+     {t:'admettre',   lab:'Reconnaître l’erreur',  d:'« Que c’était une faute, et il le sait déjà. »'},
+     {t:'blamer',     lab:'Évoquer la position',   d:'« Qu’il n’aurait pas eu à tenter ça avec une meilleure voiture. »'},
+     {t:'eluder',     lab:'Rester vague',          d:'« On en parlera tous les deux. »'},
+   ]},
+  {id:'a3', cat:'abandon',
+   q:c=>`Deux abandons de suite. Problème de fiabilité, ou d’agressivité ?`,
+   reps:[
+     {t:'defendre',   lab:'Défendre son style',    d:'« Il pilote comme ça. C’est aussi pour ça qu’il gagne. »'},
+     {t:'admettre',   lab:'Admettre l’excès',      d:'« Il doit apprendre à finir les courses. »'},
+     {t:'blamer',     lab:'Pointer la fiabilité',  d:'« Posez la question aux mécaniciens. »'},
+     {t:'eluder',     lab:'Ne pas trancher',       d:'« Les deux, sûrement. »'},
+   ]},
 ];
-function repondrePresse(repId){
-  const r = REPONSES_PRESSE.find(x=>x.id===repId);
+
+function categoriePresse(pos, dnf, att, grilleN){
+  if(dnf) return 'abandon';
+  if(pos===1) return 'victoire';
+  if(pos<=3) return 'podium';
+  if(pos > att+4) return 'deception';
+  if(pointsPour(S.saison.catId, pos) > 0) return 'points';
+  return 'neutre';
+}
+
+function genererQuestionPresse(pos, dnf, c){
+  const p=S.pilote, sa=S.saison, att=positionAttendue();
+  const cat = categoriePresse(pos, dnf, att, c.grille);
+  const coequipier = (sa.grille.find(g=>g.ecurieId===sa.ecurieId)||{}).nom || 'son coéquipier';
+  const ctx = {
+    nom:p.nom, pos, cat:c.nom, circuit:sa.calendrier[sa.courseIndex].nom,
+    ecurie:sa.ecurieNom, coequipier, att,
+  };
+  // On évite de reposer une question déjà servie récemment.
+  sa.pressePosees = sa.pressePosees || [];
+  let pool = PRESSE_QUESTIONS.filter(x=>x.cat===cat);
+  const frais = pool.filter(x=>!sa.pressePosees.includes(x.id));
+  if(frais.length) pool = frais;
+  const q = pick(pool);
+  sa.pressePosees.push(q.id);
+  if(sa.pressePosees.length>8) sa.pressePosees.shift();
+  return {qid:q.id, q:q.q(ctx), reps:q.reps, pos, dnf, repondu:false};
+}
+
+function repondrePresse(typeId){
+  const w = S.weekend;
+  if(!w || !w.presse) return null;
+  const rep = w.presse.reps.find(r=>r.t===typeId);
+  const e = PRESSE_EFFETS[typeId];
+  if(!rep || !e) return null;
   const p=S.pilote;
-  let dm=r.moral;
+  let dm=e.moral;
   if(p.traits.includes('fragile') && dm<0) dm*=1.6;
   if(p.traits.includes('medias')) dm = dm>0?dm*1.2:dm*0.8;
   p.moral = clamp(p.moral+dm,5,100);
-  p.relation = clamp(p.relation + (repId==='defendre'?+4 : repId==='admettre'?-3 : repId==='blamer'?+5 : 0), 0, 100);
-  S.manager.image = clamp(S.manager.image + r.image, 0, 100);
-  if(S.contrat) S.contrat.relationEcurie = clamp((S.contrat.relationEcurie ?? 60) + r.relation, 0, 100);
-  if(S.weekend && S.weekend.presse) S.weekend.presse.repondu = r.lab;
+  p.relation = clamp(p.relation + e.relation, 0, 100);
+  p.reputation = clamp(p.reputation + (e.repPilote||0), 1, 100);
+  S.manager.image = clamp(S.manager.image + e.image, 0, 100);
+  if(S.contrat) S.contrat.relationEcurie = clamp((S.contrat.relationEcurie ?? 60) + e.ecurie, 0, 100);
+  w.presse.repondu = rep.lab;
   // Une écurie vraiment vexée resserre la vis
   if(S.contrat && S.contrat.relationEcurie < 22 && Math.random()<0.4){
     msg('ecurie', S.contrat.ecurieNom, 'Mise au point',
@@ -1792,7 +2008,7 @@ function repondrePresse(repId){
     S.contrat.relationEcurie = clamp(S.contrat.relationEcurie+8,0,100);
   }
   saveGame();
-  return r;
+  return {...rep, ...e};
 }
 
 /* 20.3 — Le pilote écrit au manager */
@@ -2830,10 +3046,41 @@ function renderWeekend(){
   });
 }
 
+function meilleurRun(){
+  const w=S.weekend;
+  if(!w || !w.runs.length) return null;
+  return w.runs.reduce((b,r)=> !b || r.score>b.score ? r : b, null);
+}
+function memeSetup(a,b){
+  return setupParams(S.saison.catId).every(p=>(a[p.k]??10)===(b[p.k]??10));
+}
+/* Bandeau proposant de revenir au meilleur réglage trouvé pendant les essais.
+   Affiché aussi avant les qualifs et avant la course : c'est là qu'on en a besoin. */
+function rappelMeilleurReglage(course){
+  const w=S.weekend, best=meilleurRun();
+  if(!best) return '';
+  const actuel = scoreReglages(course, w.setup, S.pilote).score;
+  const dejaDessus = memeSetup(w.setup, best.setup);
+  return `<div class="card ${dejaDessus?'flat':'accent'}">
+    <h2>Réglage retenu<span class="hint">${w.runs.length} run(s) fait(s)</span></h2>
+    <div class="row" style="align-items:center">
+      <div style="flex:1">
+        <div class="note">Réglage actuellement monté sur la voiture :
+          <b class="${actuel>78?'txt-green':actuel>55?'txt-amber':'txt-red'}">${Math.round(actuel)}/100</b></div>
+        <div class="note txt-muted">Meilleur trouvé en essais : <b>${Math.round(best.score)}/100</b> (run ${best.n})</div>
+      </div>
+      ${dejaDessus
+        ? tag('C’est le meilleur','t-green')
+        : `<button class="btn btn-sm" data-act="reprendreReglage" data-n="${best.n}">Reprendre le meilleur</button>`}
+    </div>
+  </div>`;
+}
+
 function vueEssais(course, meteo){
   const w=S.weekend, params=setupParams(S.saison.catId);
   const sc = scoreReglages(course, w.setup, S.pilote).score;
   const ing = staffNiv('ingenieur');
+  const best = meilleurRun();
   let h = `<div class="card"><h2>Réglages<span class="hint">${w.runsRestants} run(s) restant(s)</span></h2>
     <div class="note mb">Chaque circuit a un réglage optimal <b>caché</b>, décalé par les préférences du pilote.
     Vous le cherchez par essais successifs — et vous repartez de zéro au circuit suivant.</div>
@@ -2845,24 +3092,50 @@ function vueEssais(course, meteo){
       <button class="btn" style="flex:1" data-act="faireRun" ${w.runsRestants<=0?'disabled':''}>Envoyer en piste</button>
       <button class="btn-ghost" data-act="etapeSuivante">Passer à « ${ETAPE_NOM[w.etapes[w.etape+1]]} »</button>
     </div>
-    ${w.runsRestants<=0?`<div class="note warn mt">Plus de temps de piste : ce sera avec ces réglages.</div>`:''}
+    ${w.runsRestants<=0?`<div class="note warn mt">Plus de temps de piste. Vous pouvez encore ajuster les curseurs
+      ou reprendre un réglage déjà essayé — mais vous ne saurez pas ce que ça donne avant la course.</div>`:''}
   </div>`;
+
+  h += rappelMeilleurReglage(course);
 
   if(w.runs.length){
     h += `<div class="card"><h2>Retour du pilote<span class="hint">${ing?NIV_LABEL[ing]+' à l’ingénierie':'Aucun ingénieur'}</span></h2>`;
-    w.runs.slice(0,3).forEach((r,i)=>{
+    w.runs.forEach((r,i)=>{
+      const estBest = best && r.n===best.n;
+      const monte = memeSetup(w.setup, r.setup);
       h += `<div class="${i?'mt2':''}">
-        <div class="row tight"><b class="small">Run ${r.n}</b>${tag('Réglages '+Math.round(r.score)+'/100', r.score>78?'t-green':r.score>55?'t-amber':'t-red')}</div>
+        <div class="row tight">
+          <b class="small">Run ${r.n}</b>
+          ${tag('Réglages '+Math.round(r.score)+'/100', r.score>78?'t-green':r.score>55?'t-amber':'t-red')}
+          ${estBest?tag('meilleur','t-amber'):''}
+          <div class="spacer"></div>
+          ${monte
+            ? `<span class="small txt-muted">monté sur la voiture</span>`
+            : `<button class="btn-ghost btn-xs" data-act="reprendreReglage" data-n="${r.n}">Reprendre</button>`}
+        </div>
         ${r.lignes.map(l=>`<div class="quote"><span class="who">${escapeHtml(S.pilote.nom)}</span>${escapeHtml(l)}</div>`).join('')}
         <div class="note txt-muted">${escapeHtml(r.ing)}</div>
       </div>`;
     });
     h += `</div>`;
   }else{
-    h += `<div class="card flat"><div class="note">Envoyez le pilote en piste pour obtenir ses sensations. Sans ingénieur de course, il décrira ce qu’il ressent sans que personne ne sache quoi en faire.</div></div>`;
+    h += `<div class="card flat"><div class="note">Envoyez le pilote en piste pour obtenir ses sensations.
+      Sans ingénieur de course, il décrira ce qu’il ressent sans que personne ne traduise ça en réglage —
+      à vous de faire le lien.</div></div>`;
   }
-  h += `<div class="card flat"><div class="note txt-muted">Indicateur interne (non visible en jeu réel) — qualité actuelle des réglages : <b>${Math.round(sc)}/100</b>.
-    Ce score alimente la variable <i>Réglages</i> de la formule de course, pour 15 % de la performance.</div></div>`;
+
+  h += `<div class="card flat">
+    <h2>Traduire ce que dit le pilote<span class="hint">aide-mémoire</span></h2>
+    <div class="note mb">Ce tableau ne change jamais : c’est le métier. Ce qui reste caché, c’est
+    <b>à quelle valeur</b> le circuit et le pilote sont bons.</div>
+    <div class="tw"><table><thead><tr><th>Il se plaint de…</th><th>Paramètre</th><th>Correction</th></tr></thead><tbody>
+    ${params.map(pm=>`
+      <tr><td class="wrap">${escapeHtml(pm.lo)}</td><td>${pm.n}</td><td class="txt-green">${escapeHtml(pm.loFix)}</td></tr>
+      <tr><td class="wrap">${escapeHtml(pm.hi)}</td><td>${pm.n}</td><td class="txt-blue">${escapeHtml(pm.hiFix)}</td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="note txt-muted mt">Qualité actuelle des réglages : <b>${Math.round(sc)}/100</b> —
+    cette variable pèse 15 % de la performance en course.</div>
+  </div>`;
   return h;
 }
 
@@ -2874,7 +3147,8 @@ function vueQualifs(course){
       <button class="btn btn-cta btn-block" data-act="etapeSuivante">Lancer les qualifications</button></div>`;
   }
   const moi = w.grille.find(g=>g.id===S.pilote.id);
-  let h = `<div class="card"><h2>Grille de départ<span class="hint">${ordinal(moi.pos)} sur ${w.grille.length}</span></h2>
+  let h = rappelMeilleurReglage(course);
+  h += `<div class="card"><h2>Grille de départ<span class="hint">${ordinal(moi.pos)} sur ${w.grille.length}</span></h2>
     <div class="tw"><table><thead><tr><th>Pos</th><th>Pilote</th><th>Écurie</th></tr></thead><tbody>
     ${w.grille.slice(0,14).map(g=>`<tr class="${g.moi?'me':''}"><td><span class="pos p${g.pos<=3?g.pos:''}">${g.pos}</span></td>
       <td>${escapeHtml(g.nom)}</td><td class="txt-2">${escapeHtml(g.ecurie)}</td></tr>`).join('')}
@@ -2888,7 +3162,8 @@ function vueCourse(course, meteo){
   const w=S.weekend;
   const moi = w.grille ? w.grille.find(g=>g.id===S.pilote.id) : null;
   const kart = CAT[S.saison.catId].format==='kart';
-  let h = `<div class="card"><h2>Stratégie de course</h2>
+  let h = rappelMeilleurReglage(course);
+  h += `<div class="card"><h2>Stratégie de course</h2>
     <div class="note mb">Départ ${moi?`en ${ordinal(moi.pos)} position`:''} · ${meteo.nom.toLowerCase()}.
     ${kart?'En karting, pas d’arrêt : tout se joue sur la gestion des pneus et l’agressivité.':'Une stratégie agressive gagne du temps mais use le matériel et augmente le risque d’abandon.'}</div>
     <div class="pills mb">${STRATS.map(s=>`<button class="pill ${w.strat===s.id?'on':''}" data-act="setStrat" data-id="${s.id}">${s.nom}</button>`).join('')}</div>
@@ -2928,8 +3203,8 @@ function vueDebrief(course){
   if(w.presse && !w.presse.repondu){
     h += `<div class="card accent"><h2>Conférence de presse</h2>
       <div class="quote"><span class="who">Journaliste</span>${escapeHtml(w.presse.q)}</div>
-      ${REPONSES_PRESSE.map(rp=>`<button class="choice" data-act="repPresse" data-id="${rp.id}">
-        <b>${escapeHtml(rp.lab)}</b><small>${escapeHtml(rp.desc)}</small></button>`).join('')}
+      ${w.presse.reps.map(rp=>`<button class="choice" data-act="repPresse" data-id="${rp.t}">
+        <b>${escapeHtml(rp.lab)}</b><small>${escapeHtml(rp.d)}</small></button>`).join('')}
       <div class="note txt-muted">Chaque réponse joue sur trois jauges : moral du pilote, relation avec l’écurie, image médiatique.</div>
     </div>`;
   }else if(w.presse){
@@ -2948,6 +3223,13 @@ function vueDebrief(course){
 }
 
 ACTIONS.faireRun = ()=>{ faireRun(); render(); };
+ACTIONS.reprendreReglage = d=>{
+  const r = S.weekend.runs.find(x=>x.n===+d.n);
+  if(!r) return;
+  S.weekend.setup = {...r.setup};
+  saveGame(); render();
+  showToast('Réglage du run '+r.n+' remonté sur la voiture');
+};
 ACTIONS.etapeSuivante = ()=>{ etapeSuivante(); render(); };
 ACTIONS.setStrat = d=>{ S.weekend.strat=d.id; saveGame(); render(); };
 ACTIONS.lancerCourse = ()=>{ lancerCourse(false); render(); };

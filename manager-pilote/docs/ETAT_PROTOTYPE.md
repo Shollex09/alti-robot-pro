@@ -50,9 +50,9 @@ ne les fixait pas.
 | 17.1 | Formule de progression | ✅ | Formule du GDD à l'identique |
 | 17.2 | Note globale | ✅ | Pace ×0,40 + Consistency ×0,30 + Racecraft ×0,30 |
 | 17.3 | Résultat de course | ✅ | Pilote ×0,40 + Voiture ×0,35 + Réglages ×0,15 + Aléa ×0,10 |
-| 18 | Réglages, optimum caché, retour du pilote | ✅ | Le cœur du week-end ; précision indexée sur l'ingénieur |
+| 18 | Réglages, optimum caché, retour du pilote | ✅ | Le cœur du week-end ; précision indexée sur l'ingénieur. Chaque run essayé reste rappelable avant la course |
 | 19 | Économie chiffrée, option A | ✅ | L'argent des sponsors ne passe jamais par la poche du manager |
-| 20 | Tons, conférence de presse, messages du pilote, relation | ✅ | |
+| 20 | Tons, conférence de presse, messages du pilote, relation | ✅ | 20 questions de presse, tirées selon le résultat, avec leurs propres réponses |
 | 21.1 | Course détaillée ou simulation rapide | ✅ | Choix manche par manche |
 | 21.2 | 3 formats de week-end | ✅ | Karting / monoplace / F1 |
 | 21.3 | Modèle économique | — | Décision reportée, rien à coder |
@@ -92,6 +92,22 @@ Autres arbitrages :
 - **Renvoi** : l'écurie fait le point toutes les 4 manches, 3 avertissements
   entraînent la rupture — un renvoi est donc impossible sur une saison de
   karting à 6 manches, ce qui est cohérent.
+- **Temps de piste** : 5 runs d'essais par week-end (6 en F1), plus 1 par
+  tranche de 2 niveaux d'ingénieur de course — soit 5 à 7. Le §18 ne chiffrait
+  pas ce budget ; à 3 runs, trouver un réglage à 4 paramètres relevait du hasard.
+  Chaque run essayé est conservé et peut être remonté sur la voiture à tout
+  moment du week-end, y compris une fois le temps de piste épuisé.
+- **Retour du pilote** : 2 sensations remontées sans ingénieur, 3 à partir du
+  niveau 2, 4 au niveau 4. L'ingénieur ne change pas la quantité d'information
+  mais sa nature : sans lui, le pilote décrit un symptôme sans que personne ne
+  nomme le correctif. Un aide-mémoire symptôme → paramètre est affiché en
+  permanence pendant les essais : c'est de la connaissance métier, pas
+  l'information cachée du §18 (laquelle reste la *valeur* optimale du circuit).
+- **Conférence de presse** : 20 questions réparties en 6 situations (victoire,
+  podium, points, course neutre, contre-performance, abandon), tirées au sort
+  sans répétition immédiate. Chaque question porte ses propres réponses : une
+  victoire ne propose pas « reconnaître l'échec ». Les effets restent ceux du
+  §20.2 sur les trois mêmes jauges, via une table de 8 postures.
 
 ## Ce que les tests ont montré sur l'équilibrage
 
@@ -117,6 +133,20 @@ Deux enseignements conformes à l'intention du GDD :
    de salaires pour 18 000 € de commissions sur trois saisons de karting avant
    la faillite. C'est exactement le scénario du §19.9 ; le jeu affiche
    désormais un avertissement quand la masse salariale dépasse les commissions.
+
+## Retours de test et suites données
+
+Premier passage de jeu réel par l'auteur, deux points remontés, tous deux corrigés :
+
+1. **« Même quand il y a de bons résultats les commentaires de la presse sont
+   les mêmes. »** Exact : il n'y avait qu'une seule question par type de
+   résultat, et les quatre mêmes réponses pour toutes. Remplacé par un tirage
+   dans 20 questions situées, chacune avec ses réponses propres.
+2. **« Trois essais pour trouver la combinaison, c'est très dur. »** Exact
+   aussi, surtout en karting : 4 paramètres × 20 crans en 3 runs, sans
+   ingénieur pour orienter. Temps de piste porté à 5-7 runs, meilleur réglage
+   rappelable d'un bouton avant les qualifs et avant la course, et
+   aide-mémoire symptôme → paramètre affiché en permanence.
 
 ## Ce qui reste à faire avant de parler de « jeu »
 
