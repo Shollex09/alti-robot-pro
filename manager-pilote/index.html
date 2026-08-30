@@ -1,0 +1,3521 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Manager de Pilote</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0e1116">
+<meta name="description" content="Simulation de gestion : menez un pilote du karting à la F1. Sponsors, contrats, réglages, courses.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Manager">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d1117; --bg2:#0a0e14; --card:#161b22; --card2:#1c232d;
+  --border:#252c37; --border2:#333c4a;
+  --text:#e6edf3; --text2:#9aa7b5; --muted:#66727f;
+  --red:#ff2f2f; --red-d:#c81e1e; --red-bg:#2a1214;
+  --amber:#f5b700; --amber-bg:#2a2210;
+  --green:#2ecc71; --green-bg:#0f2419;
+  --blue:#3d9bff; --blue-bg:#0f1d2e;
+  --purple:#a970ff; --purple-bg:#1c1430;
+  --gold:#ffd257; --silver:#c8d2dc; --bronze:#cd8b52;
+  --r:10px; --r-sm:7px; --r-lg:16px;
+  --shadow:0 4px 22px rgba(0,0,0,.4);
+  --cond:'Barlow Condensed','Barlow',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{overscroll-behavior-y:none}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Barlow','Segoe UI',system-ui,sans-serif;font-size:14.5px;
+  min-height:100dvh;-webkit-font-smoothing:antialiased;line-height:1.45;
+}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+input,select,textarea{background:var(--bg2);border:1.5px solid var(--border2);border-radius:var(--r-sm);padding:8px 10px;outline:none;transition:border-color .15s;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--red)}
+button{cursor:pointer;border:none;border-radius:var(--r-sm);padding:10px 16px;font-weight:600;transition:all .15s}
+button:disabled{opacity:.4;cursor:not-allowed}
+.btn{background:var(--red);color:#fff}
+.btn:hover:not(:disabled){background:var(--red-d)}
+.btn-ghost{background:var(--card2);color:var(--text);border:1px solid var(--border2)}
+.btn-ghost:hover:not(:disabled){border-color:var(--red);color:#fff}
+.btn-ok{background:var(--green);color:#062012}
+.btn-warn{background:var(--amber);color:#241c00}
+.btn-sm{padding:6px 11px;font-size:12.5px;border-radius:6px}
+.btn-xs{padding:4px 9px;font-size:11.5px;border-radius:5px;font-weight:600}
+.btn-block{width:100%;display:block}
+.btn-cta{background:linear-gradient(135deg,#ff2f2f,#c81e1e);color:#fff;font-family:var(--cond);font-size:19px;letter-spacing:.03em;text-transform:uppercase;padding:15px;border-radius:var(--r)}
+.btn-cta:hover:not(:disabled){filter:brightness(1.12)}
+a{color:var(--blue)}
+h1,h2,h3,h4{font-family:var(--cond);letter-spacing:.01em;line-height:1.15}
+
+/* ---- header ---- */
+#hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));
+  background:linear-gradient(180deg,#171d26,#10151c);border-bottom:1px solid var(--border2);position:sticky;top:0;z-index:30}
+#hdr .mark{width:32px;height:32px;flex:0 0 32px;border-radius:8px;background:linear-gradient(135deg,#ff2f2f,#8e0f0f);
+  display:grid;place-items:center;font-family:var(--cond);font-weight:700;color:#fff;font-size:17px}
+#hdr h1{font-size:17px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+@media(max-width:430px){
+  #hdr h1{font-size:14.5px;letter-spacing:.03em}
+  #hdr .sub{font-size:10.5px}
+  #hdr .mark{width:28px;height:28px;flex-basis:28px;font-size:15px}
+  .hdr-stat .v{font-size:14px}
+  .hdr-stat+.hdr-stat{margin-left:10px}
+}
+#hdr .sub{font-size:11px;color:var(--text2);font-weight:500;letter-spacing:.02em}
+#hdr .spacer{flex:1}
+.hdr-stat{text-align:right;font-family:var(--cond);line-height:1.05}
+.hdr-stat .l{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-family:'Barlow',sans-serif;font-weight:600}
+.hdr-stat .v{font-size:16px;font-weight:700}
+.hdr-stat .v.neg{color:var(--red)}
+.hdr-stat+.hdr-stat{margin-left:14px}
+
+/* ---- nav ---- */
+#nav{display:flex;gap:2px;padding:0 8px;overflow-x:auto;background:var(--bg2);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:25;scrollbar-width:none}
+#nav::-webkit-scrollbar{display:none}
+.tab-btn{background:transparent;color:var(--text2);font-weight:600;font-size:12.5px;padding:11px 12px;border-radius:0;
+  white-space:nowrap;border-bottom:2.5px solid transparent;position:relative}
+.tab-btn:has(.dot:not([hidden])){padding-right:24px}
+.tab-btn.active{color:#fff;border-bottom-color:var(--red)}
+.tab-btn:hover:not(.active){color:var(--text)}
+.tab-btn .dot{position:absolute;top:6px;right:3px;min-width:15px;height:15px;padding:0 4px;border-radius:9px;background:var(--red);
+  color:#fff;font-size:9.5px;font-weight:700;display:grid;place-items:center;line-height:1}
+.tab-btn.locked{opacity:.35}
+
+main{max-width:1080px;margin:0 auto;padding:14px 12px calc(40px + env(safe-area-inset-bottom))}
+.view{display:none}
+.view.active{display:block;animation:fade .2s ease}
+@keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+/* ---- cards ---- */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.card>h2{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);
+  margin-bottom:11px;display:flex;align-items:center;gap:7px}
+.card>h2 .hint{margin-left:auto;font-size:11px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:500;font-family:'Barlow',sans-serif}
+.card.accent{border-color:var(--red-d);background:linear-gradient(180deg,#1d1418,var(--card))}
+.card.flat{background:var(--card2)}
+.sect-title{font-family:var(--cond);font-size:19px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:16px 0 9px}
+.sect-title:first-child{margin-top:0}
+
+/* ---- kpi ---- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:9px;margin-bottom:12px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:11px 12px}
+.kpi .l{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.kpi .v{font-family:var(--cond);font-size:25px;font-weight:700;margin-top:2px;line-height:1}
+.kpi .s{font-size:11px;color:var(--text2);margin-top:3px}
+.v.red{color:var(--red)}.v.green{color:var(--green)}.v.amber{color:var(--amber)}.v.blue{color:var(--blue)}
+.txt-red{color:var(--red)}.txt-green{color:var(--green)}.txt-amber{color:var(--amber)}.txt-blue{color:var(--blue)}
+.txt-muted{color:var(--muted)}.txt-2{color:var(--text2)}
+
+/* ---- grids ---- */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:760px){.g2,.g3{grid-template-columns:1fr}}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.row.tight{gap:6px}
+.spacer{flex:1}
+
+/* ---- tables ---- */
+.tw{overflow-x:auto;margin:0 -14px;padding:0 14px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;
+  padding:7px 8px;border-bottom:1.5px solid var(--border2);white-space:nowrap}
+tbody td{padding:8px;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody tr:last-child td{border-bottom:none}
+tbody tr.me{background:rgba(255,47,47,.09)}
+tbody tr.me td{font-weight:600}
+.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--cond);font-size:14px;font-weight:600}
+.pos{font-family:var(--cond);font-weight:700;font-size:15px;width:30px;text-align:center}
+.pos.p1{color:var(--gold)}.pos.p2{color:var(--silver)}.pos.p3{color:var(--bronze)}
+.empty{text-align:center;color:var(--muted);padding:26px 10px;font-style:italic;font-size:13px}
+/* colonnes secondaires masquées sur petit écran, pour que le montant reste visible */
+@media(max-width:560px){.hide-s{display:none}}
+td.wrap{white-space:normal;min-width:130px}
+
+/* ---- tags ---- */
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:.03em;
+  text-transform:uppercase;white-space:nowrap}
+.t-red{background:var(--red-bg);color:#ff7b7b}
+.t-green{background:var(--green-bg);color:#5ee397}
+.t-amber{background:var(--amber-bg);color:var(--amber)}
+.t-blue{background:var(--blue-bg);color:#79bcff}
+.t-purple{background:var(--purple-bg);color:#c3a0ff}
+.t-grey{background:#20262f;color:var(--text2)}
+
+/* ---- stat bars ---- */
+.stat-line{display:flex;align-items:center;gap:9px;padding:5px 0}
+.stat-line .n{font-size:12.5px;color:var(--text2);width:96px;flex:0 0 96px}
+.stat-line .bar{flex:1;height:7px;background:var(--bg2);border-radius:4px;overflow:hidden;position:relative}
+.stat-line .bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#ff2f2f,#ff8a3d)}
+.stat-line .bar u{position:absolute;top:-2px;width:2px;height:11px;background:var(--text2);opacity:.5}
+.stat-line .v{font-family:var(--cond);font-weight:700;font-size:15px;width:56px;text-align:right;flex:0 0 56px}
+.grp{background:var(--card2);border-radius:var(--r-sm);padding:9px 11px;margin-bottom:8px}
+.grp>.h{display:flex;align-items:baseline;gap:8px;margin-bottom:3px}
+.grp>.h b{font-family:var(--cond);font-size:15px;text-transform:uppercase;letter-spacing:.05em}
+.grp>.h span{margin-left:auto;font-family:var(--cond);font-size:20px;font-weight:700}
+
+/* ---- overall badge ---- */
+.ovr{display:flex;align-items:center;gap:12px}
+.ovr .big{width:64px;height:64px;flex:0 0 64px;border-radius:14px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#2a323d,#171d26);border:2px solid var(--border2);font-family:var(--cond);
+  font-size:32px;font-weight:700;line-height:1}
+.ovr .big.hi{border-color:var(--amber);color:var(--amber)}
+.ovr .big.top{border-color:var(--red);color:var(--red)}
+
+/* ---- inbox ---- */
+.msg{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--border2);border-radius:var(--r-sm);
+  padding:11px 13px;margin-bottom:8px;cursor:pointer}
+.msg.unread{border-left-color:var(--red);background:var(--card2)}
+.msg.unread .sj{color:#fff}
+.msg .top{display:flex;gap:8px;align-items:baseline;font-size:11px;color:var(--muted);margin-bottom:2px}
+.msg .fr{font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em}
+.msg .sj{font-weight:600;font-size:14px;color:var(--text2)}
+.msg .bd{font-size:13px;color:var(--text2);margin-top:6px;line-height:1.5;white-space:pre-wrap}
+.msg .bd em{color:var(--amber);font-style:normal;font-weight:600}
+.msg-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+
+/* ---- sliders ---- */
+.setup-row{padding:9px 0;border-bottom:1px solid var(--border)}
+.setup-row:last-child{border-bottom:none}
+.setup-row .lab{display:flex;align-items:baseline;gap:8px;margin-bottom:5px}
+.setup-row .lab b{font-size:13.5px;font-weight:600}
+.setup-row .lab span{margin-left:auto;font-family:var(--cond);font-size:18px;font-weight:700;color:var(--amber)}
+input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;padding:0;border:none;height:22px;width:100%}
+input[type=range]::-webkit-slider-runnable-track{height:5px;background:var(--bg2);border-radius:3px;border:1px solid var(--border2)}
+input[type=range]::-moz-range-track{height:5px;background:var(--bg2);border-radius:3px;border:1px solid var(--border2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--red);
+  margin-top:-8.5px;border:2px solid #fff2}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--red);border:2px solid #fff2}
+
+/* ---- feedback quotes ---- */
+.quote{background:var(--bg2);border-left:3px solid var(--amber);border-radius:0 var(--r-sm) var(--r-sm) 0;
+  padding:9px 12px;margin:7px 0;font-size:13.5px;font-style:italic;color:#dfe7ef}
+.quote .who{display:block;font-style:normal;font-size:10.5px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.06em;font-weight:700;margin-bottom:3px}
+
+/* ---- modal ---- */
+#overlay{position:fixed;inset:0;background:rgba(4,7,11,.82);backdrop-filter:blur(3px);z-index:100;
+  display:none;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto}
+#overlay.on{display:flex}
+#modal{background:var(--card);border:1px solid var(--border2);border-radius:var(--r-lg);max-width:640px;width:100%;
+  margin:auto 0;box-shadow:var(--shadow);overflow:hidden;animation:pop .18s ease}
+@keyframes pop{from{opacity:0;transform:scale(.97) translateY(8px)}to{opacity:1;transform:none}}
+#modal .mh{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;
+  background:linear-gradient(180deg,#1d242e,var(--card))}
+#modal .mh h3{font-size:17px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+#modal .mh .x{margin-left:auto;background:transparent;color:var(--muted);font-size:22px;padding:0 6px;line-height:1}
+#modal .mb{padding:16px;max-height:calc(100dvh - 190px);overflow-y:auto}
+#modal .mf{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+
+/* ---- choice list ---- */
+.choice{display:block;width:100%;text-align:left;background:var(--card2);border:1.5px solid var(--border);
+  border-radius:var(--r-sm);padding:11px 13px;margin-bottom:8px;font-weight:500}
+.choice:hover:not(:disabled){border-color:var(--red);background:#20262f}
+.choice b{display:block;font-size:14px;font-weight:700;margin-bottom:2px}
+.choice small{color:var(--text2);font-size:12px;line-height:1.4;display:block}
+
+/* ---- pills / selectors ---- */
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{background:var(--card2);border:1.5px solid var(--border);color:var(--text2);border-radius:20px;
+  padding:6px 13px;font-size:12.5px;font-weight:600}
+.pill.on{background:var(--red-bg);border-color:var(--red);color:#ff9a9a}
+
+/* ---- progress / gauges ---- */
+.gauge{height:8px;background:var(--bg2);border-radius:5px;overflow:hidden;border:1px solid var(--border)}
+.gauge i{display:block;height:100%;border-radius:4px;transition:width .3s}
+.gauge.g-green i{background:linear-gradient(90deg,#1e8f4e,#2ecc71)}
+.gauge.g-amber i{background:linear-gradient(90deg,#b98a00,#f5b700)}
+.gauge.g-red i{background:linear-gradient(90deg,#8e1414,#ff2f2f)}
+.gauge.g-blue i{background:linear-gradient(90deg,#1c5f9e,#3d9bff)}
+.gline{display:flex;align-items:center;gap:9px;padding:4px 0}
+.gline .n{font-size:12px;color:var(--text2);width:98px;flex:0 0 98px}
+.gline .gauge{flex:1}
+.gline .v{font-family:var(--cond);font-weight:700;font-size:14px;width:42px;text-align:right;flex:0 0 42px}
+
+/* ---- race log ---- */
+.log{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;
+  max-height:290px;overflow-y:auto;font-size:13px;line-height:1.55}
+.log .li{padding:4px 0;border-bottom:1px dashed #1e242d;display:flex;gap:9px}
+.log .li:last-child{border-bottom:none}
+.log .lp{font-family:var(--cond);font-weight:700;color:var(--muted);flex:0 0 40px;font-size:12px}
+.log .li.big{color:var(--amber);font-weight:600}
+.log .li.bad{color:#ff8a8a}
+.log .li.good{color:#7ee6a8}
+
+/* ---- weather strip ---- */
+.strip{display:flex;gap:8px;flex-wrap:wrap;background:var(--card2);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:9px 11px;margin-bottom:11px;font-size:12.5px;align-items:center}
+.strip .it{display:flex;align-items:center;gap:5px}
+.strip .it b{font-weight:700}
+.strip .sep{width:1px;height:15px;background:var(--border2)}
+
+/* ---- offer compare ---- */
+.offer{border:1.5px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:10px;background:var(--card2)}
+.offer.best{border-color:var(--amber)}
+.offer .oh{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.offer .oh b{font-family:var(--cond);font-size:18px;font-weight:700}
+.omat{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:9px 0;text-align:center}
+.omat div{background:var(--bg2);border-radius:6px;padding:7px 4px}
+.omat .l{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+.omat .v{font-family:var(--cond);font-size:15px;font-weight:700;margin-top:2px}
+
+/* ---- misc ---- */
+.note{font-size:12.5px;color:var(--text2);line-height:1.55}
+.note.warn{color:var(--amber)}
+.hr{height:1px;background:var(--border);margin:12px 0}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(18px);background:#e6edf3;color:#0d1117;
+  padding:11px 20px;border-radius:30px;font-weight:700;font-size:13.5px;opacity:0;pointer-events:none;transition:all .25s;
+  z-index:200;box-shadow:0 6px 26px rgba(0,0,0,.5);max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.center{text-align:center}
+.mono{font-variant-numeric:tabular-nums}
+.small{font-size:12px}
+.b{font-weight:700}
+.mt{margin-top:10px}.mt2{margin-top:18px}.mb{margin-bottom:10px}
+.scroll-x{overflow-x:auto}
+#splash{max-width:560px;margin:0 auto}
+#splash .hero{text-align:center;padding:22px 10px 6px}
+#splash .hero .t{font-family:var(--cond);font-size:38px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;line-height:1}
+#splash .hero .t em{color:var(--red);font-style:normal}
+#splash .hero .s{color:var(--text2);font-size:14px;margin-top:6px}
+.slider-box{background:var(--card2);border:1px solid var(--border);border-radius:var(--r);padding:13px;margin-bottom:11px}
+.slider-box .top{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
+.slider-box .top b{font-family:var(--cond);font-size:17px;text-transform:uppercase;letter-spacing:.04em}
+.slider-box .top span{margin-left:auto;font-family:var(--cond);font-size:20px;font-weight:700;color:var(--amber)}
+.ladder{display:flex;gap:3px;align-items:flex-end;margin:10px 0}
+.ladder .st{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:4px 4px 0 0;
+  padding:5px 2px;text-align:center;font-size:9px;font-weight:700;color:var(--muted);line-height:1.15;
+  text-transform:uppercase;letter-spacing:.02em}
+.ladder .st.done{background:var(--green-bg);color:#5ee397;border-color:#1e5a38}
+.ladder .st.now{background:var(--red-bg);color:#ff8a8a;border-color:var(--red-d)}
+</style>
+</head>
+<body>
+
+<header id="hdr">
+  <div class="mark">MP</div>
+  <div>
+    <h1>Manager de Pilote</h1>
+    <div class="sub" id="hdrSub">Du karting à la F1</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="hdr-stat" id="hdrRep" hidden><div class="l">Réputation</div><div class="v"></div></div>
+  <div class="hdr-stat" id="hdrCash" hidden><div class="l">Trésorerie</div><div class="v"></div></div>
+</header>
+
+<nav id="nav" hidden>
+  <button class="tab-btn active" data-tab="bureau">Bureau</button>
+  <button class="tab-btn" data-tab="inbox">Messagerie<span class="dot" id="navUnread" hidden>0</span></button>
+  <button class="tab-btn" data-tab="pilote">Pilote</button>
+  <button class="tab-btn" data-tab="weekend">Week-end</button>
+  <button class="tab-btn" data-tab="sponsors">Sponsors</button>
+  <button class="tab-btn" data-tab="contrats">Contrats</button>
+  <button class="tab-btn" data-tab="staff">Staff</button>
+  <button class="tab-btn" data-tab="champ">Championnat</button>
+  <button class="tab-btn" data-tab="finances">Finances</button>
+  <button class="tab-btn" data-tab="save">Sauvegarde</button>
+</nav>
+
+<main>
+  <!-- ===== SPLASH / NOUVELLE PARTIE ===== -->
+  <div class="view active" id="v-splash"><div id="splash"></div></div>
+
+  <div class="view" id="v-bureau"></div>
+  <div class="view" id="v-inbox"></div>
+  <div class="view" id="v-pilote"></div>
+  <div class="view" id="v-weekend"></div>
+  <div class="view" id="v-sponsors"></div>
+  <div class="view" id="v-contrats"></div>
+  <div class="view" id="v-staff"></div>
+  <div class="view" id="v-champ"></div>
+  <div class="view" id="v-finances"></div>
+  <div class="view" id="v-save"></div>
+</main>
+
+<div id="overlay">
+  <div id="modal">
+    <div class="mh"><h3 id="modalTitle">—</h3><button class="x" id="modalX">&times;</button></div>
+    <div class="mb" id="modalBody"></div>
+    <div class="mf" id="modalFoot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   MANAGER DE PILOTE — prototype jouable V1
+   Périmètre : GDD v0.5, tout ce qui est marqué [V1].
+   Aucune dépendance, aucun build. État persisté en localStorage.
+   ========================================================================= */
+
+/* ---------------------------------------------------------------- 0. UTIL */
+const $  = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const rnd  =(a=1,b=0)=>Math.random()*(a-b)+b;
+const rint =(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const pick =arr=>arr[Math.floor(Math.random()*arr.length)];
+const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=rint(0,i);[a[i],a[j]]=[a[j],a[i]];}return a;};
+const uid  =()=>Math.random().toString(36).slice(2,10);
+const sum  =(a,f=x=>x)=>a.reduce((s,x)=>s+f(x),0);
+const avg  =(a,f=x=>x)=>a.length?sum(a,f)/a.length:0;
+const round=(v,d=0)=>{const m=Math.pow(10,d);return Math.round(v*m)/m;};
+// bruit gaussien approché (somme de 3 uniformes) : -1..+1 centré
+const gauss=()=> (Math.random()+Math.random()+Math.random())/1.5 - 1;
+// hash déterministe -> 0..1 (réglages optimaux stables par circuit/saison)
+function hash01(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619);}return ((h>>>0)%100000)/100000;}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function fmtEur(n){
+  n = Math.round(Number(n)||0);
+  const neg = n<0; n=Math.abs(n);
+  let s;
+  if(n>=1e6) s = (n/1e6).toFixed(n>=1e7?1:2).replace(/\.?0+$/,'')+' M€';
+  else if(n>=1e4) s = Math.round(n/1e3)+' k€';
+  else s = n.toLocaleString('fr-FR')+' €';
+  return (neg?'-':'')+s;
+}
+function fmtEurFull(n){return (Math.round(Number(n)||0)).toLocaleString('fr-FR')+' €';}
+function ordinal(n){return n===1?'1er':n+'e';}
+function showToast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2300);}
+
+/* ------------------------------------------------------- 1. DONNÉES JEU */
+
+/* --- 1.1 Échelle des catégories (GDD §8.1, §19.2, §19.3, §21.2) --- */
+const CATS = [
+  {id:'kmini',  nom:'Karting Mini',   court:'K-Mini',  niv:0, cout:8000,    courses:6,  grille:24, ageMin:8,  ageMax:13, format:'kart', slots:2, vict:300,   titre:1500,   ptsSys:'kart', prestige:8},
+  {id:'kcadet', nom:'Karting Cadet',  court:'K-Cadet', niv:1, cout:14000,   courses:6,  grille:24, ageMin:11, ageMax:15, format:'kart', slots:2, vict:400,   titre:2200,   ptsSys:'kart', prestige:14},
+  {id:'kjunior',nom:'Karting Junior', court:'K-Junior',niv:2, cout:22000,   courses:7,  grille:26, ageMin:13, ageMax:17, format:'kart', slots:2, vict:800,   titre:4000,   ptsSys:'kart', prestige:22},
+  {id:'ksenior',nom:'Karting Senior', court:'K-Senior',niv:3, cout:35000,   courses:8,  grille:28, ageMin:15, ageMax:22, format:'kart', slots:3, vict:1500,  titre:8000,   ptsSys:'kart', prestige:30},
+  {id:'kz',     nom:'Karting KZ',     court:'KZ',      niv:4, cout:100000,  courses:8,  grille:28, ageMin:15, ageMax:26, format:'kart', slots:3, vict:3000,  titre:15000,  ptsSys:'kart', prestige:40},
+  {id:'f4',     nom:'Formule 4',      court:'F4',      niv:5, cout:250000,  courses:15, grille:22, ageMin:15, ageMax:22, format:'mono',slots:4, vict:3000,  titre:30000,  ptsSys:'f1',   prestige:52},
+  {id:'f3',     nom:'Formule 3',      court:'F3',      niv:6, cout:900000,  courses:18, grille:26, ageMin:16, ageMax:24, format:'mono',slots:5, vict:15000, titre:150000, ptsSys:'f1',   prestige:66},
+  {id:'f2',     nom:'Formule 2',      court:'F2',      niv:7, cout:2500000, courses:24, grille:22, ageMin:17, ageMax:27, format:'mono',slots:6, vict:40000, titre:400000, ptsSys:'f1',   prestige:80},
+  {id:'f1',     nom:'Formule 1',      court:'F1',      niv:8, cout:0,       courses:24, grille:20, ageMin:18, ageMax:40, format:'f1',  slots:8, vict:0,     titre:0,      ptsSys:'f1',   prestige:100},
+];
+const CAT = Object.fromEntries(CATS.map(c=>[c.id,c]));
+const catByNiv = n=>CATS.find(c=>c.niv===n);
+
+/* Niveau moyen attendu de la grille dans chaque catégorie.
+   C'est ce qui fait qu'une catégorie « demande » un certain niveau de pilote :
+   un pilote au plafond « Moyen » (78) plafonne en F3/F2 et ne s'impose jamais en F1. */
+const NIVEAU_GRILLE = {kmini:32, kcadet:40, kjunior:48, ksenior:55, kz:61, f4:67, f3:74, f2:81, f1:87};
+
+/* Points de superlicence FIA (GDD §8.2 — 40 pts sur 3 ans) */
+const SUPERLIC = {
+  f2:[40,40,40,30,20,10,8,6,4,3],
+  f3:[30,25,20,10,7,5,3,2,1,0],
+  f4:[12,10,7,5,3,1,0,0,0,0],
+  kz:[4,3,2,1,0,0,0,0,0,0],
+};
+const SUPERLIC_REQUIS = 40;
+
+/* Barèmes de points */
+const PTS = {
+  kart:[25,20,16,13,11,10,9,8,7,6,5,4,3,2,1],
+  f1:  [25,18,15,12,10,8,6,4,2,1],
+};
+
+/* --- 1.2 Circuits réels, sans logos ni marques (GDD §12) --- */
+// profil : pondération pace / consistency / racecraft utilisée dans la simulation
+const CIRCUITS_KART = [
+  {n:'Salbris',           p:'France',   t:'Technique', w:[.36,.36,.28]},
+  {n:'Angerville',        p:'France',   t:'Rapide',    w:[.44,.30,.26]},
+  {n:'Ostricourt',        p:'France',   t:'Technique', w:[.34,.38,.28]},
+  {n:'Varennes-sur-Allier',p:'France',  t:'Mixte',     w:[.38,.33,.29]},
+  {n:'Aunay-les-Bois',    p:'France',   t:'Technique', w:[.33,.39,.28]},
+  {n:'Le Mans karting',   p:'France',   t:'Rapide',    w:[.43,.31,.26]},
+  {n:'Laval',             p:'France',   t:'Mixte',     w:[.38,.34,.28]},
+  {n:'Lonato',            p:'Italie',   t:'Mixte',     w:[.37,.33,.30]},
+  {n:'Sarno',             p:'Italie',   t:'Technique', w:[.34,.37,.29]},
+  {n:'Muro Leccese',      p:'Italie',   t:'Rapide',    w:[.42,.31,.27]},
+  {n:'Genk',              p:'Belgique', t:'Mixte',     w:[.38,.32,.30]},
+  {n:'Zuera',             p:'Espagne',  t:'Rapide',    w:[.41,.31,.28]},
+  {n:'Wackersdorf',       p:'Allemagne',t:'Technique', w:[.34,.36,.30]},
+  {n:'Portimão karting',  p:'Portugal', t:'Mixte',     w:[.38,.33,.29]},
+];
+const CIRCUITS_MONO = [
+  {n:'Spa-Francorchamps', p:'Belgique',   t:'Rapide',    w:[.44,.28,.28]},
+  {n:'Monza',             p:'Italie',     t:'Rapide',    w:[.46,.26,.28]},
+  {n:'Silverstone',       p:'Royaume-Uni',t:'Rapide',    w:[.43,.29,.28]},
+  {n:'Suzuka',            p:'Japon',      t:'Technique', w:[.36,.38,.26]},
+  {n:'Barcelone',         p:'Espagne',    t:'Mixte',     w:[.39,.34,.27]},
+  {n:'Hungaroring',       p:'Hongrie',    t:'Technique', w:[.32,.36,.32]},
+  {n:'Zandvoort',         p:'Pays-Bas',   t:'Technique', w:[.35,.37,.28]},
+  {n:'Red Bull Ring',     p:'Autriche',   t:'Rapide',    w:[.44,.27,.29]},
+  {n:'Imola',             p:'Italie',     t:'Technique', w:[.36,.39,.25]},
+  {n:'Paul Ricard',       p:'France',     t:'Mixte',     w:[.40,.32,.28]},
+  {n:'Monaco',            p:'Monaco',     t:'Technique', w:[.30,.44,.26]},
+  {n:'Interlagos',        p:'Brésil',     t:'Mixte',     w:[.37,.31,.32]},
+  {n:'Bahreïn',           p:'Bahreïn',    t:'Mixte',     w:[.39,.30,.31]},
+  {n:'Djeddah',           p:'Arabie S.',  t:'Rapide',    w:[.43,.34,.23]},
+  {n:'Melbourne',         p:'Australie',  t:'Mixte',     w:[.38,.33,.29]},
+  {n:'Montréal',          p:'Canada',     t:'Mixte',     w:[.38,.33,.29]},
+  {n:'Mexico',            p:'Mexique',    t:'Mixte',     w:[.39,.31,.30]},
+  {n:'Austin',            p:'États-Unis', t:'Mixte',     w:[.38,.32,.30]},
+  {n:'Singapour',         p:'Singapour',  t:'Technique', w:[.31,.42,.27]},
+  {n:'Bakou',             p:'Azerbaïdjan',t:'Rapide',    w:[.41,.33,.26]},
+  {n:'Losail',            p:'Qatar',      t:'Rapide',    w:[.42,.30,.28]},
+  {n:'Yas Marina',        p:'Émirats',    t:'Mixte',     w:[.38,.33,.29]},
+  {n:'Mugello',           p:'Italie',     t:'Rapide',    w:[.43,.30,.27]},
+  {n:'Hockenheim',        p:'Allemagne',  t:'Mixte',     w:[.39,.32,.29]},
+  {n:'Nürburgring',       p:'Allemagne',  t:'Mixte',     w:[.38,.34,.28]},
+  {n:'Magny-Cours',       p:'France',     t:'Technique', w:[.35,.36,.29]},
+  {n:'Estoril',           p:'Portugal',   t:'Mixte',     w:[.38,.33,.29]},
+  {n:'Jarama',            p:'Espagne',    t:'Technique', w:[.33,.37,.30]},
+];
+
+/* --- 1.3 Réglages (GDD §18) --- */
+const SETUP_MONO = [
+  {k:'ailAv', n:'Aileron avant',    lo:'Sous-virage : le train avant ne mord pas à l’inscription.',       hi:'Train avant trop pointu, l’arrière décroche en appui.',        loFix:'plus d’aileron avant', hiFix:'moins d’aileron avant'},
+  {k:'ailAr', n:'Aileron arrière',  lo:'L’arrière est instable au freinage, la voiture survire.',          hi:'Trop d’appui : je perds beaucoup en vitesse de pointe.',        loFix:'plus d’aileron arrière', hiFix:'moins d’aileron arrière'},
+  {k:'barre', n:'Barre anti-roulis',lo:'La voiture roule trop, elle est molle dans les appuis.',           hi:'Trop rigide, elle rebondit sur les vibreurs.',                  loFix:'une barre plus dure', hiFix:'une barre plus souple'},
+  {k:'carro', n:'Carrossage',       lo:'Je manque de grip dans les longs virages, ça glisse.',             hi:'Les pneus surchauffent et s’usent beaucoup trop vite.',         loFix:'plus de carrossage négatif', hiFix:'moins de carrossage'},
+  {k:'pince', n:'Pincement',        lo:'La direction est paresseuse, la voiture ne tourne pas.',           hi:'Elle est nerveuse, elle part au moindre coup de frein.',        loFix:'plus de pincement', hiFix:'moins de pincement'},
+];
+const SETUP_KART = [
+  {k:'press', n:'Pression des pneus',lo:'Le kart glisse, je n’ai aucun grip en entrée.',                   hi:'Le train avant chasse, les pneus surchauffent.',                loFix:'plus de pression', hiFix:'moins de pression'},
+  {k:'carbu', n:'Carburation',       lo:'Le moteur s’étouffe à la réaccélération.',                        hi:'Le moteur est gras, je perds tout en ligne droite.',            loFix:'une carburation plus riche', hiFix:'une carburation plus pauvre'},
+  {k:'chass', n:'Rigidité du châssis',lo:'Le châssis vrille, l’arrière se dérobe en sortie.',              hi:'Le kart saute, il ne prend pas d’appui.',                       loFix:'un châssis plus rigide', hiFix:'un châssis plus souple'},
+  {k:'trans', n:'Rapport de transmission',lo:'Je tape le rupteur bien avant la fin de la ligne droite.',   hi:'Je n’ai aucune relance en sortie de virage.',                   loFix:'un rapport plus long', hiFix:'un rapport plus court'},
+];
+const setupParams = catId => CAT[catId].format==='kart' ? SETUP_KART : SETUP_MONO;
+
+/* --- 1.4 Écuries fictives (GDD §9.1) --- */
+// voiture = performance du matériel (0-100) ; exig = note pilote attendue ; apport = € demandés au pilote
+const ECURIES = {
+  kart:[
+    {id:'kt1',nom:'Rapida Kart',        prestige:70,voiture:88,fiab:92},
+    {id:'kt2',nom:'Vertigo Racing Kart',prestige:62,voiture:83,fiab:90},
+    {id:'kt3',nom:'Team Chicane',       prestige:52,voiture:77,fiab:89},
+    {id:'kt4',nom:'Piste Nord',         prestige:42,voiture:71,fiab:87},
+    {id:'kt5',nom:'Écurie Bellevue',    prestige:32,voiture:64,fiab:85},
+    {id:'kt6',nom:'Kart Passion 45',    prestige:22,voiture:57,fiab:82},
+  ],
+  f4:[
+    {id:'f4a',nom:'Aurora Motorsport',  prestige:74,voiture:88,fiab:90},
+    {id:'f4b',nom:'Prisme Racing',      prestige:66,voiture:83,fiab:89},
+    {id:'f4c',nom:'Vulcano Corse',      prestige:57,voiture:78,fiab:87},
+    {id:'f4d',nom:'Meridian Junior',    prestige:47,voiture:72,fiab:86},
+    {id:'f4e',nom:'Cobalt Racing',      prestige:37,voiture:66,fiab:84},
+    {id:'f4f',nom:'Team Ardennes',      prestige:27,voiture:59,fiab:81},
+  ],
+  f3:[
+    {id:'f3a',nom:'Aurora Motorsport',  prestige:80,voiture:90,fiab:91},
+    {id:'f3b',nom:'Vulcano Corse',      prestige:72,voiture:86,fiab:90},
+    {id:'f3c',nom:'Prisme Racing',      prestige:64,voiture:81,fiab:88},
+    {id:'f3d',nom:'Northgate GP',       prestige:55,voiture:76,fiab:87},
+    {id:'f3e',nom:'Meridian Junior',    prestige:45,voiture:70,fiab:85},
+    {id:'f3f',nom:'Cobalt Racing',      prestige:34,voiture:63,fiab:82},
+  ],
+  f2:[
+    {id:'f2a',nom:'Aurora Motorsport',  prestige:86,voiture:92,fiab:91},
+    {id:'f2b',nom:'Vulcano Corse',      prestige:78,voiture:87,fiab:90},
+    {id:'f2c',nom:'Northgate GP',       prestige:70,voiture:82,fiab:89},
+    {id:'f2d',nom:'Prisme Racing',      prestige:61,voiture:77,fiab:87},
+    {id:'f2e',nom:'Hexagone Racing',    prestige:50,voiture:71,fiab:85},
+    {id:'f2f',nom:'Meridian Junior',    prestige:38,voiture:64,fiab:83},
+  ],
+  f1:[
+    {id:'rossa', nom:'Scuderia Rossa',        prestige:96,voiture:92,fiab:90},
+    {id:'toro',  nom:'Toro Energia',          prestige:92,voiture:94,fiab:91},
+    {id:'silver',nom:'Silver Star Motorsport',prestige:93,voiture:88,fiab:93},
+    {id:'papaya',nom:'Papaya Racing',         prestige:84,voiture:90,fiab:91},
+    {id:'emer',  nom:'Émeraude Racing',       prestige:72,voiture:78,fiab:89},
+    {id:'azur',  nom:'Azur Grand Prix',       prestige:66,voiture:74,fiab:87},
+    {id:'albion',nom:'Albion GP',             prestige:58,voiture:69,fiab:86},
+    {id:'nordic',nom:'Nordic Motorsport',     prestige:50,voiture:64,fiab:85},
+    {id:'sirius',nom:'Sirius Racing',         prestige:42,voiture:59,fiab:83},
+    {id:'falcon',nom:'Falcon GP',             prestige:34,voiture:54,fiab:81},
+  ],
+};
+function ecuriesPour(catId){
+  const c=CAT[catId];
+  if(c.format==='kart') return ECURIES.kart;
+  return ECURIES[catId] || ECURIES.f4;
+}
+
+/* --- 1.5 Réputation manager (GDD §2.2, §3) --- */
+const REP_PALIERS = [
+  {p:1, nom:'Inconnu',       seuil:0,    acces:'Aucun contact. Repérage manuel en karting local.'},
+  {p:2, nom:'Amateur',       seuil:130,  acces:'Contacts en club de karting régional.'},
+  {p:3, nom:'Régional',      seuil:320,  acces:'Confiance du karting national, petits sponsors locaux.'},
+  {p:4, nom:'National',      seuil:600,  acces:'Les jeunes pilotes F4 prometteurs répondent aux appels.'},
+  {p:5, nom:'Reconnu',       seuil:990,  acces:'Les petites écuries F3 consultent le manager.'},
+  {p:6, nom:'Respecté',      seuil:1520, acces:'Accès aux meilleurs espoirs F3, sponsors nationaux moyens.'},
+  {p:7, nom:'Continental',   seuil:2250, acces:'Les écuries F2 proposent des collaborations.'},
+  {p:8, nom:'Renommé',       seuil:3250, acces:'Grosses écuries F2 et petites écuries F1 s’intéressent.'},
+  {p:9, nom:'International', seuil:4700, acces:'Les écuries F1 de milieu de tableau viennent directement.'},
+  {p:10,nom:'Légendaire',    seuil:6900, acces:'Les top écuries F1 vous considèrent comme une référence.'},
+];
+const repPalier = pts => { let r=REP_PALIERS[0]; for(const x of REP_PALIERS) if(pts>=x.seuil) r=x; return r; };
+const repProchain = pts => REP_PALIERS.find(x=>x.seuil>pts) || null;
+// GDD §15 — nombre de pilotes gérables. V1 : 1 seul pilote, le reste est affiché comme verrouillé.
+const pilotesMax = p => p<=3?1 : p<=6?2 : p<=8?3 : 5;
+
+/* --- 1.6 Sponsors (GDD §4, §19.5) --- */
+const SPONSOR_NIVEAUX = [
+  {niv:1,lab:'Commerce local',  min:500,    max:5000,     repMin:1, coutDemarche:150,   pool:'local'},
+  {niv:2,lab:'PME régionale',   min:5000,   max:25000,    repMin:3, coutDemarche:600,   pool:'pme'},
+  {niv:3,lab:'Marque nationale',min:25000,  max:150000,   repMin:5, coutDemarche:2500,  pool:'nat'},
+  {niv:4,lab:'Grand groupe',    min:150000, max:1000000,  repMin:7, coutDemarche:9000,  pool:'groupe'},
+  {niv:5,lab:'Sponsor mondial', min:1000000,max:15000000, repMin:9, coutDemarche:28000, pool:'monde'},
+];
+const SPONSOR_POOLS = {
+  local:[
+    ['Garage Delcourt','garage'],['Boulangerie Marceau','alimentation'],['Auto-École Vitesse+','formation'],
+    ['Pizzeria Da Vinci','alimentation'],['Peinture Lambert','batiment'],['Cycles Rivière','loisirs'],
+    ['Menuiserie Fauvel','batiment'],['Pneus Express 41','pneus'],['Fleuriste Camélia','commerce'],
+    ['Concession Auto Prévost','garage'],['Boucherie Vallet','alimentation'],['Bar Le Damier','commerce'],
+  ],
+  pme:[
+    ['Transports Bréval','transport'],['BTP Sorel & Fils','batiment'],['Isolation Nordique','batiment'],
+    ['Aciers de la Loire','industrie'],['Logistique Ventoux','transport'],['Menuiserie Industrielle Cauret','industrie'],
+    ['Imprimerie Vasseur','industrie'],['Négoce Agricole Sablé','agro'],['Piscines Aquavia','loisirs'],
+    ['Solar Meunier','energie'],['Cabinet Fiscalis','conseil'],['Sécurité Vigilance','services'],
+  ],
+  nat:[
+    ['Assurances Vercors','assurance'],['Chaîne Kordia','distribution'],['Mobilis Télécom','telecom'],
+    ['Banque Lumen','banque'],['Peintures Solvex','industrie'],['Grand Frais du Nord','distribution'],
+    ['Optique Cristal','distribution'],['Énergie Verte Volta','energie'],['Meubles Bastide','distribution'],
+    ['Assurance Sécuriane','assurance'],['Hôtels Escale','tourisme'],['Sportswear Kinetik','equipementier'],
+  ],
+  groupe:[
+    ['Halcyon Télécom','telecom'],['Banque Meridiem','banque'],['Zenithal Pneumatiques','pneus'],
+    ['Voltaris Énergie','energie'],['Kaptor Électronique','electronique'],['Arkania Chimie','industrie'],
+    ['Norlink Logistique','transport'],['Vestor Assurances','assurance'],['Sportif Apex','equipementier'],
+    ['Groupe Ferrand Auto','auto'],['CloudNine Systems','informatique'],['Airnova','aerien'],
+  ],
+  monde:[
+    ['Thunder Rush','boisson'],['Volt Surge','boisson'],['Chronos Genève','horlogerie'],
+    ['Helvetic Time','horlogerie'],['Petronova','petrolier'],['Orient Petrol','petrolier'],
+    ['Apex Global','equipementier'],['Nimbus Airlines','aerien'],['Quantum Bank','banque'],
+    ['Hyperion Tech','informatique'],['Solaris Motors','auto'],['Tempo Watches','horlogerie'],
+  ],
+};
+const OBLIGATIONS = [
+  {id:'presse',  lab:'2 journées presse par saison',        desc:'Fatigue +, image médiatique +'},
+  {id:'pub',     lab:'Un tournage publicitaire',            desc:'Coûte une action de préparation'},
+  {id:'objectif',lab:'Prime liée au classement',            desc:'Une partie du montant n’est versée que si l’objectif est atteint'},
+  {id:'exclu',   lab:'Exclusivité de secteur',              desc:'Aucun concurrent du même secteur accepté'},
+  {id:'aucune',  lab:'Aucune contrepartie particulière',    desc:'—'},
+];
+
+/* --- 1.7 Traits de personnalité (GDD §7.1) --- */
+const TRAITS = {
+  bosseur:      {nom:'Bosseur',            desc:'Progresse plus vite à l’entraînement.',              coul:'t-green'},
+  tetebrulee:   {nom:'Tête brûlée',        desc:'Agressivité élevée : plus de dépassements, plus de crashs.',coul:'t-red'},
+  medias:       {nom:'Chouchou des médias',desc:'Attire davantage de sponsors.',                      coul:'t-blue'},
+  mercenaire:   {nom:'Mercenaire',         desc:'Ne signe qu’au plus offrant, peu fidèle.',           coul:'t-amber'},
+  fragile:      {nom:'Fragile mentalement',desc:'Le moral chute vite après un échec.',                coul:'t-purple'},
+  regulier:     {nom:'Métronome',          desc:'Très rarement d’erreur, mais peu de coups d’éclat.', coul:'t-grey'},
+  leader:       {nom:'Meneur d’hommes',    desc:'Fédère l’équipe : réglages et relation facilités.',  coul:'t-green'},
+};
+const TRAIT_IDS = Object.keys(TRAITS);
+
+/* --- 1.8 Staff (GDD §13, §19.7) --- */
+const STAFF_ROLES = [
+  {id:'ingenieur',nom:'Ingénieur de course', effet:'Précise le retour du pilote sur les réglages, gain de performance.', deb:1500,exp:12000},
+  {id:'prepa',    nom:'Préparateur physique',effet:'Réduit la fatigue et améliore la forme physique.',                   deb:1000,exp:6000},
+  {id:'scout',    nom:'Scout',               effet:'Affine l’estimation du potentiel des jeunes pilotes.',               deb:800, exp:4000},
+  {id:'presse',   nom:'Attaché de presse',   effet:'Améliore l’image médiatique et l’accès aux sponsors.',               deb:1200,exp:8000},
+];
+const STAFF_ROLE = Object.fromEntries(STAFF_ROLES.map(r=>[r.id,r]));
+// niveau 1..5 ; salaire interpolé entre débutant et expert
+function staffSalaire(roleId,niv){const r=STAFF_ROLE[roleId];return Math.round(r.deb+(r.exp-r.deb)*Math.pow((niv-1)/4,1.5));}
+const NIV_LABEL = ['—','Débutant','Confirmé','Solide','Très bon','Expert'];
+
+/* --- 1.9 Noms de pilotes --- */
+const PRENOMS = ['Lucas','Enzo','Mathis','Nathan','Théo','Hugo','Léo','Raphaël','Gabriel','Adam','Jules','Louis','Arthur','Noah','Ethan','Tom','Maël','Sacha','Timéo','Axel','Matteo','Diego','Rafael','Marco','Luca','Andrea','Nico','Kai','Finn','Oscar','Liam','Jack','Oliver','Max','Felix','Jonas','Aaron','Elias','Nikita','Yuki','Sota','Ren','Caio','Bruno','Santiago','Mateo','Emil','Viktor','Lars','Sven'];
+const NOMS = ['Berthier','Vasseur','Lemoine','Chastel','Ferrand','Delaunay','Rochet','Marchal','Aubry','Nivelle','Rossi','Bianchi','Marino','Costa','Ferraro','Moretti','Vidal','Herrera','Márquez','Solano','Duarte','Almeida','Weber','Brandt','Keller','Hofmann','Nyström','Lindqvist','Andersen','Halvorsen','Whitmore','Ashcroft','Bramley','Kingsley','Hartley','Novak','Kovacs','Petrov','Ivanov','Tanaka','Hayashi','Morimoto','Silva','Oliveira','Carvalho','Van Dijk','De Vries','Janssen','Kowalski','Nowak'];
+const PAYS = ['France','France','France','Italie','Espagne','Royaume-Uni','Allemagne','Pays-Bas','Belgique','Brésil','Japon','Danemark','Suède','Pologne','Portugal','Suisse','Autriche','Finlande'];
+function nomAleatoire(){return pick(PRENOMS)+' '+pick(NOMS);}
+
+/* --- 1.10 Stats pilote (GDD §6) --- */
+const STAT_GROUPES = [
+  {id:'pace',       nom:'Pace',        poids:0.40, stats:[['virages','Virages'],['freinage','Freinage'],['reactions','Réactions']]},
+  {id:'consistency',nom:'Consistency', poids:0.30, stats:[['precision','Précision'],['controle','Contrôle'],['fluidite','Fluidité']]},
+  {id:'racecraft',  nom:'Racecraft',   poids:0.30, stats:[['adaptabilite','Adaptabilité'],['depassement','Dépassement'],['defense','Défense']]},
+];
+const ALL_STATS = STAT_GROUPES.flatMap(g=>g.stats.map(s=>s[0]));
+const STAT_NOM = Object.fromEntries(STAT_GROUPES.flatMap(g=>g.stats));
+
+/* Potentiel (GDD §17.1) */
+const POTENTIELS = [
+  {id:1,nom:'Faible',       plafond:65},
+  {id:2,nom:'Moyen',        plafond:78},
+  {id:3,nom:'Élevé',        plafond:88},
+  {id:4,nom:'Exceptionnel', plafond:96},
+];
+const POT = Object.fromEntries(POTENTIELS.map(p=>[p.id,p]));
+
+/* Coefficient d'âge (GDD §17.1) */
+function coeffAge(age){
+  if(age<=15) return 1.5;
+  if(age<=21) return 1.2;
+  if(age<=27) return 1.0;
+  if(age<=32) return 0.6;
+  return 0.2;
+}
+/* Progression totale visée sur une saison complète, répartie sur les courses */
+const GAIN_SAISON = 12;
+
+/* --- 1.11 Météo (GDD §12) --- */
+const METEOS = [
+  {id:'sec',      nom:'Sec',            ico:'☀️', pluie:0,   incident:1.0, adapt:0.0},
+  {id:'nuageux',  nom:'Couvert',        ico:'☁️', pluie:0,   incident:1.05,adapt:0.05},
+  {id:'variable', nom:'Piste évolutive',ico:'🌦️', pluie:0.5, incident:1.35,adapt:0.35},
+  {id:'pluie',    nom:'Pluie',          ico:'🌧️', pluie:1,   incident:1.6, adapt:0.55},
+];
+
+/* --- 1.12 Stratégies de course (GDD §12) --- */
+const STRATS = [
+  {id:'cons', nom:'Conservatrice', desc:'Gestion des pneus, on assure l’arrivée.', perf:-2.5, risque:0.55, usure:0.8},
+  {id:'equi', nom:'Équilibrée',    desc:'Le compromis classique.',                 perf:0,    risque:1.0,  usure:1.0},
+  {id:'agr',  nom:'Agressive',     desc:'On attaque, quitte à user le matériel.',  perf:3.2,  risque:1.6,  usure:1.3},
+];
+
+/* ------------------------------------------------------------ 2. ÉTAT */
+const SAVE_KEY = 'manager_pilote_v1';
+let S = null;              // état de la partie
+let UI = {tab:'bureau', setupDraft:null, negoc:null};
+
+function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){ showToast('Sauvegarde impossible'); } }
+function loadGame(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return null;
+    const o = JSON.parse(raw);
+    return (o && o.v===1) ? o : null;
+  }catch(e){ return null; }
+}
+function wipeGame(){ localStorage.removeItem(SAVE_KEY); S=null; }
+
+/* ------------------------------------------- 3. GÉNÉRATION DES PILOTES */
+
+/* Génère les 9 stats d'un pilote à partir de son potentiel et de son âge.
+   Chaque stat a son propre plafond (plafond de base ± 3, GDD §17.1). */
+function genStats(potId, age, niveauDepart){
+  const base = POT[potId].plafond;
+  const plafonds = {}, stats = {};
+  for(const k of ALL_STATS){
+    plafonds[k] = clamp(Math.round(base + rint(-3,3)), 20, 99);
+    // niveauDepart 0..1 : part du plafond déjà atteinte
+    const part = clamp(niveauDepart + gauss()*0.07, 0.15, 0.96);
+    stats[k] = clamp(Math.round(plafonds[k]*part), 8, 99);
+  }
+  return {stats, plafonds};
+}
+
+function noteGroupe(p, gid){
+  const g = STAT_GROUPES.find(x=>x.id===gid);
+  return avg(g.stats.map(s=>p.stats[s[0]]));
+}
+/* GDD §17.2 : Note = Pace×0,40 + Consistency×0,30 + Racecraft×0,30 */
+function notePilote(p){
+  return STAT_GROUPES.reduce((s,g)=>s + noteGroupe(p,g.id)*g.poids, 0);
+}
+function notePlafond(p){
+  return STAT_GROUPES.reduce((s,g)=>s + avg(g.stats.map(x=>p.plafonds[x[0]]))*g.poids, 0);
+}
+
+/* Crée un pilote complet. role : 'joueur' | 'ia' | 'rival' */
+function creerPilote(opt={}){
+  const age  = opt.age  ?? rint(9,13);
+  const potId= opt.potId?? (Math.random()<0.55?2:Math.random()<0.75?3:Math.random()<0.9?1:4);
+  const part = opt.part ?? clamp(0.30 + (age-8)*0.035 + gauss()*0.06, 0.18, 0.9);
+  const {stats,plafonds} = genStats(potId, age, part);
+  const nbTraits = Math.random()<0.35?2:1;
+  const traits = shuffle(TRAIT_IDS).slice(0,nbTraits);
+  const p = {
+    id: opt.id || uid(),
+    nom: opt.nom || nomAleatoire(),
+    pays: opt.pays || pick(PAYS),
+    age, potId, stats, plafonds, traits,
+    agressivite: clamp(Math.round(45 + gauss()*22 + (traits.includes('tetebrulee')?26:0) - (traits.includes('regulier')?14:0)), 10, 98),
+    moral: opt.moral ?? rint(58,76),
+    forme: opt.forme ?? rint(84,96),
+    fatigue: 0,
+    reputation: opt.reputation ?? clamp(Math.round(rnd(14,4)), 1, 100),
+    relation: 55,
+    // préférences de réglages : le style propre du pilote (GDD §18)
+    prefs: Object.fromEntries([...SETUP_MONO,...SETUP_KART].map(s=>[s.k, rint(-3,3)])),
+    catId: opt.catId || 'kmini',
+    superlicence: [],       // [{annee, pts}]
+    palmares: [],           // [{annee, catId, pos, pts, victoires, podiums}]
+    retraite: false,
+    role: opt.role || 'ia',
+    // Estimation du scout (le joueur ne voit jamais la vraie valeur — GDD §5.1)
+    observe: 0,
+    seedEst: Math.random(),
+  };
+  return p;
+}
+
+/* Un pilote IA n'a besoin que d'une note synthétique pour la simulation.
+   On garde tout de même la structure complète pour les rivaux persistants. */
+function creerPiloteIA(catId, forceCible){
+  const c = CAT[catId];
+  const age = rint(c.ageMin, Math.min(c.ageMax, c.ageMin+ (c.format==='kart'?4:6)));
+  const potId = Math.random()<0.4?2:Math.random()<0.7?3:Math.random()<0.88?1:4;
+  const cible = forceCible ?? (NIVEAU_GRILLE[catId] - 4 + gauss()*8);
+  const plaf = POT[potId].plafond;
+  const part = clamp(cible/plaf, 0.2, 0.97);
+  const p = creerPilote({age, potId, part, catId, role:'ia'});
+  return p;
+}
+
+/* -------------------------------------------------- 4. NOUVELLE PARTIE */
+const BUDGETS = [
+  {id:1,lab:'Faible',     v:20000},
+  {id:2,lab:'Moyen',      v:80000},
+  {id:3,lab:'Élevé',      v:200000},
+  {id:4,lab:'Très élevé', v:500000},
+];
+
+function nouvellePartie(budgetId, repPalierId, nomManager){
+  const bud = BUDGETS.find(b=>b.id===budgetId);
+  const rep = REP_PALIERS.find(r=>r.p===repPalierId);
+  S = {
+    v:1,
+    annee: 2026,
+    phase: 'scouting',
+    manager:{
+      nom: nomManager || 'Manager',
+      repPoints: rep.seuil,
+      budget: bud.v,
+      budgetDepart: bud.v,
+      image: 25 + repPalierId*4,     // image médiatique 0-100
+      profil:{budgetId, repDepart:repPalierId},
+    },
+    pilote: null,
+    contrat: null,
+    staff: {},                        // roleId -> {niv, salaire, nom}
+    sponsors: {actifs:[], prospects:[], vus:[]},
+    saison: null,
+    weekend: null,
+    inbox: [],
+    finances: [],                     // {annee, lab, montant, type}
+    historique: [],                   // saisons terminées
+    monde: {rivaux:[], scoutPool:[], poolAnnee:0},
+    offres: null,
+    actions: 0,
+    stats:{coursesGagnees:0, podiums:0, titres:0, sponsorsSignes:0, saisonsJouees:0},
+    flags:{},
+  };
+  genererScoutPool();
+  msg('scout','Votre réseau','Bienvenue dans le métier',
+    `Vous démarrez avec ${fmtEurFull(bud.v)} en trésorerie et une réputation de « ${rep.nom} » (palier ${rep.p}/10).\n\n`+
+    `${rep.acces}\n\nPremière mission : trouver un pilote. Ouvrez l’onglet Pilote pour consulter les jeunes repérés.`);
+  saveGame();
+}
+
+/* -------------------------------------------- 5. MESSAGERIE (GDD §14) */
+function msg(type, from, sujet, corps, actions){
+  S.inbox.unshift({
+    id: uid(), type, from, sujet, corps,
+    date: dateCourante(), lu:false, actions: actions||null, ouvert:false,
+  });
+  if(S.inbox.length>140) S.inbox.length=140;
+}
+function dateCourante(){
+  if(!S.saison) return 'Intersaison '+S.annee;
+  const n = S.saison.courseIndex;
+  if(n >= S.saison.calendrier.length) return 'Fin de saison '+S.annee;
+  return 'Manche '+(n+1)+'/'+S.saison.calendrier.length+' — '+S.annee;
+}
+const nbNonLus = ()=> S ? S.inbox.filter(m=>!m.lu).length : 0;
+
+/* ------------------------------------------------- 6. FINANCES (GDD §10) */
+function argent(lab, montant, type='divers'){
+  S.manager.budget += montant;
+  S.finances.unshift({annee:S.annee, lab, montant, type, date:dateCourante()});
+  if(S.finances.length>300) S.finances.length=300;
+}
+/* Caisse de saison : l'argent des sponsors finance la saison du pilote (GDD §19.1, option A) */
+function caisse(lab, montant, type='saison'){
+  if(!S.saison) return;
+  S.saison.caisse += montant;
+  S.saison.mouvements.unshift({lab, montant, type, date:dateCourante()});
+  if(S.saison.mouvements.length>200) S.saison.mouvements.length=200;
+}
+const staffCoutMensuel = ()=> sum(Object.values(S.staff), s=>s.salaire);
+function staffNiv(roleId){ return S.staff[roleId] ? S.staff[roleId].niv : 0; }
+
+/* --------------------------------------- 7. SCOUTING (GDD §5, §13) */
+/* Taille et qualité du vivier selon la réputation du manager. */
+function genererScoutPool(){
+  const rp = repPalier(S.manager.repPoints).p;
+  const n  = clamp(4 + Math.floor(rp*0.9), 4, 12);
+  const pool = [];
+  for(let i=0;i<n;i++){
+    // Plus la réputation est haute, plus on tombe sur de vrais talents.
+    const r = Math.random() + rp*0.045;
+    const potId = r>1.02?4 : r>0.78?3 : r>0.38?2 : 1;
+    const age = rint(9,14);
+    const catKart = age<=10?'kmini' : age<=12?'kcadet' : 'kjunior';
+    pool.push(creerPilote({age, potId, role:'candidat', catId:catKart}));
+  }
+  // Un manager très réputé voit aussi des pilotes déjà installés en monoplace.
+  if(rp>=4){
+    const c = rp>=9?'f2' : rp>=7?'f3' : 'f4';
+    for(let i=0;i<(rp>=7?3:2);i++){
+      const p = creerPiloteIA(c);
+      p.role='candidat'; p.observe=0; p.seedEst=Math.random();
+      p.reputation = clamp(Math.round(20+CAT[c].niv*6+rnd(18)),5,90);
+      pool.push(p);
+    }
+  }
+  S.monde.scoutPool = pool;
+  S.monde.poolAnnee = S.annee;
+}
+
+/* Estimation floue d'une valeur — la marge dépend du scout et des observations.
+   GDD §5.1 : le joueur ne voit jamais la vraie valeur exacte. */
+function marge(p){
+  const niv = staffNiv('scout');
+  const base = [16,11,8,5.5,3.5,2][niv];      // niv 0 = aucun scout
+  return Math.max(1, base - p.observe*1.6);
+}
+function estim(p, val, salt){
+  const m = marge(p);
+  // Biais stable par pilote+stat pour que l'estimation ne change pas à chaque rendu
+  const biais = (hash01(p.id+salt+p.seedEst)*2-1) * m;
+  const c = clamp(Math.round(val + biais), 1, 99);
+  return {lo:clamp(Math.round(c-m),1,99), hi:clamp(Math.round(c+m),1,99), c};
+}
+function estimTexte(p, val, salt){
+  const e = estim(p,val,salt);
+  return marge(p)<=2.2 ? String(e.c) : e.lo+'–'+e.hi;
+}
+/* Estimation du potentiel : fourchette de libellés (ex. « Moyen à Élevé ») */
+function estimPotentiel(p){
+  const m = marge(p);
+  const span = m>13?3 : m>9?2 : m>5?1 : 0;
+  const biais = Math.round((hash01(p.id+'pot'+p.seedEst)*2-1)*span*0.7);
+  const c  = clamp(p.potId+biais,1,4);
+  const lo = clamp(c-Math.ceil(span/2),1,4), hi = clamp(c+Math.floor(span/2),1,4);
+  return lo===hi ? POT[lo].nom : POT[lo].nom+' à '+POT[hi].nom;
+}
+
+/* ------------------------------------------- 8. SAISON & CALENDRIER */
+function genererCalendrier(catId, annee){
+  const c = CAT[catId];
+  const src = c.format==='kart' ? CIRCUITS_KART : CIRCUITS_MONO;
+  const list = shuffle(src);
+  const cal = [];
+  for(let i=0;i<c.courses;i++){
+    const ci = list[i % list.length];
+    cal.push({
+      i, nom:ci.n, pays:ci.p, type:ci.t, w:ci.w,
+      seed: ci.n+'|'+annee+'|'+catId+'|'+i,
+      meteo: null, fait:false,
+    });
+  }
+  return cal;
+}
+
+/* Grille adverse d'une saison. Les rivaux persistants y sont injectés
+   quand ils courent dans la même catégorie. */
+function genererGrille(catId){
+  const c = CAT[catId];
+  const ecu = ecuriesPour(catId);
+  const n = c.grille - 1;                 // -1 : la place du pilote du joueur
+  const g = [];
+  for(let i=0;i<n;i++){
+    // Répartition : chaque écurie aligne ~2 pilotes, les meilleures écuries
+    // attirent les meilleurs pilotes.
+    const e = ecu[Math.min(ecu.length-1, Math.floor(i/Math.ceil(n/ecu.length)))];
+    const cible = NIVEAU_GRILLE[catId] + (e.prestige-50)*0.30 + gauss()*6;
+    const p = creerPiloteIA(catId, cible);
+    g.push({
+      id:p.id, nom:p.nom, pays:p.pays, note:notePilote(p), age:p.age,
+      agressivite:p.agressivite, ecurieId:e.id, ecurie:e.nom,
+      voiture:clamp(e.voiture + rint(-2,2),30,99), fiab:e.fiab,
+      pts:0, victoires:0, podiums:0, abandons:0, rival:false, p,
+    });
+  }
+  // Injection des rivaux persistants présents dans la catégorie
+  for(const r of S.monde.rivaux){
+    if(r.catId!==catId || r.retraite) continue;
+    const e = pick(ecu.slice(0, Math.max(2,Math.ceil(ecu.length/2))));
+    g.pop();
+    g.push({
+      id:r.id, nom:r.nom, pays:r.pays, note:notePilote(r), age:r.age,
+      agressivite:r.agressivite, ecurieId:e.id, ecurie:e.nom,
+      voiture:clamp(e.voiture+rint(-1,2),30,99), fiab:e.fiab,
+      pts:0, victoires:0, podiums:0, abandons:0, rival:true, p:r,
+    });
+  }
+  return g;
+}
+
+function creerRivaux(){
+  // 3 rivaux qui suivront la carrière du joueur (GDD §5.3 en germe côté pilotes)
+  const cat = S.pilote ? S.pilote.catId : 'kmini';
+  S.monde.rivaux = [];
+  for(let i=0;i<3;i++){
+    const r = creerPilote({age: (S.pilote?S.pilote.age:12)+rint(-1,1), potId: i===0?4:3, catId:cat, role:'rival',
+      part: clamp(0.34+gauss()*0.05,0.24,0.55)});
+    S.monde.rivaux.push(r);
+  }
+}
+
+function demarrerSaison(catId, ecurieId){
+  const c = CAT[catId];
+  const ecu = ecuriesPour(catId).find(e=>e.id===ecurieId) || ecuriesPour(catId)[Math.floor(ecuriesPour(catId).length/2)];
+  S.pilote.catId = catId;
+  S.saison = {
+    annee: S.annee, catId, courseIndex:0,
+    calendrier: genererCalendrier(catId, S.annee),
+    grille: genererGrille(catId),
+    ecurieId: ecu.id, ecurieNom: ecu.nom,
+    voiture: clamp(ecu.voiture + (S.contrat && S.contrat.bonusVoiture ? S.contrat.bonusVoiture : 0) + rint(-2,2), 30, 99),
+    fiab: ecu.fiab,
+    pts:0, victoires:0, podiums:0, abandons:0, meilleur:99,
+    dernierBilan: null,
+    coutTotal: c.cout,
+    coutRestant: c.cout,
+    caisse: 0,
+    mouvements: [],
+    resultats: [],
+    avertissements: 0,
+    devDepense: 0,
+    finie:false,
+  };
+  // Apport de l'écurie (programme jeunes) : elle prend une part du budget à sa charge
+  if(S.contrat && S.contrat.partEcurie>0){
+    const part = Math.round(c.cout * S.contrat.partEcurie);
+    S.saison.coutRestant -= part;
+    S.saison.coutTotal   -= part;
+    S.saison.priseEnCharge = part;
+  }
+  // Apport familial en karting (petit, mais il sauve les débuts)
+  if(c.format==='kart'){
+    const fam = Math.round(c.cout * rnd(0.22,0.10));
+    caisse('Apport de la famille du pilote', fam, 'famille');
+  }
+  S.phase = 'semaine';
+  S.actions = actionsParSemaine();
+  S.stats.saisonsJouees++;
+  majSponsorsProspects();
+  msg('systeme','Fédération','Engagement validé — saison '+S.annee,
+    `${S.pilote.nom} est engagé en ${c.nom} avec ${ecu.nom}.\n\n`+
+    `Budget de saison à financer : <em>${fmtEurFull(S.saison.coutTotal)}</em> sur ${c.courses} manches.\n`+
+    `Chaque manche prélève ${fmtEurFull(Math.round(S.saison.coutTotal/c.courses))} sur la caisse de saison.\n\n`+
+    `Rappel : cet argent vient des sponsors, pas de votre trésorerie. Si la caisse est vide, c’est vous qui comblez.`);
+  saveGame();
+}
+
+const actionsParSemaine = ()=> 3;
+
+/* ------------------------------------ 9. RÉGLAGES (GDD §18) */
+function optimalCircuit(course, k){
+  // valeur cachée 1..20, stable pour un circuit / une saison / un paramètre
+  return 1 + Math.floor(hash01(course.seed+'#'+k)*20);
+}
+function cibleReglage(course, k, pilote){
+  return clamp(optimalCircuit(course,k) + (pilote.prefs[k]||0), 1, 20);
+}
+/* GDD §18.2 : Écart = |choisi - (optimal + préférence)| ; Réglages = 100 - somme normalisée */
+function scoreReglages(course, setup, pilote){
+  const params = setupParams(S.saison.catId);
+  const ecarts = params.map(p=>Math.abs((setup[p.k]??10) - cibleReglage(course,p.k,pilote)));
+  const moy = avg(ecarts);
+  const score = 100 * (1 - Math.pow(Math.min(1, moy/9), 1.25)) + (S.flags.bonusReglages||0);
+  return {score: clamp(score,0,100), ecarts, moy};
+}
+/* Retour du pilote en langage naturel. La précision dépend de l'ingénieur (GDD §18.3). */
+function retourPilote(course, setup, pilote){
+  const params = setupParams(S.saison.catId);
+  const niv = staffNiv('ingenieur');
+  const detail = params.map(p=>{
+    const cible = cibleReglage(course,p.k,pilote);
+    const d = (setup[p.k]??10) - cible;
+    return {p, d, abs:Math.abs(d)};
+  }).sort((a,b)=>b.abs-a.abs);
+
+  const lignes = [];
+  const nbSymptomes = niv>=4?3 : niv>=2?2 : 1;
+  const seuil = niv>=4?1 : niv>=2?2 : 3;
+
+  for(const it of detail.slice(0,nbSymptomes)){
+    if(it.abs<seuil) continue;
+    const symptome = it.d<0 ? it.p.lo : it.p.hi;
+    const correctif= it.d<0 ? it.p.loFix : it.p.hiFix;
+    if(niv<=1){
+      lignes.push(symptome);                                    // symptôme seul
+    }else if(niv<=3){
+      lignes.push(symptome+' Il faudrait '+correctif+'.');      // + direction
+    }else{
+      const crans = Math.max(1, Math.round(it.abs));
+      lignes.push(symptome+' Il faudrait '+correctif+', environ '+crans+' cran'+(crans>1?'s':'')+'.');
+    }
+  }
+  if(!lignes.length){
+    lignes.push(niv>=3 ? 'La voiture est équilibrée, je n’ai plus rien à redire.' : 'Ça va, je m’y retrouve bien.');
+  }
+  const commentaireIng = niv===0
+    ? 'Sans ingénieur de course, personne ne traduit ces sensations en réglages.'
+    : niv<=2 ? 'Votre ingénieur reste évasif sur la marche à suivre.'
+    : niv<=4 ? 'Votre ingénieur sait où chercher.'
+    : 'Votre ingénieur identifie précisément le correctif.';
+  return {lignes, commentaireIng};
+}
+
+/* --------------------------------- 10. SIMULATION DE COURSE (GDD §17.3) */
+
+/* Note pondérée du pilote selon le profil du circuit et la météo */
+function notePondere(p, course, meteo){
+  const [wp,wc,wr] = course.w;
+  const pace = noteGroupe(p,'pace'), cons = noteGroupe(p,'consistency'), race = noteGroupe(p,'racecraft');
+  let n = pace*wp + cons*wc + race*wr;
+  // Sous la pluie, la régularité et l'adaptabilité pèsent bien plus lourd
+  if(meteo.pluie>0){
+    const adapt = p.stats.adaptabilite, ctrl = p.stats.controle;
+    n = n*(1-meteo.adapt) + (cons*0.45 + adapt*0.35 + ctrl*0.20)*meteo.adapt;
+  }
+  // Moral et forme physique
+  const mf = 1 + ((p.moral-60)/100)*0.10 + ((p.forme-85)/100)*0.14;
+  return n*mf;
+}
+function notePondereIA(g, course, meteo){
+  return notePondere(g.p, course, meteo);
+}
+
+/* GDD §17.3 : PerfTotale = Pilote×0,40 + Voiture×0,35 + Réglages×0,15 + Aléa×0,10 */
+function perfTotale(notePilote_, voiture, reglages, aleaMult=1){
+  const alea = clamp(50 + gauss()*45, 0, 100);
+  return notePilote_*0.40 + voiture*0.35 + reglages*0.15 + alea*0.10*aleaMult;
+}
+
+function meteoPour(course){
+  const h = hash01(course.seed+'meteo');
+  return h<0.55 ? METEOS[0] : h<0.75 ? METEOS[1] : h<0.9 ? METEOS[2] : METEOS[3];
+}
+
+/* Réglages « par défaut » de l'IA : bons mais pas parfaits, selon le prestige */
+function reglagesIA(g){ return clamp(52 + (g.voiture-60)*0.5 + rnd(18,-6), 25, 95); }
+
+/* Session de qualification / essais chronométrés */
+function simulerQualif(course, meteo, reglagesJoueur){
+  const res = [];
+  const p = S.pilote;
+  res.push({id:p.id, nom:p.nom, moi:true, ecurie:S.saison.ecurieNom,
+    perf: perfTotale(notePondere(p,course,meteo), S.saison.voiture, reglagesJoueur, 0.7)});
+  for(const g of S.saison.grille){
+    res.push({id:g.id, nom:g.nom, moi:false, ecurie:g.ecurie,
+      perf: perfTotale(notePondereIA(g,course,meteo), g.voiture, reglagesIA(g), 0.7)});
+  }
+  res.sort((a,b)=>b.perf-a.perf);
+  res.forEach((r,i)=>r.pos=i+1);
+  return res;
+}
+
+/* Course complète : grille de départ + incidents + fiabilité + récit */
+function simulerCourse(course, meteo, reglagesJoueur, grilleDepart, strat){
+  const p = S.pilote;
+  const log = [];
+  const st = STRATS.find(s=>s.id===strat) || STRATS[1];
+  const field = [];
+
+  // --- performance de course
+  const perfJoueur = perfTotale(notePondere(p,course,meteo), S.saison.voiture, reglagesJoueur, 1)
+                   + st.perf
+                   + (p.traits.includes('regulier')?1.0:0);
+  field.push({id:p.id, nom:p.nom, moi:true, ecurie:S.saison.ecurieNom, perf:perfJoueur,
+    fiab:S.saison.fiab, agr:p.agressivite, note:notePilote(p), racecraft:noteGroupe(p,'racecraft')});
+  for(const g of S.saison.grille){
+    field.push({id:g.id, nom:g.nom, moi:false, ecurie:g.ecurie,
+      perf: perfTotale(notePondereIA(g,course,meteo), g.voiture, reglagesIA(g), 1),
+      fiab:g.fiab, agr:g.agressivite, note:g.note, racecraft:noteGroupe(g.p,'racecraft'), ref:g});
+  }
+  // position de départ : la grille compte, mais la course peut tout changer
+  const gridPos = Object.fromEntries(grilleDepart.map(r=>[r.id, r.pos]));
+  for(const f of field){
+    const gp = gridPos[f.id] || field.length;
+    f.perf += (field.length - gp) * 0.28;         // avantage réel de la grille
+  }
+
+  // --- voiture de sécurité
+  const scChance = 0.16*meteo.incident + (CAT[S.saison.catId].format==='kart'?-0.05:0.04);
+  const safetyCar = Math.random() < scChance;
+  if(safetyCar) log.push({t:'Course', s:'Voiture de sécurité en piste, le peloton se regroupe.', c:'big'});
+
+  // --- incidents & fiabilité
+  for(const f of field){
+    f.abandon = null;
+    const risqueMeca = (100-f.fiab)/100 * 0.55 * st.usure;
+    if(Math.random() < risqueMeca){ f.abandon='Panne mécanique'; continue; }
+    const risqueCrash = (0.035 + (f.agr/100)*0.055) * meteo.incident * (f.moi?st.risque:1)
+                      * (1 - (f.racecraft-50)/280);
+    if(Math.random() < risqueCrash){ f.abandon = Math.random()<0.5?'Accrochage':'Sortie de piste'; }
+  }
+  if(safetyCar){
+    // la neutralisation resserre les écarts
+    const m = avg(field.filter(f=>!f.abandon), f=>f.perf);
+    for(const f of field) f.perf = f.perf*0.82 + m*0.18;
+  }
+
+  const finishers = field.filter(f=>!f.abandon).sort((a,b)=>b.perf-a.perf);
+  const dnf       = field.filter(f=> f.abandon);
+  finishers.forEach((f,i)=>f.pos=i+1);
+  dnf.forEach((f,i)=>f.pos=finishers.length+i+1);
+  const classement = [...finishers, ...dnf];
+
+  // --- récit de course
+  const moi = field.find(f=>f.moi);
+  const gp  = gridPos[p.id] || field.length;
+  log.unshift({t:'Départ', s:`${p.nom} s’élance de la ${ordinal(gp)} place. Météo : ${meteo.nom.toLowerCase()}.`, c:''});
+  if(!moi.abandon){
+    const delta = gp - moi.pos;
+    if(delta>=4) log.push({t:'Course', s:`Départ canon : ${Math.abs(delta)} places gagnées dans les premiers tours.`, c:'good'});
+    else if(delta<=-4) log.push({t:'Course', s:`Départ manqué, ${Math.abs(delta)} places perdues.`, c:'bad'});
+    if(meteo.pluie>0) log.push({t:'Piste', s: p.stats.adaptabilite>72
+      ? 'Sur le mouillé, il trouve des trajectoires que les autres n’osent pas.'
+      : 'Sur le mouillé, il peine à trouver ses repères.', c: p.stats.adaptabilite>72?'good':'bad'});
+    if(moi.pos===1) log.push({t:'Arrivée', s:'VICTOIRE ! Drapeau à damier pour '+p.nom+'.', c:'big'});
+    else if(moi.pos<=3) log.push({t:'Arrivée', s:'Podium — '+ordinal(moi.pos)+' place.', c:'good'});
+    else log.push({t:'Arrivée', s:p.nom+' termine '+ordinal(moi.pos)+'.', c:''});
+  }else{
+    log.push({t:'Abandon', s:moi.abandon+' — la course de '+p.nom+' s’arrête là.', c:'bad'});
+  }
+  const top3 = finishers.slice(0,3).map((f,i)=>`${i+1}. ${f.nom}`).join('  ·  ');
+  log.push({t:'Podium', s:top3, c:''});
+
+  return {classement, log, safetyCar, moi};
+}
+
+/* Points de championnat */
+function pointsPour(catId, pos){
+  const bareme = PTS[CAT[catId].ptsSys];
+  return pos>=1 && pos<=bareme.length ? bareme[pos-1] : 0;
+}
+
+/* ------------------------------------ 11. WEEK-END DE COURSE (GDD §21.2) */
+function etapesWeekend(catId){
+  const f = CAT[catId].format;
+  if(f==='kart') return ['essais','course'];
+  if(f==='f1')   return ['libres','essais','qualifs','course'];
+  return ['essais','qualifs','course'];
+}
+const ETAPE_NOM = {libres:'Essais libres', essais:'Essais', qualifs:'Qualifications', course:'Course'};
+
+function ouvrirWeekend(){
+  const course = S.saison.calendrier[S.saison.courseIndex];
+  const meteo  = meteoPour(course);
+  course.meteo = meteo.id;
+  const params = setupParams(S.saison.catId);
+  // On repart d'un réglage neutre : le pilote perd son réglage à chaque circuit (GDD §18.3)
+  const setup = Object.fromEntries(params.map(p=>[p.k,10]));
+  S.weekend = {
+    courseIdx:S.saison.courseIndex, meteoId:meteo.id,
+    etapes: etapesWeekend(S.saison.catId), etape:0,
+    setup, runs:[], runsRestants: CAT[S.saison.catId].format==='f1'?4:3,
+    grille:null, resultat:null, strat:'equi', debrief:null, presse:null,
+  };
+  S.phase='weekend';
+  saveGame();
+}
+
+function faireRun(){
+  const w=S.weekend, course=S.saison.calendrier[w.courseIdx], meteo=METEOS.find(m=>m.id===w.meteoId);
+  if(w.runsRestants<=0) return;
+  w.runsRestants--;
+  const sc = scoreReglages(course, w.setup, S.pilote);
+  const ret= retourPilote(course, w.setup, S.pilote);
+  w.runs.unshift({setup:{...w.setup}, score:sc.score, lignes:ret.lignes, ing:ret.commentaireIng, n:w.runs.length+1});
+  // Un run coûte un peu de fatigue
+  S.pilote.fatigue = clamp(S.pilote.fatigue + rint(1,3) - staffNiv('prepa'), 0, 100);
+  majForme();
+  saveGame();
+}
+
+function reglagesActuels(){
+  const w=S.weekend, course=S.saison.calendrier[w.courseIdx];
+  return scoreReglages(course, w.setup, S.pilote).score;
+}
+
+function etapeSuivante(){
+  const w=S.weekend;
+  const course = S.saison.calendrier[w.courseIdx];
+  const meteo  = METEOS.find(m=>m.id===w.meteoId);
+  const etape  = w.etapes[w.etape];
+
+  if(etape==='libres' || etape==='essais'){
+    w.etape++;
+    // Karting : pas de qualif, la grille sort directement des essais (GDD §21.2)
+    if(w.etapes[w.etape]==='course'){
+      w.grille = simulerQualif(course, meteo, reglagesActuels());
+    }
+  }else if(etape==='qualifs'){
+    // 1er appel : on qualifie et on affiche la grille. 2e appel : on part en course.
+    if(!w.grille) w.grille = simulerQualif(course, meteo, reglagesActuels());
+    else w.etape++;
+  }else if(etape==='course'){
+    lancerCourse(false);
+  }
+  saveGame();
+}
+
+/* Simulation rapide d'un week-end complet (GDD §21.1) */
+function simulationRapide(){
+  ouvrirWeekend();
+  const w=S.weekend, course=S.saison.calendrier[w.courseIdx], meteo=METEOS.find(m=>m.id===w.meteoId);
+  // Sans travail d'essais, les réglages valent ce que vaut l'ingénieur.
+  const base = 34 + staffNiv('ingenieur')*8 + rnd(10,-5);
+  w.setupAuto = clamp(base,20,88);
+  w.grille = simulerQualif(course, meteo, w.setupAuto);
+  lancerCourse(true);
+}
+
+function lancerCourse(rapide){
+  const w=S.weekend, course=S.saison.calendrier[w.courseIdx], meteo=METEOS.find(m=>m.id===w.meteoId);
+  const reg = rapide ? w.setupAuto : reglagesActuels();
+  const r = simulerCourse(course, meteo, reg, w.grille, w.strat);
+  w.resultat = {
+    classement: r.classement.map(f=>({id:f.id,nom:f.nom,ecurie:f.ecurie,pos:f.pos,moi:!!f.moi,abandon:f.abandon||null})),
+    log:r.log, reglages:round(reg,1), rapide:!!rapide,
+    grillePos: (w.grille.find(g=>g.id===S.pilote.id)||{}).pos || null,
+  };
+  w.etape = w.etapes.length;         // on passe au débrief
+  traiterResultat(course, meteo, r, reg);
+  saveGame();
+}
+
+/* ------------------------------- 12. APRÈS-COURSE : effets & progression */
+function traiterResultat(course, meteo, r, reg){
+  const p=S.pilote, sa=S.saison, c=CAT[sa.catId];
+  const moi = r.classement.find(f=>f.moi);
+  const pos = moi.pos, dnf = !!moi.abandon;
+  const pts = dnf?0:pointsPour(sa.catId,pos);
+
+  // --- championnat
+  sa.pts += pts;
+  if(!dnf && pos===1){ sa.victoires++; S.stats.coursesGagnees++; }
+  if(!dnf && pos<=3){ sa.podiums++; S.stats.podiums++; }
+  if(dnf) sa.abandons++;
+  if(!dnf) sa.meilleur = Math.min(sa.meilleur,pos);
+  for(const f of r.classement){
+    if(f.moi) continue;
+    const g = sa.grille.find(x=>x.id===f.id);
+    if(!g) continue;
+    g.pts += f.abandon?0:pointsPour(sa.catId,f.pos);
+    if(!f.abandon && f.pos===1) g.victoires++;
+    if(!f.abandon && f.pos<=3) g.podiums++;
+    if(f.abandon) g.abandons++;
+  }
+  sa.resultats.push({i:sa.courseIndex, circuit:course.nom, pays:course.pays, meteo:meteo.id,
+    grille:(S.weekend&&S.weekend.resultat)?S.weekend.resultat.grillePos:null,
+    pos: dnf?null:pos, dnf:dnf?moi.abandon:null, pts, reglages:round(reg)});
+
+  // --- argent (GDD §19.1 option A : gains dans la caisse, commission au manager)
+  verserSponsors();
+  const coutManche = Math.round(sa.coutTotal / c.courses);
+  if(coutManche>0) caisse('Engagement, transport, pneus — '+course.nom, -coutManche, 'course');
+  let gain = 0;
+  if(!dnf){
+    if(pos===1) gain = c.vict;
+    else if(pos===2) gain = Math.round(c.vict*0.6);
+    else if(pos===3) gain = Math.round(c.vict*0.4);
+    else if(pos<=6) gain = Math.round(c.vict*0.18);
+    else if(pos<=10) gain = Math.round(c.vict*0.07);
+  }
+  if(gain>0){
+    caisse('Prime de course — '+ordinal(pos), gain, 'gain');
+    const com = Math.round(gain*0.10);
+    argent('Commission course '+course.nom+' (10 %)', com, 'commission');
+  }
+  // salaire F1 : versé par manche
+  if(sa.catId==='f1' && S.contrat && S.contrat.salaire>0){
+    const parManche = Math.round(S.contrat.salaire/c.courses);
+    const com = Math.round(parManche*0.10);
+    argent('Commission sur salaire — '+course.nom+' (10 %)', com, 'commission');
+    // primes de résultat
+    let prime=0;
+    if(!dnf && pos===1) prime = S.contrat.primeVictoire||0;
+    else if(!dnf && pos<=3) prime = Math.round((S.contrat.primeVictoire||0)*0.4);
+    else if(pts>0) prime = (S.contrat.primePoint||0)*pts;
+    if(prime>0) argent('Commission primes '+course.nom+' (10 %)', Math.round(prime*0.10), 'commission');
+  }
+  // staff : 12 mois de salaire répartis sur la saison
+  const staffManche = Math.round(staffCoutMensuel()*12/c.courses);
+  if(staffManche>0) argent('Salaires du staff', -staffManche, 'staff');
+  // caisse négative -> le manager comble de sa poche
+  if(sa.caisse<0){
+    const trou = -sa.caisse;
+    argent('Comblement de la caisse de saison', -trou, 'sauvetage');
+    caisse('Avance du manager', trou, 'avance');
+    msg('finance','Comptabilité','La caisse de saison est à sec',
+      `Vous avez dû avancer <em>${fmtEurFull(trou)}</em> de votre trésorerie pour couvrir la manche.\n\n`+
+      `C’est exactement ce que le métier ne doit pas être : trouvez des sponsors, vite.`);
+  }
+
+  // --- progression du pilote (GDD §17.1)
+  progresserPilote(dnf?null:pos);
+  // --- moral, fatigue, réputation
+  effetsPsy(pos, dnf, r.classement.length);
+  // --- rivaux et IA progressent aussi
+  progresserGrille();
+  // --- contrat : évaluation, avertissements (GDD §9.5)
+  evaluerContrat(pos, dnf);
+  // --- sponsors : objectifs, obligations, ruptures
+  evaluerSponsors(pos, dnf);
+  // --- réputation du manager
+  if(!dnf){
+    if(pos===1) gagnerRep(Math.round(6+c.niv*2.6), 'victoire en '+c.court);
+    else if(pos<=3) gagnerRep(Math.round(2.5+c.niv*1.1), 'podium en '+c.court);
+    else if(pos<=6) gagnerRep(Math.round(0.8+c.niv*0.35), '');
+  }
+  // --- conférence de presse (GDD §20.2)
+  if(S.weekend) S.weekend.presse = genererQuestionPresse(pos, dnf, c);
+  // --- message du pilote (GDD §20.3)
+  peutEtreMessagePilote(pos, dnf);
+}
+
+function progresserPilote(pos){
+  const p=S.pilote, c=CAT[S.saison.catId];
+  const cAge = coeffAge(p.age);
+  const cStaff = 1 + staffNiv('ingenieur')*0.045 + staffNiv('prepa')*0.035;   // 1,0 → ~1,4
+  const cMoral = 0.7 + (p.moral/100)*0.6;                                     // 0,7 → 1,3
+  const cTrait = p.traits.includes('bosseur')?1.18:1;
+  const base = GAIN_SAISON / c.courses;
+  const gains = {};
+  for(const k of ALL_STATS){
+    const marge = 1 - p.stats[k]/p.plafonds[k];
+    if(marge<=0){ gains[k]=0; continue; }
+    // Chaque stat progresse à son rythme : profil unique
+    const g = base * cAge * cStaff * cMoral * cTrait * marge * rnd(1.35,0.55);
+    p.stats[k] = clamp(p.stats[k] + g, 1, 99);
+    gains[k]=g;
+  }
+  // Déclin après 32 ans (GDD §17.1)
+  if(p.age>=33){
+    const perte = rnd(3,1)/c.courses;
+    p.stats.reactions = clamp(p.stats.reactions-perte,1,99);
+    p.forme = clamp(p.forme - perte*0.6, 20, 100);
+  }
+  p.progression = gains;
+}
+
+function progresserGrille(){
+  const c=CAT[S.saison.catId];
+  const base = GAIN_SAISON/c.courses;
+  for(const g of S.saison.grille){
+    const cAge=coeffAge(g.p.age), cM=1.0;
+    for(const k of ALL_STATS){
+      const m = 1 - g.p.stats[k]/g.p.plafonds[k];
+      if(m<=0) continue;
+      g.p.stats[k] = clamp(g.p.stats[k] + base*cAge*cM*m*rnd(1.2,0.6), 1, 99);
+    }
+    g.note = notePilote(g.p);
+  }
+}
+
+function majForme(){
+  const p=S.pilote;
+  const recup = 4 + staffNiv('prepa')*2.4;
+  p.fatigue = clamp(p.fatigue, 0, 100);
+  p.forme = clamp(96 - p.fatigue*0.55 - Math.max(0,p.age-32)*1.6 + staffNiv('prepa')*1.2, 25, 100);
+  return recup;
+}
+
+function effetsPsy(pos, dnf, grilleN){
+  const p=S.pilote, c=CAT[S.saison.catId];
+  // attente = position moyenne attendue vu la voiture et le niveau du pilote
+  const attendu = positionAttendue();
+  let d = dnf ? -6 : (attendu - pos);          // positif = mieux que prévu
+  let dm = clamp(d*1.7, -22, 22);
+  if(dnf) dm = -10;
+  if(p.traits.includes('fragile') && dm<0) dm *= 1.75;
+  if(p.traits.includes('regulier')) dm *= 0.8;
+  // Finir loin reste une contre-performance, même si la voiture ne valait pas mieux :
+  // on plafonne le gain de moral sur un résultat absolu médiocre.
+  if(dm>0 && !dnf && pos > grilleN*0.4) dm = Math.min(dm, 4);
+  if(dm>0 && !dnf && pos > grilleN*0.65) dm = Math.min(dm, 1.5);
+  p.moral = clamp(p.moral + dm, 5, 100);
+  p.fatigue = clamp(p.fatigue + rint(6,12) - staffNiv('prepa')*2, 0, 100);
+  majForme();
+  // réputation du pilote
+  let dr = 0;
+  if(!dnf){
+    if(pos===1) dr = 3.2 + c.niv*0.55;
+    else if(pos<=3) dr = 1.6 + c.niv*0.3;
+    else if(pos<=6) dr = 0.6;
+    else if(pos>grilleN*0.7) dr = -0.5;
+  }else dr = -0.4;
+  if(p.traits.includes('medias')) dr *= 1.3;
+  p.reputation = clamp(p.reputation + dr, 1, 100);
+  // image médiatique du manager suit doucement
+  S.manager.image = clamp(S.manager.image + dr*0.25 + staffNiv('presse')*0.08, 0, 100);
+  // relation : de bons résultats et de la considération l'entretiennent
+  p.relation = clamp(p.relation + (dnf?-1: pos<=3?1.2 : pos<=attendu?0.4:-0.8), 0, 100);
+}
+
+/* Position que l'on peut raisonnablement attendre du duo pilote/voiture */
+function positionAttendue(){
+  const sa=S.saison;
+  const perfMoi = notePilote(S.pilote)*0.53 + sa.voiture*0.47;
+  const tous = sa.grille.map(g=>g.note*0.53 + g.voiture*0.47);
+  const mieux = tous.filter(v=>v>perfMoi).length;
+  return mieux+1;
+}
+
+/* -------------------------------- 13. RÉPUTATION MANAGER (GDD §3) */
+function gagnerRep(pts, motif){
+  if(!pts) return;
+  const avant = repPalier(S.manager.repPoints).p;
+  S.manager.repPoints = Math.max(0, S.manager.repPoints + pts);
+  const apres = repPalier(S.manager.repPoints).p;
+  if(apres>avant){
+    const r = REP_PALIERS[apres-1];
+    msg('systeme','Paddock','Votre réputation grandit — palier '+apres+' : '+r.nom,
+      `Vous êtes désormais reconnu comme « <em>${r.nom}</em> » (${apres}/10).\n\n${r.acces}\n\n`+
+      (pilotesMax(apres)>1 ? `À ce palier, un manager peut suivre jusqu’à ${pilotesMax(apres)} pilotes. Cette extension est prévue après la V1.` : ''));
+    majSponsorsProspects();
+  }else if(apres<avant){
+    msg('systeme','Paddock','Votre réputation recule — palier '+apres,
+      `Le paddock vous fait moins confiance. Vous retombez au palier ${apres} : « ${REP_PALIERS[apres-1].nom} ».`);
+  }
+}
+
+/* ------------------------------------ 14. CONTRATS (GDD §9.5) */
+function evaluerContrat(pos, dnf){
+  const ct = S.contrat; if(!ct || !ct.objectifPos) return;
+  const sa = S.saison;
+  const derniers = sa.resultats.slice(-4);
+  if(derniers.length<4) return;
+  // L'écurie fait le point toutes les 4 manches, pas après chaque course :
+  // c'est une série de résultats qui déclenche un avertissement, pas une seule.
+  if(sa.dernierBilan!=null && sa.courseIndex - sa.dernierBilan < 4) return;
+  sa.dernierBilan = sa.courseIndex;
+  const moyenne = avg(derniers, r=> r.pos===null ? CAT[sa.catId].grille : r.pos);
+  if(moyenne > ct.objectifPos + 3.5){
+    sa.avertissements++;
+    if(sa.avertissements===1 || sa.avertissements===2){
+      msg('ecurie', ct.ecurieNom, 'Avertissement — résultats insuffisants',
+        `Vos quatre dernières manches donnent une moyenne de ${round(moyenne,1)}, loin de l’objectif contractuel `+
+        `(${ordinal(ct.objectifPos)} au championnat).\n\n`+
+        (sa.avertissements===1 ? 'Considérez ceci comme un premier avertissement.'
+                               : '<em>Deuxième avertissement.</em> Le prochain sera une rupture de contrat.'));
+    }
+    if(sa.avertissements>=3){ rompreContrat(); }
+  }else if(sa.avertissements>0 && moyenne <= ct.objectifPos+1){
+    sa.avertissements = Math.max(0, sa.avertissements-1);
+  }
+}
+function rompreContrat(){
+  const ct=S.contrat, sa=S.saison;
+  msg('ecurie', ct.ecurieNom, 'Rupture de contrat',
+    `${ct.ecurieNom} met fin au contrat de ${S.pilote.nom} avec effet immédiat.\n\n`+
+    `La saison s’arrête ici. Il faudra redescendre d’une catégorie pour reconstruire sa réputation.`);
+  gagnerRep(-Math.round(60+CAT[sa.catId].niv*18), 'renvoi');
+  S.pilote.moral = clamp(S.pilote.moral-25,5,100);
+  S.pilote.relation = clamp(S.pilote.relation-12,0,100);
+  S.flags.renvoye = true;
+  S.flags.ruptureEnCours = true;
+}
+
+/* ------------------------------------ 15. SPONSORS (GDD §4, §19.5) */
+function slotsSponsors(){ return CAT[S.pilote?S.pilote.catId:'kmini'].slots; }
+function slotsLibres(){ return slotsSponsors() - S.sponsors.actifs.length; }
+function secteursOccupes(){ return S.sponsors.actifs.map(s=>s.secteur); }
+
+function genererSponsor(niv){
+  const N = SPONSOR_NIVEAUX[niv-1];
+  const pool = SPONSOR_POOLS[N.pool];
+  const dispo = pool.filter(x=>!S.sponsors.actifs.some(s=>s.nom===x[0]) && !S.sponsors.prospects.some(s=>s.nom===x[0]));
+  if(!dispo.length) return null;
+  const [nom,secteur] = pick(dispo);
+  const spread = N.max-N.min;
+  const montant = Math.round((N.min + spread*Math.pow(Math.random(),1.6))/100)*100;
+  const obl = [];
+  if(Math.random()<0.45) obl.push('presse');
+  if(Math.random()<0.30) obl.push('objectif');
+  if(Math.random()<0.25) obl.push('pub');
+  if(niv>=3) obl.push('exclu');
+  if(!obl.length) obl.push('aucune');
+  return {
+    id:uid(), nom, secteur, niv, montant,
+    objectifPos: obl.includes('objectif') ? rint(3, Math.max(5, Math.round(CAT[S.pilote.catId].grille*0.45))) : null,
+    partConditionnelle: obl.includes('objectif') ? 0.3 : 0,
+    obligations: obl,
+    duree: rint(1,niv>=3?3:2),
+    // critères d'intérêt (GDD §4.2)
+    exigeRepManager: Math.max(1, N.repMin - 1 + rint(0,1)),
+    exigeRepPilote: clamp(Math.round((niv-1)*16 + rnd(14)), 0, 92),
+    approches:0, statut:'prospect',
+  };
+}
+
+function majSponsorsProspects(){
+  if(!S.pilote){ S.sponsors.prospects = []; return; }
+  const rp = repPalier(S.manager.repPoints).p;
+  const niveauxOuverts = SPONSOR_NIVEAUX.filter(n=>rp >= n.repMin-1).map(n=>n.niv);
+  const cible = clamp(3 + rp, 4, 11);
+  // On retire les prospects devenus hors sujet, on complète
+  S.sponsors.prospects = S.sponsors.prospects.filter(s=>niveauxOuverts.includes(s.niv));
+  let garde=0;
+  while(S.sponsors.prospects.length<cible && garde++<40){
+    const niv = pick(niveauxOuverts);
+    const s = genererSponsor(niv);
+    if(s) S.sponsors.prospects.push(s);
+  }
+  S.sponsors.prospects.sort((a,b)=>b.niv-a.niv || b.montant-a.montant);
+}
+
+/* Score d'intérêt d'un sponsor pour le duo manager/pilote (GDD §4.2) */
+function interetSponsor(s){
+  const p=S.pilote, rp=repPalier(S.manager.repPoints).p;
+  let sc = 0;
+  sc += clamp((rp - s.exigeRepManager)*11, -55, 30);
+  sc += clamp((p.reputation - s.exigeRepPilote)*0.75, -45, 28);
+  // résultats récents
+  if(S.saison && S.saison.resultats.length){
+    const der = S.saison.resultats.slice(-4);
+    const moy = avg(der, r=>r.pos===null?CAT[S.saison.catId].grille:r.pos);
+    const att = positionAttendue();
+    sc += clamp((att-moy)*3.2, -18, 18);
+  }
+  sc += (S.manager.image-40)*0.30;                    // image médiatique
+  sc += staffNiv('presse')*5.5;                       // attaché de presse
+  if(p.traits.includes('medias')) sc += 9;
+  sc += (CAT[p.catId].niv - (s.niv*1.4))*3.2;         // cohérence catégorie / niveau du sponsor
+  sc += s.approches*4;                                // relancer paie un peu
+  return sc;
+}
+function probaSponsor(s){ return clamp(0.5 + interetSponsor(s)/120, 0.03, 0.94); }
+
+function demarcher(sponsorId){
+  const s = S.sponsors.prospects.find(x=>x.id===sponsorId); if(!s) return null;
+  const N = SPONSOR_NIVEAUX[s.niv-1];
+  if(S.manager.budget < N.coutDemarche){ showToast('Trésorerie insuffisante pour monter le dossier'); return null; }
+  if(S.actions<=0){ showToast('Plus d’action disponible cette semaine'); return null; }
+  S.actions--;
+  argent('Démarchage — '+s.nom+' (dossier, déplacement)', -N.coutDemarche, 'demarchage');
+  s.approches++;
+  const pr = probaSponsor(s);
+  const r = Math.random();
+  let issue;
+  if(r < pr*0.72){
+    issue = {type:'accepte', montant:s.montant};
+  }else if(r < pr*0.72 + 0.30){
+    const coef = rnd(0.80,0.45);
+    issue = {type:'contre', montant: Math.max(N.min, Math.round(s.montant*coef/100)*100)};
+  }else if(s.approches>=3){
+    issue = {type:'definitif'};
+  }else{
+    issue = {type:'refus'};
+  }
+  s.derniereIssue = issue;
+  saveGame();
+  return issue;
+}
+
+function signerSponsor(sponsorId, montant){
+  const s = S.sponsors.prospects.find(x=>x.id===sponsorId); if(!s) return false;
+  if(slotsLibres()<=0){ showToast('Aucun emplacement publicitaire libre'); return false; }
+  if(secteursOccupes().includes(s.secteur)){ showToast('Conflit de secteur avec un sponsor déjà en place'); return false; }
+  s.montant = montant;
+  s.statut='actif';
+  s.anneeSignature = S.annee;
+  s.verseSaison = 0;
+  S.sponsors.actifs.push(s);
+  S.sponsors.prospects = S.sponsors.prospects.filter(x=>x.id!==s.id);
+  S.stats.sponsorsSignes++;
+  const com = Math.round(montant*0.15);
+  argent('Commission sponsor — '+s.nom+' (15 %)', com, 'commission');
+  gagnerRep(Math.round(4 + s.niv*9), 'sponsor');
+  // Le montant alimente la caisse de saison, pas la poche du manager (GDD §19.1)
+  if(S.saison){
+    const parManche = Math.round(montant / Math.max(1, CAT[S.saison.catId].courses - S.saison.courseIndex));
+    s.parManche = parManche;
+  }
+  msg('sponsor', s.nom, 'Contrat de partenariat signé',
+    `${s.nom} s’engage pour <em>${fmtEurFull(montant)}</em> sur la saison`+(s.duree>1?` (contrat de ${s.duree} ans)`:'')+`.\n\n`+
+    `Secteur : ${s.secteur}. Contreparties : ${s.obligations.map(o=>OBLIGATIONS.find(x=>x.id===o).lab).join(', ')}.\n\n`+
+    `Votre commission de 15 % (${fmtEurFull(com)}) est créditée. Le reste finance la saison du pilote.`);
+  majSponsorsProspects();
+  saveGame();
+  return true;
+}
+
+/* Versement des sponsors : à chaque manche, par tranches */
+function verserSponsors(){
+  if(!S.saison) return;
+  const c = CAT[S.saison.catId];
+  for(const s of S.sponsors.actifs){
+    const partFixe = s.montant*(1-s.partConditionnelle);
+    const tranche = Math.round(partFixe / c.courses);
+    caisse('Sponsor — '+s.nom, tranche, 'sponsor');
+    s.verseSaison = (s.verseSaison||0)+tranche;
+    // obligations d'image : elles coûtent de la fraîcheur (GDD §4.3)
+    if(s.obligations.includes('presse') && Math.random()<0.35){
+      S.pilote.fatigue = clamp(S.pilote.fatigue+rint(3,7),0,100);
+      S.manager.image = clamp(S.manager.image+1.2,0,100);
+    }
+  }
+  majForme();
+}
+
+function evaluerSponsors(pos, dnf){
+  if(!S.saison) return;
+  const restants = CAT[S.saison.catId].courses - S.saison.courseIndex - 1;
+  for(const s of [...S.sponsors.actifs]){
+    // rupture si la saison est catastrophique
+    const der = S.saison.resultats.slice(-5);
+    if(der.length>=5){
+      const moy = avg(der, r=>r.pos===null?CAT[S.saison.catId].grille:r.pos);
+      const att = positionAttendue();
+      if(moy > att+6 && Math.random()<0.16){
+        S.sponsors.actifs = S.sponsors.actifs.filter(x=>x.id!==s.id);
+        msg('sponsor', s.nom, 'Fin de partenariat anticipée',
+          `${s.nom} met fin au partenariat : les résultats ne sont pas au rendez-vous et l’exposition n’est plus jugée suffisante.\n\n`+
+          `Le versement des tranches restantes (environ ${fmtEurFull(Math.round(s.montant/CAT[S.saison.catId].courses*restants))}) est annulé.`);
+        gagnerRep(-8,'rupture sponsor');
+      }
+    }
+  }
+}
+
+/* Primes conditionnelles versées en fin de saison */
+function primesSponsorsFinSaison(posChamp){
+  let total=0;
+  for(const s of S.sponsors.actifs){
+    if(!s.objectifPos) continue;
+    if(posChamp && posChamp<=s.objectifPos){
+      const prime = Math.round(s.montant*s.partConditionnelle);
+      total += prime;
+      caisse('Prime d’objectif — '+s.nom, prime, 'sponsor');
+      argent('Commission prime sponsor — '+s.nom+' (15 %)', Math.round(prime*0.15), 'commission');
+    }
+  }
+  return total;
+}
+
+/* ------------------------- 16. INTERACTIONS HUMAINES (GDD §20) */
+
+/* 20.1 — Le manager s'adresse à son pilote. L'effet dépend du trait. */
+const TONS = [
+  {id:'feliciter', nom:'Féliciter',      desc:'Souligner ce qu’il a réussi.'},
+  {id:'encourager',nom:'Encourager',     desc:'Le remettre en confiance sans en faire trop.'},
+  {id:'recadrer',  nom:'Recadrer',       desc:'Hausser le ton, exiger davantage.'},
+  {id:'rassurer',  nom:'Rassurer',       desc:'Dédramatiser, protéger la tête.'},
+  {id:'ultimatum', nom:'Fixer un ultimatum',desc:'Mettre la pression, sans filet.'},
+];
+function parlerAuPilote(tonId, contexteBon){
+  const p=S.pilote;
+  const t = TONS.find(x=>x.id===tonId);
+  let dm=0, dr=0, dagr=0, txt='';
+  const fragile = p.traits.includes('fragile');
+  const brulee  = p.traits.includes('tetebrulee');
+  const merc    = p.traits.includes('mercenaire');
+  const leader  = p.traits.includes('leader');
+
+  switch(tonId){
+    case 'feliciter':
+      if(contexteBon){ dm=+12; dr=+4; txt='Il rayonne. Le message est passé au bon moment.'; }
+      else { dm=+3; dr=-3; txt='Le féliciter après ça sonne faux : il ne vous croit pas vraiment.'; }
+      if(contexteBon && merc){ dm=+7; dr=+1; txt='Il encaisse le compliment sans s’émouvoir. Ce qui l’intéresse, c’est le contrat.'; }
+      break;
+    case 'encourager':
+      dm=+6; dr=+2; txt='Un mot juste, sans excès. Il repart plus léger.';
+      if(fragile){ dm=+10; txt='Il avait besoin exactement de ça.'; }
+      break;
+    case 'recadrer':
+      if(brulee){ dm=+7; dagr=+7; dr=+3; txt='Sursaut d’orgueil : il veut vous prouver quelque chose dès la prochaine course.'; }
+      else if(fragile){ dm=-20; dr=-11; txt='Il se referme complètement. Vous venez de casser quelque chose.'; }
+      else if(contexteBon){ dm=-9; dr=-6; txt='Le recadrer après une bonne course : il ne comprend pas.'; }
+      else { dm=-3; dagr=+4; dr=-2; txt='Il encaisse, tête basse, et promet de faire mieux.'; }
+      break;
+    case 'rassurer':
+      dm = contexteBon ? +2 : +9; dr=+3;
+      txt = contexteBon ? 'Rien à rassurer aujourd’hui, mais l’intention est notée.' : 'Il souffle. La pression retombe.';
+      if(fragile && !contexteBon){ dm=+14; dr=+5; txt='Vous venez d’éviter une spirale.'; }
+      break;
+    case 'ultimatum':
+      if(brulee || leader){ dm=+10; dagr=+9; dr=-2; txt='Il prend le défi de plein fouet. Ça va attaquer.'; }
+      else if(fragile){ dm=-26; dr=-18; txt='Rupture de confiance. Il doute désormais de vous autant que de lui.'; }
+      else { dm=-6; dagr=+6; dr=-9; txt='Il accepte, mais la relation se refroidit nettement.'; }
+      break;
+  }
+  p.moral = clamp(p.moral+dm,5,100);
+  p.relation = clamp(p.relation+dr,0,100);
+  p.agressivite = clamp(p.agressivite+dagr,10,99);
+  return {txt, dm, dr, dagr, ton:t.nom};
+}
+
+/* 20.2 — Conférence de presse */
+function genererQuestionPresse(pos, dnf, c){
+  const p=S.pilote, att=positionAttendue();
+  let q;
+  if(dnf) q = `${p.nom} abandonne encore. Est-ce le pilote, la voiture, ou votre gestion ?`;
+  else if(pos===1) q = `Belle victoire. Certains disent que c’est surtout la voiture. Vous répondez quoi ?`;
+  else if(pos<=3) q = `Un podium solide. Objectif titre assumé, ou vous restez prudent ?`;
+  else if(pos>att+4) q = `${p.nom} a terminé ${ordinal(pos)}. Est-ce qu’il a vraiment le niveau pour cette catégorie ?`;
+  else q = `Course sans relief pour ${p.nom}. Que manque-t-il exactement ?`;
+  return {q, pos, dnf, repondu:false};
+}
+const REPONSES_PRESSE = [
+  {id:'defendre', lab:'Défendre le pilote',        desc:'« Il fait ce qu’il peut avec ce qu’on lui donne. »',   moral:+9, relation:-7, image:-5},
+  {id:'admettre', lab:'Reconnaître l’échec',       desc:'« Ce n’est pas assez bon, et nous le savons. »',       moral:-8, relation:+3, image:+8},
+  {id:'blamer',   lab:'Blâmer la voiture / l’écurie',desc:'« Le matériel n’est pas au niveau, point. »',        moral:+6, relation:-16,image:+2},
+  {id:'eluder',   lab:'Éluder la question',        desc:'« On regarde déjà la prochaine course. »',             moral:0,  relation:0,  image:-1},
+];
+function repondrePresse(repId){
+  const r = REPONSES_PRESSE.find(x=>x.id===repId);
+  const p=S.pilote;
+  let dm=r.moral;
+  if(p.traits.includes('fragile') && dm<0) dm*=1.6;
+  if(p.traits.includes('medias')) dm = dm>0?dm*1.2:dm*0.8;
+  p.moral = clamp(p.moral+dm,5,100);
+  p.relation = clamp(p.relation + (repId==='defendre'?+4 : repId==='admettre'?-3 : repId==='blamer'?+5 : 0), 0, 100);
+  S.manager.image = clamp(S.manager.image + r.image, 0, 100);
+  if(S.contrat) S.contrat.relationEcurie = clamp((S.contrat.relationEcurie ?? 60) + r.relation, 0, 100);
+  if(S.weekend && S.weekend.presse) S.weekend.presse.repondu = r.lab;
+  // Une écurie vraiment vexée resserre la vis
+  if(S.contrat && S.contrat.relationEcurie < 22 && Math.random()<0.4){
+    msg('ecurie', S.contrat.ecurieNom, 'Mise au point',
+      `Vos déclarations publiques passent mal. ${S.contrat.ecurieNom} vous rappelle que le contrat contient une clause de bonne conduite médiatique.`);
+    S.contrat.relationEcurie = clamp(S.contrat.relationEcurie+8,0,100);
+  }
+  saveGame();
+  return r;
+}
+
+/* 20.3 — Le pilote écrit au manager */
+const DEMANDES_PILOTE = [
+  {id:'essais',   sujet:'Je veux plus de temps d’essai',
+   corps:'« Je débarque sur les circuits sans repères. Il me faudrait une journée d’essais privés avant la prochaine manche. »',
+   options:[
+     {lab:'Payer une journée d’essais', cout:'variable', effet:'relation +, forme -, réglages du prochain week-end améliorés'},
+     {lab:'Refuser, la caisse est trop juste', effet:'relation -'},
+   ]},
+  {id:'materiel', sujet:'Mon coéquipier a un meilleur matériel',
+   corps:'« Je vois les données. Il n’a pas la même voiture que moi et personne ne me répond. »',
+   options:[
+     {lab:'Aller négocier avec l’écurie', effet:'relation ++, relation écurie -'},
+     {lab:'Lui dire de se concentrer sur lui', effet:'relation -, moral -'},
+   ]},
+  {id:'confiance',sujet:'Je ne me sens pas en confiance ici',
+   corps:'« Cette écurie ne croit pas en moi. J’ai l’impression d’être un numéro. »',
+   options:[
+     {lab:'Le rassurer et défendre le projet', effet:'moral +, relation +'},
+     {lab:'Lui promettre un transfert en fin de saison', effet:'moral ++, relation ++ mais engagement'},
+   ]},
+  {id:'offre',    sujet:'Un autre manager m’a contacté',
+   corps:'« On m’a proposé une autre représentation. Je ne dis pas oui, mais je voulais que tu le saches. »',
+   options:[
+     {lab:'Renégocier votre relation, promettre mieux', effet:'relation ++'},
+     {lab:'Le laisser réfléchir', effet:'risque de départ'},
+   ]},
+];
+function peutEtreMessagePilote(pos, dnf){
+  const p=S.pilote;
+  let proba = 0.16;
+  if(p.relation<45) proba += 0.14;
+  if(p.moral<45) proba += 0.12;
+  if(Math.random()>proba) return;
+  let d;
+  if(p.relation<35) d = DEMANDES_PILOTE.find(x=>x.id==='offre');
+  else if(p.moral<45) d = pick(DEMANDES_PILOTE.filter(x=>x.id!=='offre'));
+  else d = pick(DEMANDES_PILOTE.filter(x=>x.id!=='offre'));
+  msg('pilote', p.nom, d.sujet, d.corps, {kind:'demandePilote', demandeId:d.id});
+}
+function repondreDemande(msgObj, choix){
+  const p=S.pilote, d=DEMANDES_PILOTE.find(x=>x.id===msgObj.actions.demandeId);
+  let txt='';
+  if(d.id==='essais'){
+    if(choix===0){
+      const cout = Math.round(CAT[p.catId].cout*0.035);
+      if(S.manager.budget<cout){ showToast('Trésorerie insuffisante'); return null; }
+      argent('Journée d’essais privés', -cout, 'pilote');
+      p.relation=clamp(p.relation+9,0,100); p.moral=clamp(p.moral+5,5,100);
+      p.fatigue=clamp(p.fatigue+6,0,100);
+      S.flags.bonusReglages = 12;
+      txt=`Journée réservée pour ${fmtEurFull(cout)}. Il arrivera avec des repères sur le prochain circuit (+12 sur les réglages).`;
+    }else{ p.relation=clamp(p.relation-7,0,100); txt='Il comprend, mais il n’est pas dupe : l’argent manque.'; }
+  }
+  if(d.id==='materiel'){
+    if(choix===0){
+      p.relation=clamp(p.relation+11,0,100);
+      if(S.contrat) S.contrat.relationEcurie=clamp((S.contrat.relationEcurie??60)-12,0,100);
+      txt='Vous montez au créneau. Le pilote apprécie, l’écurie beaucoup moins.';
+    }else{ p.relation=clamp(p.relation-8,0,100); p.moral=clamp(p.moral-7,5,100); txt='Il se sent seul. Le message est reçu, mal.'; }
+  }
+  if(d.id==='confiance'){
+    if(choix===0){ p.moral=clamp(p.moral+8,5,100); p.relation=clamp(p.relation+6,0,100); txt='Il repart apaisé.'; }
+    else{ p.moral=clamp(p.moral+14,5,100); p.relation=clamp(p.relation+12,0,100); S.flags.promesseTransfert=S.annee;
+          txt='Vous vous êtes engagé. S’il reste dans la même écurie l’an prochain, il ne l’oubliera pas.'; }
+  }
+  if(d.id==='offre'){
+    if(choix===0){ p.relation=clamp(p.relation+14,0,100); txt='Il reste. Pour l’instant.'; }
+    else{
+      if(Math.random() < (1 - p.relation/100)*0.7){ perdrePilote(); return {txt:'Il a signé ailleurs.'}; }
+      p.relation=clamp(p.relation+3,0,100); txt='Il décline l’offre… de justesse.';
+    }
+  }
+  msgObj.actions=null; msgObj.reponse=txt;
+  saveGame();
+  return {txt};
+}
+function perdrePilote(){
+  msg('pilote', S.pilote.nom, 'Fin de collaboration',
+    `${S.pilote.nom} change de manager. Toutes vos commissions futures sur lui sont perdues.\n\n`+
+    `C’était le risque d’une relation laissée se dégrader. Il faut repartir sur un nouveau pilote.`);
+  gagnerRep(-120,'départ du pilote');
+  S.historique.push({annee:S.annee, type:'depart', pilote:S.pilote.nom});
+  S.pilote=null; S.contrat=null; S.saison=null; S.weekend=null;
+  S.sponsors.actifs=[]; S.sponsors.prospects=[];
+  S.phase='scouting';
+  genererScoutPool();
+  saveGame();
+}
+
+/* --------------------------------- 17. FIN DE SAISON */
+function classementChampionnat(){
+  const sa=S.saison;
+  const l = [{id:S.pilote.id, nom:S.pilote.nom, ecurie:sa.ecurieNom, pts:sa.pts, victoires:sa.victoires,
+              podiums:sa.podiums, abandons:sa.abandons, moi:true}];
+  for(const g of sa.grille) l.push({id:g.id,nom:g.nom,ecurie:g.ecurie,pts:g.pts,victoires:g.victoires,
+              podiums:g.podiums,abandons:g.abandons,moi:false,rival:g.rival});
+  l.sort((a,b)=> b.pts-a.pts || b.victoires-a.victoires || b.podiums-a.podiums);
+  l.forEach((x,i)=>x.pos=i+1);
+  return l;
+}
+function positionChampionnat(){ const c=classementChampionnat(); return (c.find(x=>x.moi)||{}).pos || null; }
+
+function ptsSuperlicence(catId, posChamp){
+  const t = SUPERLIC[catId];
+  if(!t) return 0;
+  return posChamp>=1 && posChamp<=t.length ? t[posChamp-1] : 0;
+}
+function totalSuperlicence(){
+  if(!S.pilote) return 0;
+  // Une fois la F1 atteinte, la superlicence est acquise et se renouvelle.
+  if(S.pilote.palmares.some(x=>x.catId==='f1') || S.pilote.catId==='f1') return SUPERLIC_REQUIS;
+  return sum(S.pilote.superlicence.filter(x=>x.annee > S.annee-3), x=>x.pts);
+}
+
+function terminerSaison(interrompue){
+  const sa=S.saison, c=CAT[sa.catId], p=S.pilote;
+  const cl = classementChampionnat();
+  const pos = (cl.find(x=>x.moi)||{}).pos || cl.length;
+  sa.finie=true;
+  sa.posChamp=pos;
+
+  if(!interrompue){
+    // primes conditionnelles des sponsors
+    primesSponsorsFinSaison(pos);
+    // titre
+    if(pos===1){
+      S.stats.titres++;
+      if(c.titre>0){
+        caisse('Prime de champion — '+c.nom, c.titre, 'gain');
+        argent('Commission titre (20 %)', Math.round(c.titre*0.20), 'commission');
+      }
+      gagnerRep(Math.round(80+c.niv*46), 'titre');
+      msg('systeme','Fédération','Champion !', `${p.nom} est sacré champion de ${c.nom} ${S.annee}.\n\nVotre réputation en profite pleinement.`);
+    }else if(pos<=3){
+      gagnerRep(Math.round(24+c.niv*13),'podium championnat');
+    }
+    // points de superlicence
+    const sl = ptsSuperlicence(sa.catId, pos);
+    if(sl>0){
+      p.superlicence.push({annee:S.annee, pts:sl, catId:sa.catId, pos});
+      msg('systeme','FIA','Points de superlicence attribués',
+        `${ordinal(pos)} en ${c.nom} : <em>${sl} points</em> de superlicence.\n\n`+
+        `Total sur les 3 dernières années : ${totalSuperlicence()} / ${SUPERLIC_REQUIS}.`);
+    }
+  }
+
+  p.palmares.push({annee:S.annee, catId:sa.catId, pos, pts:sa.pts, victoires:sa.victoires,
+                   podiums:sa.podiums, abandons:sa.abandons, interrompue:!!interrompue});
+  // Une saison complète passée avec lui vaut une observation de scout.
+  p.observe = (p.observe||0) + 1;
+
+  // Stagnation : rester dans une catégorie qu'on domine déjà use la motivation.
+  const memeCat = p.palmares.filter(x=>x.catId===sa.catId);
+  if(!interrompue && memeCat.length>=2 && pos<=3){
+    const perte = 8 + (memeCat.length-2)*7;
+    p.moral = clamp(p.moral - perte, 5, 100);
+    p.relation = clamp(p.relation - perte*0.6, 0, 100);
+    msg('pilote', p.nom, 'Je tourne en rond ici',
+      `« ${memeCat.length} saisons en ${CAT[sa.catId].nom}, et je finis encore devant. `+
+      `Si on ne monte pas, je vais finir par me demander ce que je fais avec toi. »`);
+  }
+  S.historique.push({annee:S.annee, catId:sa.catId, pos, pts:sa.pts, victoires:sa.victoires,
+                     podiums:sa.podiums, pilote:p.nom, ecurie:sa.ecurieNom, interrompue:!!interrompue,
+                     soldeManager:Math.round(S.manager.budget)});
+
+  // Solde de caisse : un reliquat positif reste au pilote/à la structure, il n'enrichit pas le manager
+  if(sa.caisse<0){
+    argent('Régularisation de fin de saison', sa.caisse, 'sauvetage');
+  }
+
+  S.phase='finSaison';
+  S.weekend=null;
+  saveGame();
+}
+
+/* Vieillissement, retraite et progression du monde */
+function passerAnneeSuivante(){
+  const p=S.pilote;
+  S.annee++;
+  p.age++;
+  for(const r of S.monde.rivaux){ r.age++; progresserPiloteAbstrait(r); }
+  // Retraite (GDD §7.2)
+  const proba = p.age<33?0 : clamp((p.age-32)*0.13 + (notePilote(p)<55?0.15:0), 0, 1);
+  if(p.age>=34 && Math.random()<proba){ partirRetraite(); return; }
+  // Nettoyage de saison
+  S.saison=null; S.weekend=null;
+  S.flags.renvoye=false;
+  // sponsors : ceux dont le contrat pluriannuel court restent, les autres partent
+  const gardes=[];
+  for(const s of S.sponsors.actifs){
+    s.duree--;
+    if(s.duree>0){ s.verseSaison=0; gardes.push(s); }
+    else msg('sponsor', s.nom, 'Fin de contrat', `Le partenariat avec ${s.nom} arrive à son terme. Il faudra le renégocier ou trouver mieux.`);
+  }
+  S.sponsors.actifs=gardes;
+  S.phase='intersaison';
+  S.actions=6;
+  majSponsorsProspects();
+  saveGame();
+}
+function progresserPiloteAbstrait(r){
+  const cA=coeffAge(r.age);
+  for(const k of ALL_STATS){
+    const m=1-r.stats[k]/r.plafonds[k];
+    if(m>0) r.stats[k]=clamp(r.stats[k]+GAIN_SAISON*cA*m*rnd(1.1,0.7),1,99);
+  }
+  // le rival monte d'une catégorie s'il est prêt
+  const c=CAT[r.catId];
+  if(notePilote(r) > 42+c.niv*6.2 && c.niv<8 && r.age>=catByNiv(c.niv+1).ageMin){
+    r.catId = catByNiv(c.niv+1).id;
+    msg('scout','Votre réseau','Un rival progresse',
+      `${r.nom}, que vous croisez depuis les débuts de ${S.pilote?S.pilote.nom:'votre pilote'}, vient de signer en ${CAT[r.catId].nom}.`);
+  }
+}
+function partirRetraite(){
+  const p=S.pilote;
+  const meilleur = p.palmares.reduce((b,x)=> (!b || CAT[x.catId].niv>CAT[b.catId].niv || (CAT[x.catId].niv===CAT[b.catId].niv&&x.pos<b.pos))?x:b, null);
+  msg('pilote', p.nom, 'Fin de carrière',
+    `Après ${p.palmares.length} saisons, ${p.nom} raccroche le casque à ${p.age} ans.\n\n`+
+    (meilleur ? `Meilleure saison : ${ordinal(meilleur.pos)} en ${CAT[meilleur.catId].nom} (${meilleur.annee}).\n\n` : '')+
+    `La carrière de manager continue : à vous de trouver le prochain.`);
+  S.historique.push({annee:S.annee, type:'retraite', pilote:p.nom, palmares:p.palmares});
+  gagnerRep(Math.round(10 + (meilleur?CAT[meilleur.catId].niv*6:0)), 'carrière accomplie');
+  S.pilote=null; S.contrat=null; S.saison=null; S.weekend=null;
+  S.sponsors.actifs=[]; S.sponsors.prospects=[];
+  S.phase='scouting';
+  genererScoutPool();
+  saveGame();
+}
+
+/* --------------------------- 18. OFFRES & NÉGOCIATION (GDD §9.2, §9.4) */
+/* Un « contrat » en catégorie junior est surtout un baquet à financer.
+   En F1, le pilote est payé. Les pilotes payants (GDD §4.6) obtiennent
+   un baquet au-dessus de leur niveau en apportant du budget. */
+function genererOffres(){
+  const p=S.pilote, rp=repPalier(S.manager.repPoints).p;
+  const catAct = CAT[p.catId];
+  const posChamp = S.saison ? (S.saison.posChamp||positionChampionnat()) : null;
+  const note = notePilote(p);
+  const budgetSponsors = sum(S.sponsors.actifs, s=>s.montant);
+  const offres=[];
+
+  const cibles=[];
+  const sup = catByNiv(catAct.niv+1);
+  // Monter d'une catégorie
+  if(sup && p.age>=sup.ageMin-1 && p.age<=sup.ageMax){
+    if(sup.id!=='f1' || (totalSuperlicence()>=SUPERLIC_REQUIS && p.age>=18)) cibles.push(sup.id);
+  }
+  cibles.push(catAct.id);                                     // rester
+  // Redescendre est toujours possible : c'est la porte de sortie quand la saison
+  // n'est pas finançable, et la seule option après un renvoi.
+  if(catAct.niv>0) cibles.push(catByNiv(catAct.niv-1).id);
+
+  for(const catId of [...new Set(cibles)]){
+    const c=CAT[catId];
+    const ecus = ecuriesPour(catId);
+    for(const e of ecus){
+      // Exigence sportive de l'écurie
+      const exigNote = NIVEAU_GRILLE[catId] - 9 + (e.prestige-45)*0.30;
+      const exigRep  = Math.max(1, Math.round(1 + c.niv*0.9 + (e.prestige-40)/22));
+      // Un gros budget compense un déficit de niveau (pilote payant)
+      const compensation = clamp(budgetSponsors / Math.max(60000, c.cout||3e6) * 16, 0, 22);
+      const ecart = note + compensation - exigNote;
+      if(ecart < -6) continue;
+      if(rp < exigRep-2) continue;
+      if(Math.random() > clamp(0.35 + ecart/22, 0.12, 0.95)) continue;
+
+      const junior = c.niv<8 && Math.random() < clamp(0.10 + ecart/45 + (posChamp&&posChamp<=3?0.25:0), 0, 0.55);
+      // Part du budget prise en charge par l'écurie
+      let partEcurie = 0;
+      if(c.niv===8) partEcurie = 1;
+      else if(junior) partEcurie = clamp(0.45 + ecart/60 + rnd(0.2), 0.4, 1);
+      else partEcurie = clamp(ecart/55 + rnd(0.18) - 0.05, 0, 0.65);
+      const apport = Math.max(0, Math.round(c.cout*(1-partEcurie)/1000)*1000);
+
+      // Salaire (uniquement en F1)
+      let salaire=0, primeVictoire=0, primePoint=0;
+      if(c.niv===8){
+        const base = e.prestige>85 ? 6e6 : e.prestige>65 ? 2.4e6 : 0.8e6;
+        salaire = Math.round(base * clamp(0.6+ (note-70)/40, 0.5, 3.2) / 1e4)*1e4;
+        primeVictoire = Math.round(salaire*0.06/1e3)*1e3;
+        primePoint    = Math.round(salaire*0.002/100)*100;
+      }
+      const objectifPos = Math.max(1, Math.round(clamp(c.grille*0.5 - (e.prestige-45)*0.16 - ecart*0.30, 1, c.grille-2)));
+      offres.push({
+        id:uid(), catId, ecurieId:e.id, ecurieNom:e.nom, prestige:e.prestige, voiture:e.voiture,
+        junior, partEcurie:round(partEcurie,2), apport, salaire, primeVictoire, primePoint,
+        duree: junior?2:rint(1,2), objectifPos,
+        clauseLiberation: Math.random()<0.4,
+        bonusFidelite: Math.random()<0.3 ? Math.round((salaire||c.cout)*0.05/1e3)*1e3 : 0,
+        bonusVoiture: junior ? rint(2,5) : 0,
+        risque: clamp(Math.round(20 + (c.niv-catAct.niv)*16 + Math.max(0,-ecart)*3.4 - (junior?12:0)), 5, 92),
+        progression: junior
+            ? (c.niv>catAct.niv ? 'Programme jeunes : montée en '+c.court+' avec le soutien de l’écurie'
+                                : 'Programme jeunes : 1 an de plus en '+c.court+', fort soutien')
+            : c.niv>catAct.niv ? 'Montée directe en '+c.court
+            : c.niv<catAct.niv ? 'Retour en '+c.court+' pour se relancer'
+            : 'Maintien en '+c.court,
+        tours:0, retiree:false,
+      });
+    }
+  }
+  // On garde les meilleures, sans doublon d'écurie
+  const vus=new Set(); const out=[];
+  offres.sort((a,b)=> (CAT[b.catId].niv-CAT[a.catId].niv) || (b.prestige-a.prestige));
+  for(const o of offres){ const k=o.catId+o.ecurieId; if(vus.has(k))continue; vus.add(k); out.push(o); }
+  return out.slice(0, 6);
+}
+
+/* Négociation en plusieurs tours : chaque relance peut faire fuir l'écurie (GDD §9.4) */
+const LEVIERS = [
+  {id:'apport',  lab:'Demander une prise en charge supplémentaire', desc:'Faire baisser l’apport exigé de 15 %.'},
+  {id:'salaire', lab:'Demander un meilleur salaire',                desc:'+18 % sur le fixe (F1 uniquement).'},
+  {id:'duree',   lab:'Raccourcir l’engagement',                     desc:'Contrat plus court : plus de liberté.'},
+  {id:'clause',  lab:'Exiger une clause de libération',             desc:'Partir librement si l’écurie ne tient pas ses promesses.'},
+  {id:'objectif',lab:'Assouplir l’objectif de résultat',            desc:'Objectif contractuel relevé de 2 places : moins de risque de renvoi.'},
+];
+function negocier(offre, levierId){
+  offre.tours++;
+  const rp=repPalier(S.manager.repPoints).p;
+  const base = 0.62 + rp*0.028 + (S.pilote.reputation/100)*0.18;
+  const proba = clamp(base - offre.tours*0.16, 0.06, 0.9);
+  const risqueRetrait = clamp(0.05 + offre.tours*0.13 - rp*0.012, 0.02, 0.6);
+
+  if(Math.random() < risqueRetrait){
+    offre.retiree = true;
+    return {issue:'retrait', txt:`${offre.ecurieNom} se retire de la négociation. Vous avez tiré sur la corde une fois de trop.`};
+  }
+  if(Math.random() < proba){
+    switch(levierId){
+      case 'apport':  offre.apport = Math.max(0, Math.round(offre.apport*0.85/1000)*1000);
+                      offre.partEcurie = round(1 - offre.apport/Math.max(1,CAT[offre.catId].cout||1),2); break;
+      case 'salaire': if(offre.salaire>0){ offre.salaire=Math.round(offre.salaire*1.18/1e4)*1e4; } break;
+      case 'duree':   offre.duree = Math.max(1, offre.duree-1); break;
+      case 'clause':  offre.clauseLiberation = true; break;
+      case 'objectif':offre.objectifPos = Math.min(CAT[offre.catId].grille-1, offre.objectifPos+2); break;
+    }
+    return {issue:'ok', txt:`${offre.ecurieNom} accepte votre demande.`};
+  }
+  return {issue:'refus', txt:`${offre.ecurieNom} refuse mais reste à la table. Chaque relance supplémentaire augmente le risque de rupture.`};
+}
+
+function signerOffre(offre){
+  const c=CAT[offre.catId];
+  const com = offre.salaire>0
+    ? Math.round(offre.salaire*(0.05 + (offre.prestige/100)*0.10))
+    : Math.round(Math.max(2000, c.cout*0.02));
+  argent('Commission de transfert — '+offre.ecurieNom, com, 'commission');
+  S.contrat = {
+    ecurieId:offre.ecurieId, ecurieNom:offre.ecurieNom, catId:offre.catId,
+    duree:offre.duree, anneeDebut:S.annee, salaire:offre.salaire,
+    primeVictoire:offre.primeVictoire, primePoint:offre.primePoint,
+    partEcurie:offre.partEcurie, apport:offre.apport, objectifPos:offre.objectifPos,
+    clauseLiberation:offre.clauseLiberation, bonusFidelite:offre.bonusFidelite,
+    bonusVoiture:offre.bonusVoiture, junior:offre.junior, relationEcurie:62,
+  };
+  S.pilote.catId = offre.catId;
+  gagnerRep(Math.round(8 + c.niv*7 + offre.prestige*0.12), 'signature');
+  if(offre.catId==='f1' && !S.flags.f1Atteinte){
+    S.flags.f1Atteinte = true;
+    gagnerRep(500,'accès à la F1');
+    msg('systeme','Paddock','La Formule 1',
+      `${S.pilote.nom} est officiellement pilote de Formule 1 chez ${offre.ecurieNom}.\n\n`+
+      `C’est l’aboutissement de tout ce que vous avez construit depuis le karting.`);
+  }
+  msg('ecurie', offre.ecurieNom, 'Contrat signé — saison '+S.annee,
+    `${S.pilote.nom} rejoint ${offre.ecurieNom} en ${c.nom}.\n\n`+
+    (offre.salaire>0 ? `Salaire annuel : <em>${fmtEurFull(offre.salaire)}</em>. Votre commission : 10 %.\n` :
+                       `Apport exigé : <em>${fmtEurFull(offre.apport)}</em> sur la saison — à trouver auprès des sponsors.\n`)+
+    `Objectif contractuel : ${ordinal(offre.objectifPos)} au championnat. Durée : ${offre.duree} an(s).`);
+  S.offres = null;
+  saveGame();
+}
+
+/* -------------------------------------- 19. STAFF (GDD §13, §19.7) */
+function candidatsStaff(roleId){
+  const rp=repPalier(S.manager.repPoints).p;
+  const nivMax = clamp(1+Math.floor(rp/2), 1, 5);
+  const out=[];
+  for(let n=1;n<=nivMax;n++){
+    out.push({roleId, niv:n, nom:nomAleatoire(), salaire:staffSalaire(roleId,n)});
+  }
+  return out;
+}
+function recruterStaff(roleId, niv, nom){
+  const sal = staffSalaire(roleId,niv);
+  S.staff[roleId] = {niv, salaire:sal, nom};
+  msg('systeme','Ressources humaines','Recrutement — '+STAFF_ROLE[roleId].nom,
+    `${nom} rejoint votre structure comme ${STAFF_ROLE[roleId].nom} (${NIV_LABEL[niv]}).\n\n`+
+    `Coût : <em>${fmtEurFull(sal)} par mois</em>, prélevé sur votre trésorerie à chaque manche.`);
+  saveGame();
+}
+function licencierStaff(roleId){
+  const s=S.staff[roleId]; if(!s) return;
+  const indem = Math.round(s.salaire*1.5);
+  argent('Indemnité de départ — '+STAFF_ROLE[roleId].nom, -indem, 'staff');
+  delete S.staff[roleId];
+  saveGame();
+}
+
+/* ------------------------ 20. ACTIONS DE PRÉPARATION (entre 2 manches) */
+const ACTIONS_SEMAINE = [
+  {id:'entrainement', nom:'Séance d’entraînement', desc:'Progression ciblée, mais fatigue le pilote.'},
+  {id:'repos',        nom:'Repos',                 desc:'Fait retomber la fatigue, un peu de moral.'},
+  {id:'discussion',   nom:'Parler au pilote',      desc:'Choisir un ton — l’effet dépend de sa personnalité.'},
+  {id:'dev',          nom:'Développement technique',desc:'Investir sur le matériel : performance de la voiture.'},
+];
+function entrainement(groupeId){
+  if(S.actions<=0){ showToast('Plus d’action disponible'); return null; }
+  S.actions--;
+  const p=S.pilote, g=STAT_GROUPES.find(x=>x.id===groupeId);
+  const cAge=coeffAge(p.age), cStaff=1+staffNiv('ingenieur')*0.045+staffNiv('prepa')*0.035;
+  const cMoral=0.7+(p.moral/100)*0.6, cTrait=p.traits.includes('bosseur')?1.25:1;
+  const gains={};
+  for(const [k] of g.stats){
+    const m=1-p.stats[k]/p.plafonds[k];
+    if(m<=0){gains[k]=0;continue;}
+    const gain = 0.85*cAge*cStaff*cMoral*cTrait*m*rnd(1.3,0.6);
+    p.stats[k]=clamp(p.stats[k]+gain,1,99);
+    gains[k]=gain;
+  }
+  p.fatigue=clamp(p.fatigue+rint(7,13)-staffNiv('prepa')*2,0,100);
+  majForme();
+  saveGame();
+  return {groupe:g.nom, gains};
+}
+function repos(){
+  if(S.actions<=0){ showToast('Plus d’action disponible'); return null; }
+  S.actions--;
+  const p=S.pilote;
+  const r = 14 + staffNiv('prepa')*5;
+  p.fatigue=clamp(p.fatigue-r,0,100);
+  p.moral=clamp(p.moral+3,5,100);
+  majForme();
+  saveGame();
+  return {recup:r};
+}
+function developpement(montant){
+  if(S.actions<=0){ showToast('Plus d’action disponible'); return null; }
+  if(!S.saison){ return null; }
+  if(S.saison.caisse < montant){ showToast('La caisse de saison ne le permet pas'); return null; }
+  S.actions--;
+  caisse('Développement technique', -montant, 'dev');
+  S.saison.devDepense += montant;
+  // rendement décroissant : plus on a déjà investi, moins ça rapporte
+  const ref = Math.max(20000, CAT[S.saison.catId].cout*0.25);
+  const gain = 3.2 * Math.log10(1 + montant/ref*9) * (1 - S.saison.devDepense/(ref*14));
+  const g = clamp(gain, 0, 4);
+  S.saison.voiture = clamp(S.saison.voiture + g, 30, 99);
+  saveGame();
+  return {gain:g};
+}
+
+/* --------------------------------------------- 21. BOUCLE DE JEU */
+function financementCouvert(){
+  if(!S.saison) return 0;
+  const c=CAT[S.saison.catId];
+  const restants = c.courses - S.saison.courseIndex;
+  const besoin = Math.round(S.saison.coutTotal/c.courses)*restants;
+  const attendu = sum(S.sponsors.actifs, s=>Math.round(s.montant*(1-s.partConditionnelle)/c.courses)*restants);
+  return besoin<=0 ? 1 : clamp((S.saison.caisse + attendu)/besoin, 0, 2);
+}
+function faillite(){ return S.manager.budget < -60000; }
+
+function avancerSemaine(){
+  // Fin des actions de préparation -> on part en week-end de course
+  ouvrirWeekend();
+}
+function finirWeekend(){
+  S.saison.courseIndex++;
+  S.weekend=null;
+  if(S.flags.ruptureEnCours){
+    S.flags.ruptureEnCours=false;
+    terminerSaison(true);
+    saveGame();
+    return;
+  }
+  if(faillite()){ S.phase='faillite'; saveGame(); return; }
+  if(S.saison.courseIndex >= S.saison.calendrier.length){
+    terminerSaison(false);
+  }else{
+    S.phase='semaine';
+    S.actions=actionsParSemaine();
+    S.flags.bonusReglages = 0;
+    majSponsorsProspects();
+  }
+  saveGame();
+}
+
+/* ===================================================================== */
+/* ============================== INTERFACE ============================ */
+/* ===================================================================== */
+
+/* --- modale --- */
+function openModal(title, body, foot){
+  $('#modalTitle').textContent = title;
+  $('#modalBody').innerHTML = body;
+  $('#modalFoot').innerHTML = foot||'';
+  $('#overlay').classList.add('on');
+}
+function closeModal(){ $('#overlay').classList.remove('on'); }
+$('#modalX').onclick = closeModal;
+$('#overlay').addEventListener('click', e=>{ if(e.target.id==='overlay') closeModal(); });
+
+/* --- composants --- */
+function bar(nom, val, plaf){
+  const pct = clamp(val,0,99), pp = plaf?clamp(plaf,0,99):null;
+  return `<div class="stat-line"><span class="n">${nom}</span>
+    <span class="bar"><i style="width:${pct}%"></i>${pp?`<u style="left:${pp}%"></u>`:''}</span>
+    <span class="v">${Math.round(val)}</span></div>`;
+}
+function gline(nom, val, coul, suffixe){
+  return `<div class="gline"><span class="n">${nom}</span>
+    <span class="gauge g-${coul}"><i style="width:${clamp(val,0,100)}%"></i></span>
+    <span class="v">${Math.round(val)}${suffixe||''}</span></div>`;
+}
+function tag(txt, cls){ return `<span class="tag ${cls||'t-grey'}">${escapeHtml(txt)}</span>`; }
+function couleurMoral(v){ return v>=65?'green':v>=40?'amber':'red'; }
+function kpi(l,v,s,cls){ return `<div class="kpi"><div class="l">${l}</div><div class="v ${cls||''}">${v}</div>${s?`<div class="s">${s}</div>`:''}</div>`; }
+function noteBadge(n){
+  const cls = n>=85?'top' : n>=72?'hi':'';
+  return `<div class="big ${cls}">${Math.round(n)}</div>`;
+}
+function echelle(catId){
+  return `<div class="ladder">`+CATS.map(c=>{
+    const cls = c.id===catId?'now' : (catId && CAT[catId].niv>c.niv)?'done':'';
+    return `<div class="st ${cls}">${c.court.replace('-','<br>')}</div>`;
+  }).join('')+`</div>`;
+}
+
+/* --- routeur --- */
+const RENDERERS = {
+  bureau:renderBureau, inbox:renderInbox, pilote:renderPilote, weekend:renderWeekend,
+  sponsors:renderSponsors, contrats:renderContrats, staff:renderStaff,
+  champ:renderChamp, finances:renderFinances, save:renderSave,
+};
+function go(tab){ UI.tab=tab; render(); }
+function render(){
+  const enJeu = !!S;
+  $('#nav').hidden = !enJeu;
+  $('#hdrRep').hidden = !enJeu; $('#hdrCash').hidden = !enJeu;
+  $$('.view').forEach(v=>v.classList.remove('active'));
+
+  if(!enJeu){ $('#v-splash').classList.add('active'); renderSplash(); return; }
+
+  // en-tête
+  const rp = repPalier(S.manager.repPoints);
+  $('#hdrRep .v').textContent = rp.p+'/10';
+  $('#hdrRep .l').textContent = rp.nom;
+  const c = $('#hdrCash .v');
+  c.textContent = fmtEur(S.manager.budget);
+  c.classList.toggle('neg', S.manager.budget<0);
+  $('#hdrSub').textContent = S.pilote
+    ? `${S.pilote.nom} · ${CAT[S.pilote.catId].nom} · ${S.annee}`
+    : `Saison ${S.annee} · aucun pilote`;
+
+  const u = nbNonLus();
+  $('#navUnread').hidden = u===0; $('#navUnread').textContent = u;
+
+  $$('.tab-btn').forEach(b=>{
+    const t=b.dataset.tab;
+    b.classList.toggle('active', t===UI.tab);
+    b.classList.toggle('locked', (t==='weekend' && S.phase!=='weekend'));
+  });
+
+  $('#v-'+UI.tab).classList.add('active');
+  (RENDERERS[UI.tab]||renderBureau)();
+}
+$$('.tab-btn').forEach(b=> b.onclick = ()=>go(b.dataset.tab));
+
+/* Délégation d'événements : data-act="nom" data-x="…" */
+document.addEventListener('click', e=>{
+  const el = e.target.closest('[data-act]');
+  if(!el) return;
+  const act = el.dataset.act;
+  if(ACTIONS[act]){ e.preventDefault(); ACTIONS[act](el.dataset, el); }
+});
+const ACTIONS = {};
+
+/* ------------------------------------------ ÉCRAN : NOUVELLE PARTIE */
+let creaBudget=1, creaRep=1;
+function renderSplash(){
+  const bud = BUDGETS.find(b=>b.id===creaBudget);
+  const rep = REP_PALIERS.find(r=>r.p===creaRep);
+  const sauvegarde = !!localStorage.getItem(SAVE_KEY);
+  $('#splash').innerHTML = `
+    <div class="hero">
+      <div class="t">Manager de <em>Pilote</em></div>
+      <div class="s">Repérer le talent. Trouver l’argent. Négocier la carrière.</div>
+    </div>
+    ${sauvegarde?`<div class="card accent"><h2>Partie en cours</h2>
+      <button class="btn btn-cta btn-block" data-act="reprendre">Reprendre la carrière</button></div>`:''}
+
+    <div class="card">
+      <h2>Profil de départ<span class="hint">2 curseurs indépendants</span></h2>
+
+      <div class="slider-box">
+        <div class="top"><b>Budget de départ</b><span>${fmtEur(bud.v)}</span></div>
+        <div class="note mb">${bud.lab}</div>
+        <input type="range" min="1" max="4" step="1" value="${creaBudget}" data-act="setBudget" id="rgBudget">
+      </div>
+
+      <div class="slider-box">
+        <div class="top"><b>Réputation manager</b><span>${rep.p}/10</span></div>
+        <div class="note mb"><b>${rep.nom}</b> — ${rep.acces}</div>
+        <input type="range" min="1" max="10" step="1" value="${creaRep}" data-act="setRep" id="rgRep">
+      </div>
+
+      <div class="field mb">
+        <label class="note">Votre nom</label>
+        <input id="nomManager" placeholder="Manager" maxlength="26" value="">
+      </div>
+
+      <div class="note mb">Ces deux réglages sont libres : 4 × 10 = <b>40 profils de départ</b>.
+      Un gros budget sans crédibilité, ou l’inverse — la partie ne se joue pas du tout pareil.</div>
+
+      <button class="btn btn-cta btn-block" data-act="lancerPartie">Commencer la carrière</button>
+    </div>
+
+    <div class="card flat">
+      <h2>Ce que vous allez faire</h2>
+      <div class="note">
+        <b class="txt-red">1. Repérer</b> — Un scout vous donne une estimation floue du potentiel d’un jeune. Jamais la vraie valeur.<br><br>
+        <b class="txt-red">2. Financer</b> — L’argent des sponsors ne va pas dans votre poche : il paie la saison du pilote. Vous ne touchez que la commission.<br><br>
+        <b class="txt-red">3. Négocier</b> — Contrats, montées de catégorie, superlicence. Une relance de trop et l’écurie se retire.
+      </div>
+    </div>`;
+  $('#rgBudget').oninput = e=>{ creaBudget=+e.target.value; renderSplash(); };
+  $('#rgRep').oninput    = e=>{ creaRep=+e.target.value; renderSplash(); };
+}
+ACTIONS.reprendre = ()=>{ S=loadGame(); if(S){ UI.tab='bureau'; render(); } else showToast('Sauvegarde illisible'); };
+ACTIONS.lancerPartie = ()=>{
+  const nom = ($('#nomManager')?.value||'').trim();
+  nouvellePartie(creaBudget, creaRep, nom);
+  UI.tab='pilote'; render();
+};
+
+/* ------------------------------------------------- ÉCRAN : BUREAU */
+function renderBureau(){
+  const p=S.pilote, sa=S.saison, rp=repPalier(S.manager.repPoints), suiv=repProchain(S.manager.repPoints);
+  let h='';
+
+  if(S.phase==='faillite'){
+    $('#v-bureau').innerHTML = `<div class="card accent center">
+      <h2 style="justify-content:center">Fin de partie</h2>
+      <div class="sect-title">Faillite</div>
+      <div class="note mb">Votre trésorerie est descendue à ${fmtEurFull(S.manager.budget)}. Plus personne ne vous suit.</div>
+      <div class="note mb">${S.stats.saisonsJouees} saison(s) · ${S.stats.coursesGagnees} victoire(s) · ${S.stats.titres} titre(s)</div>
+      <button class="btn btn-cta btn-block mt" data-act="nouvellePartieDepuisFin">Recommencer une carrière</button>
+    </div>`;
+    return;
+  }
+
+  // ---- bandeau réputation / argent
+  h += `<div class="kpis">
+    ${kpi('Réputation', rp.p+'/10', rp.nom, '')}
+    ${kpi('Trésorerie', fmtEur(S.manager.budget), 'Manager', S.manager.budget<0?'red':S.manager.budget<20000?'amber':'green')}
+    ${sa?kpi('Caisse de saison', fmtEur(sa.caisse), 'Finance la saison', sa.caisse<0?'red':sa.caisse<Math.round(sa.coutTotal/CAT[sa.catId].courses)?'amber':'green'):kpi('Caisse de saison','—','Hors saison','')}
+    ${kpi('Image médiatique', Math.round(S.manager.image), 'Attractivité sponsors','blue')}
+  </div>`;
+
+  if(suiv){
+    const prev = rp.seuil, span = suiv.seuil-prev, fait = S.manager.repPoints-prev;
+    h += `<div class="card"><h2>Progression de réputation<span class="hint">palier ${suiv.p} : ${suiv.nom}</span></h2>
+      ${gline('Vers '+suiv.nom, fait/span*100, 'blue','%')}
+      <div class="note mt">${suiv.acces}</div>
+      <div class="note txt-muted mt">Chaque palier est plus long que le précédent : ${Math.round(span)} points à couvrir ici.</div>
+    </div>`;
+  }
+
+  // ---- CTA principal selon la phase
+  h += ctaBureau();
+
+  // ---- pilote
+  if(p){
+    const n=notePilote(p);
+    h += `<div class="card"><h2>Votre pilote</h2>
+      <div class="ovr">${noteBadge(n)}
+        <div style="flex:1">
+          <div style="font-family:var(--cond);font-size:20px;font-weight:700">${escapeHtml(p.nom)}</div>
+          <div class="note">${p.age} ans · ${p.pays} · ${CAT[p.catId].nom}</div>
+          <div class="row tight mt">${p.traits.map(t=>tag(TRAITS[t].nom,TRAITS[t].coul)).join('')}</div>
+        </div>
+      </div>
+      <div class="hr"></div>
+      ${gline('Moral', p.moral, couleurMoral(p.moral))}
+      ${gline('Forme', p.forme, couleurMoral(p.forme))}
+      ${gline('Relation', p.relation, couleurMoral(p.relation))}
+      ${gline('Réputation', p.reputation, 'blue')}
+      ${p.relation<32?`<div class="note warn mt">⚠ La relation se dégrade sérieusement. Un pilote mal suivi change de manager — et vous perdez toutes vos commissions.</div>`:''}
+    </div>`;
+  }
+
+  // ---- saison en cours
+  if(sa && !sa.finie){
+    const c=CAT[sa.catId], prochaine=sa.calendrier[sa.courseIndex];
+    const cv = financementCouvert();
+    h += `<div class="card"><h2>Saison ${sa.annee} — ${c.nom}<span class="hint">${sa.ecurieNom}</span></h2>
+      ${echelle(sa.catId)}
+      <div class="kpis" style="margin:10px 0 6px">
+        ${kpi('Manche', (sa.courseIndex+1)+' / '+c.courses, prochaine?prochaine.nom:'—','')}
+        ${kpi('Points', sa.pts, ordinal(positionChampionnat())+' au général','')}
+        ${kpi('Victoires', sa.victoires, sa.podiums+' podium(s)', sa.victoires?'amber':'')}
+        ${kpi('Voiture', Math.round(sa.voiture), 'Performance matériel','blue')}
+      </div>
+      ${gline('Financement couvert', cv*100, cv>=1?'green':cv>=0.7?'amber':'red','%')}
+      ${cv<1?`<div class="note warn mt">Il manque du sponsoring pour boucler la saison. Chaque manche non financée est prélevée sur votre trésorerie.</div>`:''}
+    </div>`;
+  }
+
+  // ---- derniers messages
+  const derniers = S.inbox.slice(0,3);
+  if(derniers.length){
+    h += `<div class="card"><h2>Messagerie<span class="hint">${nbNonLus()} non lu(s)</span></h2>
+      ${derniers.map(m=>`<div class="msg ${m.lu?'':'unread'}" data-act="ouvrirMsg" data-id="${m.id}">
+        <div class="top"><span class="fr">${escapeHtml(m.from)}</span><span>${escapeHtml(m.date)}</span></div>
+        <div class="sj">${escapeHtml(m.sujet)}</div></div>`).join('')}
+      <button class="btn-ghost btn-sm btn-block mt" data-act="tab" data-tab="inbox">Toute la messagerie</button>
+    </div>`;
+  }
+
+  $('#v-bureau').innerHTML = h;
+}
+
+function ctaBureau(){
+  const p=S.pilote, sa=S.saison;
+  if(S.phase==='scouting'){
+    return `<div class="card accent"><h2>À faire maintenant</h2>
+      <div class="note mb">Vous n’avez pas de pilote. Sans pilote, pas de commission, et le staff continue de coûter.</div>
+      <button class="btn btn-cta btn-block" data-act="tab" data-tab="pilote">Consulter le vivier de jeunes pilotes</button></div>`;
+  }
+  if(S.phase==='intersaison'){
+    if(!S.contrat || S.contrat.anneeDebut!==S.annee){
+      return `<div class="card accent"><h2>Intersaison ${S.annee}</h2>
+        <div class="note mb">Aucun engagement pour cette saison. Il faut trouver un baquet à ${escapeHtml(p.nom)}.</div>
+        <button class="btn btn-cta btn-block" data-act="ouvrirOffres">Étudier les offres d’écuries</button></div>`;
+    }
+    const c=CAT[S.contrat.catId];
+    const apport = S.contrat.apport;
+    const sponsorise = sum(S.sponsors.actifs, s=>s.montant);
+    return `<div class="card accent"><h2>Prêt pour la saison ${S.annee}</h2>
+      <div class="note mb">Engagement en <b>${c.nom}</b> avec <b>${escapeHtml(S.contrat.ecurieNom)}</b>.
+      ${apport>0?`Apport à financer : <b>${fmtEurFull(apport)}</b> — sponsors actuels : <b class="${sponsorise>=apport?'txt-green':'txt-amber'}">${fmtEurFull(sponsorise)}</b>.`:'Le pilote est payé par l’écurie.'}</div>
+      ${apport>0 && sponsorise<apport*0.5 ? `<div class="note warn mb">Vous pouvez démarrer sans le budget complet, mais chaque manche non couverte tapera dans votre trésorerie.</div>`:''}
+      <div class="row">
+        <button class="btn-ghost" data-act="tab" data-tab="sponsors">Chercher des sponsors</button>
+        <button class="btn btn-cta" style="flex:1" data-act="lancerSaison">Lancer la saison</button>
+      </div></div>`;
+  }
+  if(S.phase==='semaine'){
+    const prochaine=sa.calendrier[sa.courseIndex];
+    return `<div class="card accent"><h2>Préparation — manche ${sa.courseIndex+1}<span class="hint">${S.actions} action(s) restante(s)</span></h2>
+      <div class="note mb">Prochaine manche : <b>${prochaine.nom}</b> (${prochaine.pays}) — circuit ${prochaine.type.toLowerCase()}.</div>
+      <div class="row tight mb">
+        <button class="btn-ghost btn-sm" data-act="modalEntrainement" ${S.actions<=0?'disabled':''}>Entraînement</button>
+        <button class="btn-ghost btn-sm" data-act="actionRepos" ${S.actions<=0?'disabled':''}>Repos</button>
+        <button class="btn-ghost btn-sm" data-act="modalDiscussion" ${S.actions<=0?'disabled':''}>Parler au pilote</button>
+        <button class="btn-ghost btn-sm" data-act="modalDev" ${S.actions<=0?'disabled':''}>Développement</button>
+        <button class="btn-ghost btn-sm" data-act="tab" data-tab="sponsors" ${S.actions<=0?'disabled':''}>Démarcher un sponsor</button>
+      </div>
+      <div class="row">
+        <button class="btn-ghost" style="flex:1" data-act="simRapide">Simulation rapide</button>
+        <button class="btn btn-cta" style="flex:2" data-act="allerWeekend">Aller au week-end de course</button>
+      </div>
+      <div class="note txt-muted mt">La simulation rapide règle la voiture toute seule (selon votre ingénieur) et donne le résultat immédiatement.</div>
+    </div>`;
+  }
+  if(S.phase==='weekend'){
+    const w=S.weekend, et=w.etapes[Math.min(w.etape,w.etapes.length-1)];
+    return `<div class="card accent"><h2>Week-end en cours</h2>
+      <div class="note mb">${sa.calendrier[w.courseIdx].nom} — étape : <b>${w.etape>=w.etapes.length?'Débrief':ETAPE_NOM[et]}</b></div>
+      <button class="btn btn-cta btn-block" data-act="tab" data-tab="weekend">Reprendre le week-end</button></div>`;
+  }
+  if(S.phase==='finSaison'){
+    return `<div class="card accent"><h2>Saison ${S.annee} terminée</h2>
+      <button class="btn btn-cta btn-block" data-act="bilanSaison">Voir le bilan de saison</button></div>`;
+  }
+  return '';
+}
+
+ACTIONS.tab = d=>go(d.tab);
+ACTIONS.nouvellePartieDepuisFin = ()=>{ wipeGame(); UI.tab='bureau'; render(); };
+ACTIONS.lancerSaison = ()=>{
+  demarrerSaison(S.contrat.catId, S.contrat.ecurieId);
+  render(); showToast('Saison lancée');
+};
+ACTIONS.allerWeekend = ()=>{ avancerSemaine(); go('weekend'); };
+ACTIONS.simRapide = ()=>{ simulationRapide(); go('weekend'); };
+
+/* ------------------------------------------------- ÉCRAN : PILOTE */
+function renderPilote(){
+  if(!S.pilote){ renderScouting(); return; }
+  const p=S.pilote, n=notePilote(p), plaf=notePlafond(p);
+  const ePlaf = estimTexte(p, plaf, 'plafGlobal');
+  let h='';
+  h += `<div class="card">
+    <div class="ovr">${noteBadge(n)}
+      <div style="flex:1">
+        <div style="font-family:var(--cond);font-size:23px;font-weight:700;line-height:1.05">${escapeHtml(p.nom)}</div>
+        <div class="note">${p.age} ans · ${p.pays} · ${CAT[p.catId].nom}${S.contrat?' · '+escapeHtml(S.contrat.ecurieNom):''}</div>
+        <div class="row tight mt">${p.traits.map(t=>tag(TRAITS[t].nom,TRAITS[t].coul)).join('')}</div>
+      </div>
+    </div>
+    <div class="note txt-muted mt">Plafond <b>estimé</b> de la note globale : <b>${ePlaf}</b> — potentiel estimé « ${estimPotentiel(p)} ».
+    Les repères clairs sur les barres situent le plafond estimé de chaque statistique : vous ne connaîtrez jamais sa vraie limite,
+    seulement une fourchette qui se resserre avec un bon scout et les saisons passées ensemble.</div>
+  </div>`;
+
+  h += `<div class="card"><h2>Statistiques<span class="hint">Note = Pace×0,40 + Consistency×0,30 + Racecraft×0,30</span></h2>`;
+  for(const g of STAT_GROUPES){
+    const gv = noteGroupe(p,g.id);
+    h += `<div class="grp"><div class="h"><b>${g.nom}</b><span>${Math.round(gv)}</span></div>
+      ${g.stats.map(([k,nom])=>bar(nom,p.stats[k],estim(p,p.plafonds[k],'plaf'+k).c)).join('')}</div>`;
+  }
+  h += `</div>`;
+
+  h += `<div class="card"><h2>État du pilote</h2>
+    ${gline('Moral', p.moral, couleurMoral(p.moral))}
+    ${gline('Forme physique', p.forme, couleurMoral(p.forme))}
+    ${gline('Fatigue', p.fatigue, p.fatigue>60?'red':p.fatigue>35?'amber':'green')}
+    ${gline('Relation avec vous', p.relation, couleurMoral(p.relation))}
+    ${gline('Réputation du pilote', p.reputation, 'blue')}
+    ${gline('Agressivité', p.agressivite, p.agressivite>75?'red':'amber')}
+    <div class="note txt-muted mt">Une agressivité élevée multiplie les dépassements… et les abandons.</div>
+  </div>`;
+
+  // superlicence
+  const tot = totalSuperlicence();
+  h += `<div class="card"><h2>Superlicence FIA<span class="hint">${SUPERLIC_REQUIS} points sur 3 ans</span></h2>
+    ${gline('Points acquis', tot/SUPERLIC_REQUIS*100, tot>=SUPERLIC_REQUIS?'green':'amber', '%')}
+    <div class="note mt"><b>${tot} / ${SUPERLIC_REQUIS} points</b> ${tot>=SUPERLIC_REQUIS?'— éligible à la Formule 1'+(p.age<18?' dès ses 18 ans':''):'— la F1 reste fermée'}.</div>
+    ${p.superlicence.length?`<div class="tw mt"><table><thead><tr><th>Année</th><th>Catégorie</th><th>Classement</th><th class="num">Points</th></tr></thead><tbody>
+      ${p.superlicence.slice().reverse().map(s=>`<tr><td>${s.annee}</td><td>${CAT[s.catId].court}</td><td>${ordinal(s.pos)}</td><td class="num">${s.pts}</td></tr>`).join('')}
+    </tbody></table></div>`:'<div class="note txt-muted mt">Aucun point pour l’instant. Seuls la KZ, la F4, la F3 et la F2 en rapportent.</div>'}
+  </div>`;
+
+  // palmarès
+  if(p.palmares.length){
+    h += `<div class="card"><h2>Palmarès</h2><div class="tw"><table>
+      <thead><tr><th>Saison</th><th>Catégorie</th><th>Écurie</th><th>Class.</th><th class="num">Pts</th><th class="num">V</th><th class="num">P</th></tr></thead><tbody>
+      ${p.palmares.slice().reverse().map((x,i)=>{
+        const hi=S.historique.filter(z=>z.annee===x.annee)[0]||{};
+        return `<tr><td>${x.annee}</td><td>${CAT[x.catId].nom}</td><td>${escapeHtml(hi.ecurie||'—')}</td>
+        <td><span class="pos p${x.pos<=3?x.pos:''}">${x.pos}</span></td><td class="num">${x.pts}</td>
+        <td class="num">${x.victoires}</td><td class="num">${x.podiums}</td></tr>`;}).join('')}
+    </tbody></table></div></div>`;
+  }
+
+  h += `<div class="card"><h2>Parcours</h2>${echelle(p.catId)}
+    <div class="note txt-muted mt">Karting Mini → Cadet → Junior → Senior → KZ → F4 → F3 → F2 → F1</div></div>`;
+
+  $('#v-pilote').innerHTML = h;
+}
+
+/* -------------------------- ÉCRAN : SCOUTING (pas encore de pilote) */
+function renderScouting(){
+  const rp=repPalier(S.manager.repPoints);
+  const sc=staffNiv('scout');
+  let h = `<div class="card accent"><h2>Repérage</h2>
+    <div class="note mb">Votre réputation (« ${rp.nom} ») détermine qui accepte de vous rencontrer.
+    ${sc? `Votre scout ${NIV_LABEL[sc].toLowerCase()} affine les estimations.` : `<b class="txt-amber">Vous n’avez aucun scout :</b> les estimations sont très larges.`}</div>
+    <div class="note txt-muted">Vous ne verrez <b>jamais</b> la valeur exacte d’un jeune. Une observation supplémentaire (payante) resserre la fourchette.</div>
+    ${!sc?`<button class="btn-ghost btn-sm mt" data-act="tab" data-tab="staff">Recruter un scout</button>`:''}
+  </div>`;
+
+  for(const c of S.monde.scoutPool){
+    const noteEst = estimTexte(c, notePilote(c), 'note');
+    const pot = estimPotentiel(c);
+    const coutObs = 400 + c.observe*700 + CAT[c.catId].niv*450;
+    h += `<div class="card">
+      <div class="row" style="align-items:flex-start">
+        <div style="flex:1">
+          <div style="font-family:var(--cond);font-size:19px;font-weight:700">${escapeHtml(c.nom)}</div>
+          <div class="note">${c.age} ans · ${c.pays} · ${CAT[c.catId].nom}</div>
+        </div>
+        <div class="center">
+          <div class="l small txt-muted">NOTE ESTIMÉE</div>
+          <div style="font-family:var(--cond);font-size:24px;font-weight:700;color:var(--amber)">${noteEst}</div>
+        </div>
+      </div>
+      <div class="hr"></div>
+      <div class="row" style="gap:14px">
+        <div><div class="small txt-muted">Potentiel estimé</div><div class="b">${pot}</div></div>
+        <div><div class="small txt-muted">Observations</div><div class="b">${c.observe} · marge ±${round(marge(c),1)}</div></div>
+      </div>
+      <div class="row tight mt">${traitsRevele(c).map(t=>tag(TRAITS[t].nom,TRAITS[t].coul)).join('') || tag('Personnalité inconnue','t-grey')}</div>
+      <div class="mt">${STAT_GROUPES.map(g=>{
+        const v = noteGroupe(c,g.id);
+        return `<div class="stat-line"><span class="n">${g.nom}</span>
+          <span class="bar"><i style="width:${clamp(v,0,99)}%;opacity:.55"></i></span>
+          <span class="v" style="width:70px;flex:0 0 70px">${estimTexte(c,v,g.id)}</span></div>`;
+      }).join('')}</div>
+      <div class="row mt">
+        <button class="btn-ghost btn-sm" data-act="observer" data-id="${c.id}">Observer — ${fmtEur(coutObs)}</button>
+        <div class="spacer"></div>
+        <button class="btn btn-sm" data-act="signerPilote" data-id="${c.id}">Proposer un management</button>
+      </div>
+    </div>`;
+  }
+  h += `<div class="card flat"><div class="note txt-muted">Le vivier se renouvelle à chaque nouvelle saison, et s’élargit avec votre réputation.</div></div>`;
+  $('#v-pilote').innerHTML = h;
+}
+function traitsRevele(c){
+  const niv=staffNiv('scout');
+  if(niv>=4 || c.observe>=3) return c.traits;
+  if(niv>=2 || c.observe>=2) return c.traits.slice(0,2);
+  if(niv>=1 || c.observe>=1) return c.traits.slice(0,1);
+  return [];
+}
+ACTIONS.observer = d=>{
+  const c=S.monde.scoutPool.find(x=>x.id===d.id); if(!c) return;
+  const cout = 400 + c.observe*700 + CAT[c.catId].niv*450;
+  if(S.manager.budget<cout){ showToast('Trésorerie insuffisante'); return; }
+  argent('Observation — '+c.nom, -cout, 'scouting');
+  c.observe++;
+  saveGame(); render();
+  showToast('Fourchette resserrée : ±'+round(marge(c),1));
+};
+ACTIONS.signerPilote = d=>{
+  const c=S.monde.scoutPool.find(x=>x.id===d.id); if(!c) return;
+  const rp=repPalier(S.manager.repPoints).p;
+  // Un jeune très prometteur ne signe pas avec n'importe qui
+  const exigence = CAT[c.catId].niv*0.9 + (c.potId-1)*1.1;
+  const proba = clamp(0.45 + (rp-exigence)*0.13, 0.08, 0.97);
+  openModal('Proposer un management',
+    `<div class="note mb">Vous proposez à <b>${escapeHtml(c.nom)}</b> (et à son entourage) de le représenter.</div>
+     <div class="note mb">Votre réputation : <b>${rp}/10</b>. Chances estimées d’acceptation : <b>${Math.round(proba*100)} %</b>.</div>
+     <div class="note txt-muted">Un refus ne coûte rien d’autre que du temps — mais un jeune approché trop tôt se souvient de vous.</div>`,
+    `<button class="btn-ghost" data-act="fermerModal">Annuler</button>
+     <button class="btn" data-act="confirmSignerPilote" data-id="${c.id}" data-proba="${proba}">Faire la proposition</button>`);
+};
+ACTIONS.confirmSignerPilote = d=>{
+  const c=S.monde.scoutPool.find(x=>x.id===d.id); if(!c) return;
+  if(Math.random() > +d.proba){
+    c.refus=(c.refus||0)+1;
+    closeModal(); render();
+    showToast(c.nom+' décline votre proposition');
+    return;
+  }
+  c.role='joueur'; c.relation=58; c.moral=Math.max(c.moral,62);
+  S.pilote=c;
+  S.monde.scoutPool = S.monde.scoutPool.filter(x=>x.id!==c.id);
+  creerRivaux();
+  S.phase='intersaison';
+  S.actions=6;
+  S.contrat=null;
+  majSponsorsProspects();
+  msg('pilote', c.nom, 'Ravi de travailler avec vous',
+    `« Merci de croire en moi. Maintenant il faut trouver de quoi rouler. »\n\n`+
+    `Prochaine étape : lui trouver un baquet (onglet Contrats) puis financer la saison (onglet Sponsors).`);
+  closeModal(); saveGame(); go('bureau');
+  showToast(c.nom+' rejoint votre écurie de management');
+};
+ACTIONS.fermerModal = ()=>closeModal();
+
+/* ------------------------------------------------ ÉCRAN : MESSAGERIE */
+const MSG_TAG = {sponsor:['Sponsor','t-green'], ecurie:['Écurie','t-red'], pilote:['Pilote','t-blue'],
+  presse:['Presse','t-purple'], scout:['Scout','t-amber'], systeme:['Officiel','t-grey'], finance:['Finances','t-amber']};
+function renderInbox(){
+  let h = `<div class="row mb"><div class="sect-title" style="margin:0">Messagerie</div><div class="spacer"></div>
+    <button class="btn-ghost btn-sm" data-act="toutLu">Tout marquer comme lu</button></div>`;
+  if(!S.inbox.length) h += `<div class="card"><div class="empty">Aucun message.</div></div>`;
+  for(const m of S.inbox){
+    const t = MSG_TAG[m.type]||['Info','t-grey'];
+    h += `<div class="msg ${m.lu?'':'unread'}" data-act="ouvrirMsg" data-id="${m.id}">
+      <div class="top"><span class="fr">${escapeHtml(m.from)}</span>${tag(t[0],t[1])}<span class="spacer"></span><span>${escapeHtml(m.date)}</span></div>
+      <div class="sj">${escapeHtml(m.sujet)}</div>
+      ${m.ouvert?`<div class="bd">${m.corps}</div>
+        ${m.reponse?`<div class="quote"><span class="who">Suite donnée</span>${escapeHtml(m.reponse)}</div>`:''}
+        ${m.actions?renderMsgActions(m):''}`:''}
+    </div>`;
+  }
+  $('#v-inbox').innerHTML = h;
+}
+function renderMsgActions(m){
+  if(m.actions.kind==='demandePilote'){
+    const d = DEMANDES_PILOTE.find(x=>x.id===m.actions.demandeId);
+    return `<div class="msg-actions">`+d.options.map((o,i)=>
+      `<button class="btn-ghost btn-sm" data-act="repDemande" data-id="${m.id}" data-i="${i}">${escapeHtml(o.lab)}</button>`).join('')+`</div>`;
+  }
+  return '';
+}
+ACTIONS.ouvrirMsg = d=>{
+  const m=S.inbox.find(x=>x.id===d.id); if(!m) return;
+  m.lu=true; m.ouvert=!m.ouvert;
+  saveGame();
+  if(UI.tab!=='inbox'){ go('inbox'); } else render();
+};
+ACTIONS.toutLu = ()=>{ S.inbox.forEach(m=>m.lu=true); saveGame(); render(); };
+ACTIONS.repDemande = d=>{
+  const m=S.inbox.find(x=>x.id===d.id); if(!m||!m.actions) return;
+  const r = repondreDemande(m, +d.i);
+  if(r) showToast(r.txt.slice(0,80));
+  render();
+};
+
+/* ------------------------------------------- ÉCRAN : WEEK-END */
+function renderWeekend(){
+  if(S.phase!=='weekend' || !S.weekend){
+    $('#v-weekend').innerHTML = `<div class="card"><div class="empty">Aucun week-end de course en cours.<br>Lancez-le depuis le Bureau.</div></div>`;
+    return;
+  }
+  const w=S.weekend, sa=S.saison, course=sa.calendrier[w.courseIdx], meteo=METEOS.find(m=>m.id===w.meteoId);
+  const et = w.etape>=w.etapes.length ? 'debrief' : w.etapes[w.etape];
+  let h='';
+
+  h += `<div class="card">
+    <div class="row"><div style="flex:1">
+      <div class="sect-title" style="margin:0">${escapeHtml(course.nom)}</div>
+      <div class="note">${course.pays} · circuit ${course.type.toLowerCase()} · manche ${w.courseIdx+1}/${sa.calendrier.length}</div>
+    </div>
+    <div class="center"><div style="font-size:26px">${meteo.ico}</div><div class="small txt-2">${meteo.nom}</div></div></div>
+    <div class="strip mt">
+      ${w.etapes.map((e,i)=>`<div class="it">${i<w.etape?'✓':i===w.etape?'▶':'·'} <b class="${i===w.etape?'txt-red':''}">${ETAPE_NOM[e]}</b></div>`).join('<div class="sep"></div>')}
+      <div class="sep"></div><div class="it">${w.etape>=w.etapes.length?'▶ <b class="txt-red">Débrief</b>':'· Débrief'}</div>
+    </div>
+  </div>`;
+
+  if(et==='libres'||et==='essais') h += vueEssais(course, meteo);
+  else if(et==='qualifs')          h += vueQualifs(course);
+  else if(et==='course')           h += vueCourse(course, meteo);
+  else                             h += vueDebrief(course);
+
+  $('#v-weekend').innerHTML = h;
+  // brancher les sliders
+  $$('input[data-setup]').forEach(inp=>{
+    inp.oninput = e=>{
+      S.weekend.setup[e.target.dataset.setup] = +e.target.value;
+      const lab = e.target.closest('.setup-row').querySelector('.lab span');
+      if(lab) lab.textContent = e.target.value;
+    };
+    inp.onchange = ()=>saveGame();
+  });
+}
+
+function vueEssais(course, meteo){
+  const w=S.weekend, params=setupParams(S.saison.catId);
+  const sc = scoreReglages(course, w.setup, S.pilote).score;
+  const ing = staffNiv('ingenieur');
+  let h = `<div class="card"><h2>Réglages<span class="hint">${w.runsRestants} run(s) restant(s)</span></h2>
+    <div class="note mb">Chaque circuit a un réglage optimal <b>caché</b>, décalé par les préférences du pilote.
+    Vous le cherchez par essais successifs — et vous repartez de zéro au circuit suivant.</div>
+    ${params.map(p=>`<div class="setup-row">
+      <div class="lab"><b>${p.n}</b><span>${w.setup[p.k]}</span></div>
+      <input type="range" min="1" max="20" step="1" value="${w.setup[p.k]}" data-setup="${p.k}">
+    </div>`).join('')}
+    <div class="row mt">
+      <button class="btn" style="flex:1" data-act="faireRun" ${w.runsRestants<=0?'disabled':''}>Envoyer en piste</button>
+      <button class="btn-ghost" data-act="etapeSuivante">Passer à « ${ETAPE_NOM[w.etapes[w.etape+1]]} »</button>
+    </div>
+    ${w.runsRestants<=0?`<div class="note warn mt">Plus de temps de piste : ce sera avec ces réglages.</div>`:''}
+  </div>`;
+
+  if(w.runs.length){
+    h += `<div class="card"><h2>Retour du pilote<span class="hint">${ing?NIV_LABEL[ing]+' à l’ingénierie':'Aucun ingénieur'}</span></h2>`;
+    w.runs.slice(0,3).forEach((r,i)=>{
+      h += `<div class="${i?'mt2':''}">
+        <div class="row tight"><b class="small">Run ${r.n}</b>${tag('Réglages '+Math.round(r.score)+'/100', r.score>78?'t-green':r.score>55?'t-amber':'t-red')}</div>
+        ${r.lignes.map(l=>`<div class="quote"><span class="who">${escapeHtml(S.pilote.nom)}</span>${escapeHtml(l)}</div>`).join('')}
+        <div class="note txt-muted">${escapeHtml(r.ing)}</div>
+      </div>`;
+    });
+    h += `</div>`;
+  }else{
+    h += `<div class="card flat"><div class="note">Envoyez le pilote en piste pour obtenir ses sensations. Sans ingénieur de course, il décrira ce qu’il ressent sans que personne ne sache quoi en faire.</div></div>`;
+  }
+  h += `<div class="card flat"><div class="note txt-muted">Indicateur interne (non visible en jeu réel) — qualité actuelle des réglages : <b>${Math.round(sc)}/100</b>.
+    Ce score alimente la variable <i>Réglages</i> de la formule de course, pour 15 % de la performance.</div></div>`;
+  return h;
+}
+
+function vueQualifs(course){
+  const w=S.weekend;
+  if(!w.grille){
+    return `<div class="card accent"><h2>Qualifications</h2>
+      <div class="note mb">Un tour lancé, sans trafic, avec les réglages trouvés en essais. La grille de départ compte beaucoup — surtout sur un circuit ${course.type.toLowerCase()}.</div>
+      <button class="btn btn-cta btn-block" data-act="etapeSuivante">Lancer les qualifications</button></div>`;
+  }
+  const moi = w.grille.find(g=>g.id===S.pilote.id);
+  let h = `<div class="card"><h2>Grille de départ<span class="hint">${ordinal(moi.pos)} sur ${w.grille.length}</span></h2>
+    <div class="tw"><table><thead><tr><th>Pos</th><th>Pilote</th><th>Écurie</th></tr></thead><tbody>
+    ${w.grille.slice(0,14).map(g=>`<tr class="${g.moi?'me':''}"><td><span class="pos p${g.pos<=3?g.pos:''}">${g.pos}</span></td>
+      <td>${escapeHtml(g.nom)}</td><td class="txt-2">${escapeHtml(g.ecurie)}</td></tr>`).join('')}
+    ${moi.pos>14?`<tr class="me"><td><span class="pos">${moi.pos}</span></td><td>${escapeHtml(moi.nom)}</td><td class="txt-2">${escapeHtml(moi.ecurie)}</td></tr>`:''}
+    </tbody></table></div>
+    <button class="btn btn-cta btn-block mt" data-act="etapeSuivante">Aller à la course</button></div>`;
+  return h;
+}
+
+function vueCourse(course, meteo){
+  const w=S.weekend;
+  const moi = w.grille ? w.grille.find(g=>g.id===S.pilote.id) : null;
+  const kart = CAT[S.saison.catId].format==='kart';
+  let h = `<div class="card"><h2>Stratégie de course</h2>
+    <div class="note mb">Départ ${moi?`en ${ordinal(moi.pos)} position`:''} · ${meteo.nom.toLowerCase()}.
+    ${kart?'En karting, pas d’arrêt : tout se joue sur la gestion des pneus et l’agressivité.':'Une stratégie agressive gagne du temps mais use le matériel et augmente le risque d’abandon.'}</div>
+    <div class="pills mb">${STRATS.map(s=>`<button class="pill ${w.strat===s.id?'on':''}" data-act="setStrat" data-id="${s.id}">${s.nom}</button>`).join('')}</div>
+    <div class="note">${escapeHtml(STRATS.find(s=>s.id===w.strat).desc)}</div>
+    <button class="btn btn-cta btn-block mt" data-act="lancerCourse">Départ</button>
+  </div>`;
+  return h;
+}
+
+function vueDebrief(course){
+  const w=S.weekend, r=w.resultat, sa=S.saison;
+  if(!r) return `<div class="card"><div class="empty">—</div></div>`;
+  const moi = r.classement.find(x=>x.moi);
+  let h = `<div class="card ${moi.pos===1?'accent':''}"><h2>Résultat — ${escapeHtml(course.nom)}</h2>
+    <div class="row" style="align-items:center;gap:16px">
+      <div class="center"><div class="pos p${moi.pos<=3?moi.pos:''}" style="font-size:44px;width:auto">${moi.abandon?'AB':moi.pos}</div>
+        <div class="small txt-muted">${moi.abandon?escapeHtml(moi.abandon):'à l’arrivée'}</div></div>
+      <div style="flex:1">
+        <div class="note">Parti ${r.grillePos?ordinal(r.grillePos):'—'} · réglages ${Math.round(r.reglages)}/100${r.rapide?' (simulation rapide)':''}</div>
+        <div class="note mt">Points marqués : <b>${moi.abandon?0:pointsPour(sa.catId,moi.pos)}</b> · total saison <b>${sa.pts}</b> (${ordinal(positionChampionnat())} au général)</div>
+      </div>
+    </div>
+    <div class="log mt">${r.log.map(l=>`<div class="li ${l.c}"><span class="lp">${escapeHtml(l.t)}</span><span>${escapeHtml(l.s)}</span></div>`).join('')}</div>
+  </div>`;
+
+  h += `<div class="card"><h2>Classement de la course</h2><div class="tw"><table>
+    <thead><tr><th>Pos</th><th>Pilote</th><th>Écurie</th><th></th></tr></thead><tbody>
+    ${r.classement.slice(0,12).map(x=>`<tr class="${x.moi?'me':''}">
+      <td><span class="pos p${x.pos<=3&&!x.abandon?x.pos:''}">${x.abandon?'AB':x.pos}</span></td>
+      <td>${escapeHtml(x.nom)}</td><td class="txt-2">${escapeHtml(x.ecurie)}</td>
+      <td>${x.abandon?tag(x.abandon,'t-red'):''}</td></tr>`).join('')}
+    ${moi.pos>12?`<tr class="me"><td><span class="pos">${moi.abandon?'AB':moi.pos}</span></td><td>${escapeHtml(moi.nom)}</td>
+      <td class="txt-2">${escapeHtml(moi.ecurie)}</td><td>${moi.abandon?tag(moi.abandon,'t-red'):''}</td></tr>`:''}
+  </tbody></table></div></div>`;
+
+  // conférence de presse
+  if(w.presse && !w.presse.repondu){
+    h += `<div class="card accent"><h2>Conférence de presse</h2>
+      <div class="quote"><span class="who">Journaliste</span>${escapeHtml(w.presse.q)}</div>
+      ${REPONSES_PRESSE.map(rp=>`<button class="choice" data-act="repPresse" data-id="${rp.id}">
+        <b>${escapeHtml(rp.lab)}</b><small>${escapeHtml(rp.desc)}</small></button>`).join('')}
+      <div class="note txt-muted">Chaque réponse joue sur trois jauges : moral du pilote, relation avec l’écurie, image médiatique.</div>
+    </div>`;
+  }else if(w.presse){
+    h += `<div class="card"><h2>Conférence de presse</h2>
+      <div class="quote"><span class="who">Journaliste</span>${escapeHtml(w.presse.q)}</div>
+      <div class="note">Votre réponse : <b>${escapeHtml(w.presse.repondu)}</b></div></div>`;
+  }
+
+  h += `<div class="card"><h2>Après la course</h2>
+    <div class="row">
+      <button class="btn-ghost" data-act="modalDiscussion">Parler au pilote</button>
+      <div class="spacer"></div>
+      <button class="btn btn-cta" data-act="finirWeekend">${sa.courseIndex+1>=sa.calendrier.length?'Clore la saison':'Passer à la suite'}</button>
+    </div></div>`;
+  return h;
+}
+
+ACTIONS.faireRun = ()=>{ faireRun(); render(); };
+ACTIONS.etapeSuivante = ()=>{ etapeSuivante(); render(); };
+ACTIONS.setStrat = d=>{ S.weekend.strat=d.id; saveGame(); render(); };
+ACTIONS.lancerCourse = ()=>{ lancerCourse(false); render(); };
+ACTIONS.repPresse = d=>{ repondrePresse(d.id); render(); };
+ACTIONS.finirWeekend = ()=>{
+  finirWeekend();
+  go('bureau');
+  if(S.phase==='finSaison') ACTIONS.bilanSaison();
+};
+
+/* ------------------------------------------------ ÉCRAN : SPONSORS */
+function renderSponsors(){
+  if(!S.pilote){ $('#v-sponsors').innerHTML=`<div class="card"><div class="empty">Trouvez d’abord un pilote.</div></div>`; return; }
+  const libres = slotsLibres(), rp=repPalier(S.manager.repPoints).p;
+  const totalActif = sum(S.sponsors.actifs, s=>s.montant);
+  let h='';
+
+  h += `<div class="kpis">
+    ${kpi('Emplacements', S.sponsors.actifs.length+' / '+slotsSponsors(), CAT[S.pilote.catId].court, libres?'':'amber')}
+    ${kpi('Budget sponsors', fmtEur(totalActif), 'par saison', totalActif?'green':'')}
+    ${kpi('Actions', S.actions, 'cette semaine', S.actions?'':'red')}
+    ${S.saison?kpi('Coût saison', fmtEur(S.saison.coutTotal), CAT[S.saison.catId].nom,''):kpi('Coût saison','—','hors saison','')}
+  </div>`;
+
+  h += `<div class="card flat"><div class="note">
+    <b>L’argent des sponsors ne va pas dans votre poche.</b> Il alimente la caisse de saison qui paie engagements,
+    pneus et transport. Vous touchez <b>15 % de commission</b> à la signature. C’est votre vrai métier :
+    sans sponsors, la saison ne se court pas.</div></div>`;
+
+  // actifs
+  h += `<div class="card"><h2>Partenaires actifs</h2>`;
+  if(!S.sponsors.actifs.length) h += `<div class="empty">Aucun sponsor. Le pilote roule à crédit — le vôtre.</div>`;
+  for(const s of S.sponsors.actifs){
+    h += `<div class="offer">
+      <div class="oh"><b>${escapeHtml(s.nom)}</b>${tag(SPONSOR_NIVEAUX[s.niv-1].lab,'t-green')}<div class="spacer"></div>
+        <span class="num" style="font-size:17px">${fmtEur(s.montant)}</span></div>
+      <div class="note">Secteur : ${escapeHtml(s.secteur)} · contrat ${s.duree} an(s) restant(s)
+        ${s.objectifPos?` · prime conditionnelle (${Math.round(s.partConditionnelle*100)} %) si ${ordinal(s.objectifPos)} au championnat`:''}</div>
+      <div class="row tight mt">${s.obligations.map(o=>tag(OBLIGATIONS.find(x=>x.id===o).lab,'t-grey')).join('')}</div>
+    </div>`;
+  }
+  h += `</div>`;
+
+  // prospects
+  h += `<div class="card"><h2>Sponsors à démarcher<span class="hint">réputation ${rp}/10</span></h2>`;
+  if(!S.sponsors.prospects.length) h += `<div class="empty">Aucune piste. Faites grimper votre réputation.</div>`;
+  for(const s of S.sponsors.prospects){
+    const N=SPONSOR_NIVEAUX[s.niv-1];
+    const pr = probaSponsor(s);
+    const conflit = secteursOccupes().includes(s.secteur);
+    h += `<div class="offer ${pr>0.6?'best':''}">
+      <div class="oh"><b>${escapeHtml(s.nom)}</b>${tag(N.lab, s.niv>=4?'t-purple':s.niv>=3?'t-blue':'t-grey')}
+        <div class="spacer"></div><span class="num" style="font-size:17px">${fmtEur(s.montant)}</span></div>
+      <div class="omat">
+        <div><div class="l">Intérêt</div><div class="v ${pr>0.6?'txt-green':pr>0.3?'txt-amber':'txt-red'}">${Math.round(pr*100)} %</div></div>
+        <div><div class="l">Secteur</div><div class="v" style="font-size:12px">${escapeHtml(s.secteur)}</div></div>
+        <div><div class="l">Durée</div><div class="v">${s.duree} an</div></div>
+        <div><div class="l">Dossier</div><div class="v">${fmtEur(N.coutDemarche)}</div></div>
+      </div>
+      <div class="note">Attend un manager de palier ≥ ${s.exigeRepManager} et un pilote d’au moins ${s.exigeRepPilote} de réputation.</div>
+      <div class="row tight mt">${s.obligations.map(o=>tag(OBLIGATIONS.find(x=>x.id===o).lab,'t-grey')).join('')}</div>
+      ${conflit?`<div class="note warn mt">⚠ Conflit de secteur avec un partenaire déjà en place — signature impossible.</div>`:''}
+      ${s.approches?`<div class="note txt-muted mt">${s.approches} approche(s) déjà effectuée(s).</div>`:''}
+      <div class="row mt">
+        <div class="spacer"></div>
+        <button class="btn btn-sm" data-act="demarcher" data-id="${s.id}"
+          ${(S.actions<=0||S.manager.budget<N.coutDemarche||conflit||libres<=0)?'disabled':''}>Démarcher</button>
+      </div>
+    </div>`;
+  }
+  h += `</div>`;
+  $('#v-sponsors').innerHTML = h;
+}
+ACTIONS.demarcher = d=>{
+  const s=S.sponsors.prospects.find(x=>x.id===d.id);
+  const issue = demarcher(d.id);
+  if(!issue){ render(); return; }
+  let body='', foot='';
+  if(issue.type==='accepte'){
+    body = `<div class="quote"><span class="who">${escapeHtml(s.nom)}</span>Nous acceptons votre dossier. Nous nous engageons sur la saison au montant proposé.</div>
+      <div class="note">Montant : <b>${fmtEurFull(issue.montant)}</b> · votre commission : <b>${fmtEurFull(Math.round(issue.montant*0.15))}</b>.</div>`;
+    foot = `<button class="btn-ghost" data-act="fermerModal">Décliner</button>
+            <button class="btn" data-act="signSponsor" data-id="${s.id}" data-m="${issue.montant}">Signer</button>`;
+  }else if(issue.type==='contre'){
+    body = `<div class="quote"><span class="who">${escapeHtml(s.nom)}</span>Le projet nous intéresse, mais pas à ce prix. Voici ce que nous pouvons mettre.</div>
+      <div class="note">Contre-proposition : <b>${fmtEurFull(issue.montant)}</b> au lieu de ${fmtEurFull(s.montant)}.</div>
+      <div class="note txt-muted mt">Vous pouvez accepter, ou relancer plus tard avec de meilleurs résultats.</div>`;
+    foot = `<button class="btn-ghost" data-act="fermerModal">Refuser</button>
+            <button class="btn" data-act="signSponsor" data-id="${s.id}" data-m="${issue.montant}">Accepter</button>`;
+  }else if(issue.type==='definitif'){
+    S.sponsors.prospects = S.sponsors.prospects.filter(x=>x.id!==s.id);
+    body = `<div class="quote"><span class="who">${escapeHtml(s.nom)}</span>Nous vous avons déjà répondu. Le dossier est clos pour cette saison.</div>`;
+    foot = `<button class="btn" data-act="fermerModal">Fermer</button>`;
+  }else{
+    body = `<div class="quote"><span class="who">${escapeHtml(s.nom)}</span>${escapeHtml(raisonRefus(s))}</div>
+      <div class="note txt-muted">Le dossier reste ouvert. Revenez avec de meilleurs résultats, une meilleure image, ou un attaché de presse.</div>`;
+    foot = `<button class="btn" data-act="fermerModal">Fermer</button>`;
+  }
+  openModal('Démarchage — '+s.nom, body, foot);
+  render();
+};
+function raisonRefus(s){
+  const rp=repPalier(S.manager.repPoints).p, p=S.pilote;
+  if(rp < s.exigeRepManager) return 'Nous ne vous connaissons pas assez. Revenez quand votre nom circulera davantage.';
+  if(p.reputation < s.exigeRepPilote) return 'Votre pilote n’a pas encore l’exposition que nous recherchons.';
+  if(S.manager.image < 35) return 'Votre communication n’est pas assez soignée pour associer notre marque.';
+  return 'Ce n’est pas le bon moment pour nous. Le budget marketing est déjà engagé ailleurs.';
+}
+ACTIONS.signSponsor = d=>{ if(signerSponsor(d.id, +d.m)) closeModal(); render(); };
+
+/* ------------------------------------------------ ÉCRAN : CONTRATS */
+function renderContrats(){
+  if(!S.pilote){ $('#v-contrats').innerHTML=`<div class="card"><div class="empty">Trouvez d’abord un pilote.</div></div>`; return; }
+  const ct=S.contrat;
+  let h='';
+  if(ct){
+    h += `<div class="card"><h2>Contrat en cours</h2>
+      <div class="row"><div style="flex:1">
+        <div style="font-family:var(--cond);font-size:21px;font-weight:700">${escapeHtml(ct.ecurieNom)}</div>
+        <div class="note">${CAT[ct.catId].nom} · signé en ${ct.anneeDebut} · ${ct.duree} an(s)</div>
+      </div>${ct.junior?tag('Programme jeunes','t-purple'):''}</div>
+      <div class="omat mt">
+        <div><div class="l">Salaire</div><div class="v">${ct.salaire?fmtEur(ct.salaire):'—'}</div></div>
+        <div><div class="l">Apport exigé</div><div class="v">${ct.apport?fmtEur(ct.apport):'0'}</div></div>
+        <div><div class="l">Objectif</div><div class="v">${ordinal(ct.objectifPos)}</div></div>
+        <div><div class="l">Prise en charge</div><div class="v">${Math.round(ct.partEcurie*100)} %</div></div>
+      </div>
+      ${gline('Relation avec l’écurie', ct.relationEcurie??60, couleurMoral(ct.relationEcurie??60))}
+      <div class="note mt">${ct.clauseLiberation?'✓ Clause de libération négociée.':'✗ Aucune clause de libération.'}
+        ${ct.bonusFidelite?` · Bonus de fidélité : ${fmtEur(ct.bonusFidelite)}.`:''}</div>
+      ${S.saison&&S.saison.avertissements?`<div class="note warn mt">⚠ ${S.saison.avertissements} avertissement(s) reçu(s) sur les résultats. Trois entraînent la rupture.</div>`:''}
+    </div>`;
+  }else{
+    h += `<div class="card"><div class="empty">Aucun contrat en cours.</div></div>`;
+  }
+
+  if(S.phase==='intersaison'){
+    h += `<div class="card accent"><h2>Marché des baquets</h2>
+      <div class="note mb">Les offres dépendent du niveau du pilote, de sa réputation, de la vôtre — et du budget que vous apportez.
+      Un pilote payant peut décrocher un baquet au-dessus de son niveau.</div>
+      <button class="btn btn-cta btn-block" data-act="ouvrirOffres">${S.offres?'Reprendre les négociations':'Consulter les offres'}</button></div>`;
+  }
+
+  // superlicence rappel
+  const tot=totalSuperlicence();
+  h += `<div class="card"><h2>Accès à la Formule 1</h2>
+    ${gline('Superlicence', tot/SUPERLIC_REQUIS*100, tot>=SUPERLIC_REQUIS?'green':'amber','%')}
+    <div class="note mt">${tot} / ${SUPERLIC_REQUIS} points sur 3 ans · âge du pilote : ${S.pilote.age} ans (18 minimum).</div>
+    <div class="note txt-muted mt">Aucune écurie de F1 ne peut engager un pilote qui n’a pas les points, quel que soit le budget apporté.</div>
+  </div>`;
+
+  if(S.historique.length){
+    h += `<div class="card"><h2>Historique de carrière</h2><div class="tw"><table>
+      <thead><tr><th>Saison</th><th>Pilote</th><th>Catégorie</th><th class="hide-s">Écurie</th><th>Class.</th><th class="num">Trésorerie</th></tr></thead><tbody>
+      ${S.historique.filter(x=>!x.type).slice().reverse().map(x=>`<tr><td>${x.annee}</td><td>${escapeHtml(x.pilote)}</td>
+        <td>${CAT[x.catId].court}</td><td class="txt-2 hide-s">${escapeHtml(x.ecurie||'—')}</td>
+        <td>${x.interrompue?tag('Interrompue','t-red'):ordinal(x.pos)}</td><td class="num">${fmtEur(x.soldeManager)}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+  }
+  $('#v-contrats').innerHTML=h;
+}
+
+/* ---------------------- OFFRES : comparaison + négociation (GDD §9.2/9.4) */
+ACTIONS.ouvrirOffres = ()=>{
+  if(!S.offres || !S.offres.length) S.offres = genererOffres();
+  saveGame();
+  afficherOffres();
+};
+function afficherOffres(){
+  const list = S.offres.filter(o=>!o.retiree);
+  if(!list.length){
+    openModal('Marché des baquets',
+      `<div class="note mb">Aucune écurie ne se manifeste. Le niveau du pilote, votre réputation ou le budget apporté ne suffisent pas.</div>
+       <div class="note txt-muted">Vous pouvez repartir dans la même catégorie avec l’écurie la plus modeste, le temps de reconstruire.</div>`,
+      `<button class="btn-ghost" data-act="fermerModal">Fermer</button>
+       <button class="btn" data-act="baquetSecours">Prendre un baquet de secours</button>`);
+    return;
+  }
+  const body = `<div class="note mb">Comparez au-delà du seul salaire : la vitesse de progression et le risque de renvoi comptent autant.</div>`
+   + list.map(o=>{
+      const c=CAT[o.catId];
+      const progr = o.junior?'Élevée' : c.niv>CAT[S.pilote.catId].niv?'Très élevée':'Moyenne';
+      return `<div class="offer">
+        <div class="oh"><b>${escapeHtml(o.ecurieNom)}</b>${tag(c.court, c.niv>CAT[S.pilote.catId].niv?'t-green':'t-grey')}
+        ${o.junior?tag('Programme jeunes','t-purple'):''}<div class="spacer"></div></div>
+        <div class="omat">
+          <div><div class="l">Salaire</div><div class="v">${o.salaire?fmtEur(o.salaire):'—'}</div></div>
+          <div><div class="l">Progression</div><div class="v" style="font-size:12.5px">${progr}</div></div>
+          <div><div class="l">Risque renvoi</div><div class="v ${o.risque>55?'txt-red':o.risque>30?'txt-amber':'txt-green'}">${o.risque} %</div></div>
+          <div><div class="l">Prestige</div><div class="v">${o.prestige}</div></div>
+        </div>
+        <div class="note">${escapeHtml(o.progression)} · voiture ${o.voiture}/100 · objectif ${ordinal(o.objectifPos)} · ${o.duree} an(s)</div>
+        <div class="note mt">${o.apport>0
+          ? `Apport à financer : <b class="txt-amber">${fmtEurFull(o.apport)}</b> (l’écurie prend ${Math.round(o.partEcurie*100)} % à sa charge)`
+          : `<b class="txt-green">Aucun apport</b> — le pilote est payé.`}
+          ${o.clauseLiberation?' · clause de libération incluse':''}</div>
+        <div class="row mt">
+          <button class="btn-ghost btn-sm" data-act="negocierOffre" data-id="${o.id}">Négocier (${o.tours} relance${o.tours>1?'s':''})</button>
+          <div class="spacer"></div>
+          <button class="btn btn-sm" data-act="accepterOffre" data-id="${o.id}">Accepter</button>
+        </div>
+      </div>`;
+    }).join('');
+  openModal('Offres — saison '+S.annee, body,
+    `<button class="btn-ghost" data-act="fermerModal">Y réfléchir</button>`);
+}
+ACTIONS.negocierOffre = d=>{
+  const o=S.offres.find(x=>x.id===d.id); if(!o) return;
+  const body = `<div class="note mb">Négocier avec <b>${escapeHtml(o.ecurieNom)}</b>. Relance n° ${o.tours+1}.</div>
+    <div class="note warn mb">Plus vous relancez, plus le risque que l’écurie se retire augmente.</div>
+    ${LEVIERS.filter(l=>l.id!=='salaire'||o.salaire>0).map(l=>
+      `<button class="choice" data-act="appliquerLevier" data-id="${o.id}" data-l="${l.id}">
+        <b>${escapeHtml(l.lab)}</b><small>${escapeHtml(l.desc)}</small></button>`).join('')}`;
+  openModal('Négociation', body, `<button class="btn-ghost" data-act="retourOffres">Retour aux offres</button>`);
+};
+ACTIONS.appliquerLevier = d=>{
+  const o=S.offres.find(x=>x.id===d.id); if(!o) return;
+  const r = negocier(o, d.l);
+  saveGame();
+  openModal(r.issue==='retrait'?'Négociation rompue':'Réponse de l’écurie',
+    `<div class="quote"><span class="who">${escapeHtml(o.ecurieNom)}</span>${escapeHtml(r.txt)}</div>`,
+    `<button class="btn" data-act="retourOffres">Retour aux offres</button>`);
+};
+ACTIONS.retourOffres = ()=>afficherOffres();
+ACTIONS.accepterOffre = d=>{
+  const o=S.offres.find(x=>x.id===d.id); if(!o) return;
+  signerOffre(o);
+  S.phase='intersaison';
+  S.offres=null;
+  closeModal(); saveGame(); go('bureau');
+  showToast('Contrat signé avec '+o.ecurieNom);
+};
+ACTIONS.baquetSecours = ()=>{
+  const catId = S.pilote.catId;
+  const e = ecuriesPour(catId).slice(-1)[0];
+  const c = CAT[catId];
+  signerOffre({id:uid(), catId, ecurieId:e.id, ecurieNom:e.nom, prestige:e.prestige, voiture:e.voiture,
+    junior:false, partEcurie:0, apport:c.cout, salaire:0, primeVictoire:0, primePoint:0, duree:1,
+    objectifPos:Math.round(c.grille*0.7), clauseLiberation:false, bonusFidelite:0, bonusVoiture:0});
+  S.phase='intersaison';
+  closeModal(); saveGame(); go('bureau');
+};
+
+/* ------------------------------------------------- ÉCRAN : STAFF */
+function renderStaff(){
+  const rp=repPalier(S.manager.repPoints).p;
+  let h = `<div class="kpis">
+    ${kpi('Masse salariale', fmtEur(staffCoutMensuel()), 'par mois', staffCoutMensuel()?'amber':'')}
+    ${kpi('Sur une saison', fmtEur(staffCoutMensuel()*12), '12 mois','')}
+    ${kpi('Trésorerie', fmtEur(S.manager.budget), 'manager', S.manager.budget<0?'red':'green')}
+  </div>`;
+  const commissions12 = sum(S.finances.filter(f=>f.type==='commission'&&f.annee>=S.annee-1), f=>f.montant);
+  h += `<div class="card flat"><div class="note">Le staff est payé sur <b>votre</b> trésorerie, pas sur la caisse de saison.
+    C’est le poste qui vous ruine en karting — et celui qui vous fait gagner ensuite.</div>
+    ${staffCoutMensuel()*12 > commissions12 ? `<div class="note warn mt">⚠ Masse salariale annuelle (${fmtEur(staffCoutMensuel()*12)})
+    supérieure à vos commissions des 12 derniers mois (${fmtEur(commissions12)}). À ce rythme, la trésorerie s’épuise.</div>`:''}
+    </div>`;
+
+  for(const r of STAFF_ROLES){
+    const cur = S.staff[r.id];
+    h += `<div class="card"><h2>${r.nom}${cur?`<span class="hint">${fmtEur(cur.salaire)}/mois</span>`:''}</h2>
+      <div class="note mb">${r.effet}</div>`;
+    if(cur){
+      h += `<div class="row"><div style="flex:1">
+        <div class="b">${escapeHtml(cur.nom)}</div>
+        <div class="note">${NIV_LABEL[cur.niv]} · niveau ${cur.niv}/5</div>
+        ${gline('Niveau', cur.niv/5*100, 'blue','')}
+      </div></div>
+      <div class="row mt"><div class="spacer"></div>
+        <button class="btn-ghost btn-sm" data-act="modalStaff" data-role="${r.id}">Remplacer</button>
+        <button class="btn-ghost btn-sm" data-act="licencier" data-role="${r.id}">Licencier</button></div>`;
+    }else{
+      h += `<div class="row"><span class="note txt-muted">Poste vacant</span><div class="spacer"></div>
+        <button class="btn btn-sm" data-act="modalStaff" data-role="${r.id}">Recruter</button></div>`;
+    }
+    h += `</div>`;
+  }
+  h += `<div class="card flat"><div class="note txt-muted">Coach mental et négociateur/avocat sont prévus en V2 (GDD §13).
+    Niveaux disponibles limités par votre réputation : ${clamp(1+Math.floor(rp/2),1,5)}/5.</div></div>`;
+  $('#v-staff').innerHTML=h;
+}
+ACTIONS.modalStaff = d=>{
+  const cands = candidatsStaff(d.role);
+  const body = cands.slice().reverse().map(c=>`<button class="choice" data-act="recruter" data-role="${c.roleId}" data-niv="${c.niv}" data-nom="${escapeHtml(c.nom)}"
+      ${S.manager.budget<c.salaire*2?'disabled':''}>
+      <b>${escapeHtml(c.nom)} — ${NIV_LABEL[c.niv]}</b>
+      <small>${fmtEurFull(c.salaire)} par mois · ${fmtEur(c.salaire*12)} sur une saison${S.manager.budget<c.salaire*2?' · trésorerie insuffisante':''}</small></button>`).join('');
+  openModal('Recruter — '+STAFF_ROLE[d.role].nom,
+    `<div class="note mb">${STAFF_ROLE[d.role].effet}</div>`+body,
+    `<button class="btn-ghost" data-act="fermerModal">Annuler</button>`);
+};
+ACTIONS.recruter = d=>{ recruterStaff(d.role, +d.niv, d.nom); closeModal(); render(); showToast('Recrutement effectué'); };
+ACTIONS.licencier = d=>{ licencierStaff(d.role); render(); showToast('Contrat rompu'); };
+
+/* --------------------------------------------- ÉCRAN : CHAMPIONNAT */
+function renderChamp(){
+  if(!S.saison){ $('#v-champ').innerHTML=`<div class="card"><div class="empty">Aucune saison en cours.</div></div>`; return; }
+  const sa=S.saison, c=CAT[sa.catId], cl=classementChampionnat();
+  let h=`<div class="card"><h2>${c.nom} ${sa.annee}<span class="hint">manche ${Math.min(sa.courseIndex+1,c.courses)}/${c.courses}</span></h2>
+    <div class="tw"><table><thead><tr><th>Pos</th><th>Pilote</th><th>Écurie</th><th class="num">Pts</th><th class="num">V</th><th class="num">P</th><th class="num">AB</th></tr></thead><tbody>
+    ${cl.slice(0,16).map(x=>`<tr class="${x.moi?'me':''}"><td><span class="pos p${x.pos<=3?x.pos:''}">${x.pos}</span></td>
+      <td>${escapeHtml(x.nom)}${x.rival?' '+tag('rival','t-amber'):''}</td><td class="txt-2">${escapeHtml(x.ecurie)}</td>
+      <td class="num">${x.pts}</td><td class="num">${x.victoires}</td><td class="num">${x.podiums}</td><td class="num">${x.abandons}</td></tr>`).join('')}
+    ${(cl.find(x=>x.moi)||{}).pos>16?(()=>{const m=cl.find(x=>x.moi);return `<tr class="me"><td><span class="pos">${m.pos}</span></td>
+      <td>${escapeHtml(m.nom)}</td><td class="txt-2">${escapeHtml(m.ecurie)}</td><td class="num">${m.pts}</td>
+      <td class="num">${m.victoires}</td><td class="num">${m.podiums}</td><td class="num">${m.abandons}</td></tr>`;})():''}
+  </tbody></table></div></div>`;
+
+  h+=`<div class="card"><h2>Calendrier</h2><div class="tw"><table>
+    <thead><tr><th>#</th><th>Circuit</th><th class="hide-s">Pays</th><th class="hide-s">Type</th><th>Résultat</th><th class="num">Pts</th></tr></thead><tbody>
+    ${sa.calendrier.map((ci,i)=>{
+      const r=sa.resultats.find(x=>x.i===i);
+      return `<tr class="${i===sa.courseIndex&&!sa.finie?'me':''}"><td class="num">${i+1}</td><td>${escapeHtml(ci.nom)}</td>
+      <td class="txt-2 hide-s">${escapeHtml(ci.pays)}</td><td class="txt-2 hide-s">${ci.type}</td>
+      <td>${r? (r.dnf?tag(r.dnf,'t-red'):`<span class="pos p${r.pos<=3?r.pos:''}" style="width:auto">${ordinal(r.pos)}</span>`) : '<span class="txt-muted">—</span>'}</td>
+      <td class="num">${r?r.pts:''}</td></tr>`;}).join('')}
+  </tbody></table></div></div>`;
+
+  // comparaison avec le coéquipier (GDD §14)
+  const coequipier = sa.grille.find(g=>g.ecurieId===sa.ecurieId);
+  if(coequipier){
+    const clC = cl.find(x=>x.id===coequipier.id)||{}, clM=cl.find(x=>x.moi)||{};
+    h+=`<div class="card"><h2>Comparaison avec le coéquipier<span class="hint">le vrai juge de paix</span></h2>
+      <div class="tw"><table><thead><tr><th></th><th>${escapeHtml(S.pilote.nom)}</th><th>${escapeHtml(coequipier.nom)}</th></tr></thead><tbody>
+        <tr><td class="txt-2">Points</td><td class="num">${clM.pts??0}</td><td class="num">${clC.pts??0}</td></tr>
+        <tr><td class="txt-2">Classement</td><td class="num">${clM.pos??'—'}</td><td class="num">${clC.pos??'—'}</td></tr>
+        <tr><td class="txt-2">Victoires</td><td class="num">${clM.victoires??0}</td><td class="num">${clC.victoires??0}</td></tr>
+        <tr><td class="txt-2">Podiums</td><td class="num">${clM.podiums??0}</td><td class="num">${clC.podiums??0}</td></tr>
+        <tr><td class="txt-2">Abandons</td><td class="num">${clM.abandons??0}</td><td class="num">${clC.abandons??0}</td></tr>
+        <tr><td class="txt-2">Note estimée</td><td class="num">${Math.round(notePilote(S.pilote))}</td><td class="num">${Math.round(coequipier.note)}</td></tr>
+      </tbody></table></div>
+      <div class="note txt-muted mt">Même voiture, même écurie : l’écart avec le coéquipier est ce que regardent réellement les recruteurs.</div>
+    </div>`;
+  }
+  $('#v-champ').innerHTML=h;
+}
+
+/* ------------------------------------------------ ÉCRAN : FINANCES */
+function renderFinances(){
+  const sa=S.saison;
+  const parType = {};
+  for(const f of S.finances.filter(f=>f.annee===S.annee)) parType[f.type]=(parType[f.type]||0)+f.montant;
+  let h=`<div class="kpis">
+    ${kpi('Trésorerie', fmtEur(S.manager.budget), 'manager', S.manager.budget<0?'red':'green')}
+    ${kpi('Commissions '+S.annee, fmtEur(parType.commission||0), 'encaissées','green')}
+    ${kpi('Staff '+S.annee, fmtEur(parType.staff||0), 'décaissé','red')}
+    ${kpi('Démarchage', fmtEur((parType.demarchage||0)+(parType.scouting||0)), 'sponsors + scouting','amber')}
+  </div>`;
+
+  if(sa){
+    const c=CAT[sa.catId], parManche=Math.round(sa.coutTotal/c.courses);
+    const restantes=c.courses-sa.courseIndex;
+    h+=`<div class="card"><h2>Caisse de saison<span class="hint">finance le pilote, pas vous</span></h2>
+      <div class="kpis" style="margin-bottom:8px">
+        ${kpi('Solde', fmtEur(sa.caisse),'disponible', sa.caisse<0?'red':sa.caisse<parManche?'amber':'green')}
+        ${kpi('Coût / manche', fmtEur(parManche), c.nom,'')}
+        ${kpi('Reste à courir', restantes+' manche(s)', fmtEur(parManche*restantes)+' à couvrir','')}
+      </div>
+      ${gline('Financement couvert', financementCouvert()*100, financementCouvert()>=1?'green':'amber','%')}
+      ${sa.priseEnCharge>0?`<div class="note mt">${escapeHtml(S.contrat?S.contrat.ecurieNom:'L’écurie')} prend
+        <b class="txt-green">${fmtEurFull(sa.priseEnCharge)}</b> à sa charge : le coût affiché ci-dessus est déjà net.</div>`:''}
+      <div class="tw mt"><table><thead><tr><th>Mouvement</th><th class="hide-s">Quand</th><th class="num">Montant</th></tr></thead><tbody>
+        ${sa.mouvements.slice(0,18).map(m=>`<tr><td class="wrap">${escapeHtml(m.lab)}</td><td class="txt-2 hide-s">${escapeHtml(m.date)}</td>
+          <td class="num ${m.montant<0?'txt-red':'txt-green'}">${fmtEur(m.montant)}</td></tr>`).join('')
+          || '<tr><td colspan="3" class="empty">Aucun mouvement</td></tr>'}
+      </tbody></table></div></div>`;
+  }
+
+  h+=`<div class="card"><h2>Compte du manager</h2><div class="tw"><table>
+    <thead><tr><th>Opération</th><th class="hide-s">Quand</th><th class="num">Montant</th></tr></thead><tbody>
+    ${S.finances.slice(0,30).map(f=>`<tr><td class="wrap">${escapeHtml(f.lab)}</td><td class="txt-2 hide-s">${escapeHtml(f.date)}</td>
+      <td class="num ${f.montant<0?'txt-red':'txt-green'}">${fmtEur(f.montant)}</td></tr>`).join('')
+      || '<tr><td colspan="3" class="empty">Aucune opération</td></tr>'}
+  </tbody></table></div></div>`;
+
+  h+=`<div class="card flat"><h2>Barème des commissions</h2><div class="tw"><table><tbody>
+    <tr><td>Gains de course</td><td class="num">10 %</td></tr>
+    <tr><td>Salaire du pilote</td><td class="num">10 %</td></tr>
+    <tr><td>Sponsors décrochés</td><td class="num">15 %</td></tr>
+    <tr><td>Transfert vers une écurie</td><td class="num">5 % à 15 %</td></tr>
+    <tr><td>Titre de champion</td><td class="num">20 % de la prime</td></tr>
+  </tbody></table></div></div>`;
+  $('#v-finances').innerHTML=h;
+}
+
+/* ------------------------------------------------ ÉCRAN : SAUVEGARDE */
+function renderSave(){
+  const st=S.stats;
+  $('#v-save').innerHTML=`
+    <div class="card"><h2>Carrière de ${escapeHtml(S.manager.nom||'Manager')}</h2>
+      <div class="kpis">
+        ${kpi('Saisons', st.saisonsJouees,'jouées','')}
+        ${kpi('Victoires', st.coursesGagnees,'en course','amber')}
+        ${kpi('Titres', st.titres,'de champion','amber')}
+        ${kpi('Sponsors', st.sponsorsSignes,'signés','green')}
+      </div>
+      <div class="note">La partie est enregistrée automatiquement dans ce navigateur après chaque action.</div>
+    </div>
+    <div class="card"><h2>Sauvegarde</h2>
+      <div class="row">
+        <button class="btn-ghost" data-act="exportSave">Exporter (fichier)</button>
+        <button class="btn-ghost" data-act="importSave">Importer</button>
+        <div class="spacer"></div>
+        <button class="btn-ghost btn-sm" style="color:var(--red)" data-act="resetSave">Effacer la partie</button>
+      </div>
+      <input type="file" id="fileImport" accept="application/json" hidden>
+      <div class="note txt-muted mt">L’export produit un fichier JSON : utile pour changer d’appareil ou garder une trace avant une décision risquée.</div>
+    </div>
+    <div class="card flat"><h2>À propos</h2>
+      <div class="note">Prototype jouable du GDD « Manager de Pilote » v0.5, limité au périmètre <b>[V1]</b> :
+      un seul pilote, 2D, boucle complète karting → F1.<br><br>
+      Circuits réels cités par leur nom, sans logo ni marque officielle. Écuries fictives.</div>
+    </div>`;
+}
+ACTIONS.exportSave = ()=>{
+  const blob=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='manager-pilote-'+S.annee+'.json';
+  a.click(); URL.revokeObjectURL(a.href);
+};
+ACTIONS.importSave = ()=>{
+  const inp=$('#fileImport');
+  inp.onchange=e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const rd=new FileReader();
+    rd.onload=()=>{ try{ const o=JSON.parse(rd.result); if(o&&o.v===1){S=o;saveGame();UI.tab='bureau';render();showToast('Partie importée');} else showToast('Fichier invalide'); }catch(err){ showToast('Fichier illisible'); } };
+    rd.readAsText(f);
+  };
+  inp.click();
+};
+ACTIONS.resetSave = ()=>{
+  openModal('Effacer la partie',
+    `<div class="note">Toute la carrière sera supprimée de ce navigateur. Cette action est définitive.</div>`,
+    `<button class="btn-ghost" data-act="fermerModal">Annuler</button>
+     <button class="btn" data-act="resetConfirm">Effacer définitivement</button>`);
+};
+ACTIONS.resetConfirm = ()=>{ wipeGame(); closeModal(); UI.tab='bureau'; render(); };
+
+/* --------------------------- MODALES : actions de préparation */
+ACTIONS.modalEntrainement = ()=>{
+  const p=S.pilote;
+  openModal('Séance d’entraînement',
+    `<div class="note mb">Une séance ciblée fait progresser un groupe de statistiques, mais fatigue le pilote.
+     La progression ralentit à mesure qu’il approche de son plafond.</div>
+     ${STAT_GROUPES.map(g=>{
+       const v=noteGroupe(p,g.id);
+       const plaf=avg(g.stats.map(s=>p.plafonds[s[0]]));
+       const marge=Math.max(0,plaf-v);
+       return `<button class="choice" data-act="entrainer" data-g="${g.id}">
+         <b>${g.nom} — ${Math.round(v)}</b>
+         <small>${g.stats.map(s=>s[1]).join(' · ')} — marge de progression restante : ${round(marge,1)} points</small></button>`;
+     }).join('')}
+     <div class="note txt-muted">Fatigue actuelle : ${Math.round(p.fatigue)}/100 ${staffNiv('prepa')?`· préparateur physique ${NIV_LABEL[staffNiv('prepa')].toLowerCase()}`:'· aucun préparateur physique'}</div>`,
+    `<button class="btn-ghost" data-act="fermerModal">Annuler</button>`);
+};
+ACTIONS.entrainer = d=>{
+  const r=entrainement(d.g); if(!r) return;
+  const lignes=Object.entries(r.gains).map(([k,v])=>`${STAT_NOM[k]} : +${round(v,2)}`).join('<br>');
+  openModal('Séance terminée',
+    `<div class="note mb">Groupe travaillé : <b>${r.groupe}</b></div><div class="note">${lignes}</div>
+     <div class="note txt-muted mt">Fatigue : ${Math.round(S.pilote.fatigue)}/100 · forme : ${Math.round(S.pilote.forme)}/100</div>`,
+    `<button class="btn" data-act="fermerEtRender">Fermer</button>`);
+};
+ACTIONS.actionRepos = ()=>{
+  const r=repos(); if(!r) return;
+  showToast('Fatigue -'+r.recup); render();
+};
+ACTIONS.modalDiscussion = ()=>{
+  const p=S.pilote;
+  const dernier = S.saison && S.saison.resultats.length ? S.saison.resultats[S.saison.resultats.length-1] : null;
+  const bon = dernier ? (dernier.pos!==null && dernier.pos<=positionAttendue()) : true;
+  openModal('Parler à '+p.nom,
+    `<div class="note mb">${dernier ? (dernier.dnf?`Dernière course : abandon (${dernier.dnf}).`:`Dernière course : ${ordinal(dernier.pos)}.`) : 'Avant le début de la saison.'}
+     Moral ${Math.round(p.moral)}/100 · relation ${Math.round(p.relation)}/100.</div>
+     <div class="row tight mb">${p.traits.map(t=>tag(TRAITS[t].nom,TRAITS[t].coul)).join('')}</div>
+     <div class="note txt-muted mb">L’effet dépend entièrement de sa personnalité. Engueuler une tête brûlée la réveille ; engueuler un pilote fragile le détruit.</div>
+     ${TONS.map(t=>`<button class="choice" data-act="tonPilote" data-t="${t.id}" data-bon="${bon?1:0}">
+       <b>${t.nom}</b><small>${t.desc}</small></button>`).join('')}`,
+    `<button class="btn-ghost" data-act="fermerModal">Ne rien dire</button>`);
+};
+ACTIONS.tonPilote = d=>{
+  if(S.phase==='semaine'){ if(S.actions<=0){ showToast('Plus d’action disponible'); return; } S.actions--; }
+  const r = parlerAuPilote(d.t, d.bon==='1');
+  saveGame();
+  openModal('Après la discussion',
+    `<div class="quote"><span class="who">${escapeHtml(S.pilote.nom)}</span>${escapeHtml(r.txt)}</div>
+     <div class="note">Moral ${r.dm>0?'+':''}${round(r.dm,1)} · relation ${r.dr>0?'+':''}${round(r.dr,1)}${r.dagr?` · agressivité +${round(r.dagr,1)}`:''}</div>`,
+    `<button class="btn" data-act="fermerEtRender">Fermer</button>`);
+};
+ACTIONS.modalDev = ()=>{
+  if(!S.saison){ showToast('Hors saison'); return; }
+  const c=CAT[S.saison.catId];
+  const paliers=[0.02,0.05,0.10].map(x=>Math.round(c.cout*x/500)*500).filter(x=>x>0);
+  openModal('Développement technique',
+    `<div class="note mb">Investir sur le matériel (châssis, aéro, moteur) améliore la performance de la voiture,
+     indépendamment du talent du pilote. L’argent sort de la <b>caisse de saison</b>.</div>
+     <div class="note mb">Voiture actuelle : <b>${Math.round(S.saison.voiture)}/100</b> · caisse : <b>${fmtEur(S.saison.caisse)}</b>
+     · déjà investi cette saison : ${fmtEur(S.saison.devDepense)}</div>
+     ${paliers.map(m=>`<button class="choice" data-act="investir" data-m="${m}" ${S.saison.caisse<m?'disabled':''}>
+       <b>${fmtEurFull(m)}</b><small>${S.saison.caisse<m?'Caisse insuffisante':'Rendement décroissant : les gros investissements rapportent proportionnellement moins.'}</small></button>`).join('')}`,
+    `<button class="btn-ghost" data-act="fermerModal">Annuler</button>`);
+};
+ACTIONS.investir = d=>{
+  const r=developpement(+d.m); if(!r) return;
+  openModal('Développement livré',
+    `<div class="note">Performance de la voiture : <b class="txt-green">+${round(r.gain,2)}</b> → ${Math.round(S.saison.voiture)}/100.</div>
+     <div class="note txt-muted mt">Caisse restante : ${fmtEur(S.saison.caisse)}</div>`,
+    `<button class="btn" data-act="fermerEtRender">Fermer</button>`);
+};
+ACTIONS.fermerEtRender = ()=>{ closeModal(); render(); };
+
+/* --------------------------------- MODALE : bilan de fin de saison */
+ACTIONS.bilanSaison = ()=>{
+  const sa=S.saison, c=CAT[sa.catId], p=S.pilote;
+  const pos=sa.posChamp||positionChampionnat();
+  const gainsCommission = sum(S.finances.filter(f=>f.annee===S.annee&&f.type==='commission'), f=>f.montant);
+  const depenses = sum(S.finances.filter(f=>f.annee===S.annee&&f.montant<0), f=>f.montant);
+  const sl = ptsSuperlicence(sa.catId,pos);
+  const body = `
+    <div class="center mb">
+      <div class="pos p${pos<=3?pos:''}" style="font-size:50px;width:auto">${pos}</div>
+      <div class="note">${ordinal(pos)} du championnat ${c.nom} ${sa.annee}</div>
+    </div>
+    <div class="omat mb">
+      <div><div class="l">Points</div><div class="v">${sa.pts}</div></div>
+      <div><div class="l">Victoires</div><div class="v">${sa.victoires}</div></div>
+      <div><div class="l">Podiums</div><div class="v">${sa.podiums}</div></div>
+      <div><div class="l">Abandons</div><div class="v">${sa.abandons}</div></div>
+    </div>
+    <div class="card flat"><h2>Bilan financier</h2>
+      <div class="tw"><table><tbody>
+        <tr><td>Commissions encaissées</td><td class="num txt-green">${fmtEurFull(gainsCommission)}</td></tr>
+        <tr><td>Dépenses du manager</td><td class="num txt-red">${fmtEurFull(depenses)}</td></tr>
+        <tr><td>Solde de caisse de saison</td><td class="num ${sa.caisse<0?'txt-red':''}">${fmtEurFull(sa.caisse)}</td></tr>
+        <tr><td><b>Trésorerie</b></td><td class="num ${S.manager.budget<0?'txt-red':'txt-green'}"><b>${fmtEurFull(S.manager.budget)}</b></td></tr>
+      </tbody></table></div>
+    </div>
+    ${sl?`<div class="note mt">Superlicence : <b>+${sl} points</b> — total ${totalSuperlicence()}/${SUPERLIC_REQUIS} sur 3 ans.</div>`:''}
+    <div class="note mt">Progression de ${escapeHtml(p.nom)} : note globale <b>${Math.round(notePilote(p))}</b> (plafond estimé ${estimTexte(p, notePlafond(p), 'plafGlobal')}).</div>
+    ${p.age>=32?`<div class="note warn mt">${p.nom} a ${p.age} ans. Le déclin physique est engagé, la retraite approche.</div>`:''}`;
+  openModal('Saison '+sa.annee+' — bilan', body,
+    `<button class="btn btn-cta" data-act="allerIntersaison">Passer à l’intersaison</button>`);
+};
+ACTIONS.allerIntersaison = ()=>{
+  passerAnneeSuivante();
+  closeModal();
+  if(S.pilote){
+    S.offres = genererOffres();
+    saveGame();
+    go('bureau');
+    afficherOffres();
+  }else{
+    go('pilote');
+  }
+};
+
+/* ------------------------------------------------------- INIT */
+function boot(){
+  const sv = loadGame();
+  if(sv){ S=sv; UI.tab = S.phase==='weekend'?'weekend':'bureau'; }
+  render();
+}
+boot();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>
