@@ -413,6 +413,23 @@ const catByNiv = n=>CATS.find(c=>c.niv===n);
    un pilote au plafond « Moyen » (78) plafonne en F3/F2 et ne s'impose jamais en F1. */
 const NIVEAU_GRILLE = {kmini:32, kcadet:40, kjunior:48, ksenior:55, kz:61, f4:67, f3:74, f2:81, f1:87};
 
+/* Conditions de changement de catégorie (GDD §8.2).
+   Trois conditions cumulatives : un résultat sportif, un budget sécurisé,
+   une écurie disposée à recruter. Le budget est le véritable filtre —
+   un champion sans argent ne monte pas.
+   Table indexée par catégorie visée. Le GDD décrit 6 paliers pour 9 échelons :
+   les trois premiers passages de karting partagent la ligne « régional → national ». */
+const MONTEE = {
+  kcadet:  {pos:5, sl:0,  age:[10,13], lib:'Top 5 au championnat'},
+  kjunior: {pos:5, sl:0,  age:[10,14], lib:'Top 5 au championnat'},
+  ksenior: {pos:5, sl:0,  age:[12,16], lib:'Top 5 au championnat'},
+  kz:      {pos:3, sl:0,  age:[13,15], lib:'Top 3 au championnat'},
+  f4:      {pos:5, sl:0,  age:[15,17], lib:'Top 5 en KZ, ou titre national', titreSuffit:true},
+  f3:      {pos:6, sl:12, age:[17,19], lib:'Top 6 au championnat + 12 points de superlicence'},
+  f2:      {pos:5, sl:25, age:[18,21], lib:'Top 5 au championnat + 25 points de superlicence'},
+  f1:      {pos:4, sl:40, age:[19,24], lib:'Top 4 au championnat + 40 points de superlicence'},
+};
+
 /* Points de superlicence FIA (GDD §8.2 — 40 pts sur 3 ans) */
 const SUPERLIC = {
   f2:[40,40,40,30,20,10,8,6,4,3],
@@ -495,30 +512,34 @@ const setupParams = catId => CAT[catId].format==='kart' ? SETUP_KART : SETUP_MON
 
 /* --- 1.4 Écuries fictives (GDD §9.1) --- */
 // voiture = performance du matériel (0-100) ; exig = note pilote attendue ; apport = € demandés au pilote
+/* L'écart de matériel entre écuries se creuse à mesure qu'on monte l'échelle.
+   En karting les châssis sont proches et tout se joue au pilote ; en F1 la
+   voiture décide largement. Sans ce gradient, un excellent pilote restait
+   bloqué en milieu de grille en karting, ce qui n'a aucun sens. */
 const ECURIES = {
   kart:[
-    {id:'kt1',nom:'Rapida Kart',        prestige:70,voiture:88,fiab:92},
-    {id:'kt2',nom:'Vertigo Racing Kart',prestige:62,voiture:83,fiab:90},
-    {id:'kt3',nom:'Team Chicane',       prestige:52,voiture:77,fiab:89},
-    {id:'kt4',nom:'Piste Nord',         prestige:42,voiture:71,fiab:87},
-    {id:'kt5',nom:'Écurie Bellevue',    prestige:32,voiture:64,fiab:85},
-    {id:'kt6',nom:'Kart Passion 45',    prestige:22,voiture:57,fiab:82},
+    {id:'kt1',nom:'Rapida Kart',        prestige:70,voiture:90,fiab:92},
+    {id:'kt2',nom:'Vertigo Racing Kart',prestige:62,voiture:87,fiab:90},
+    {id:'kt3',nom:'Team Chicane',       prestige:52,voiture:84,fiab:89},
+    {id:'kt4',nom:'Piste Nord',         prestige:42,voiture:81,fiab:87},
+    {id:'kt5',nom:'Écurie Bellevue',    prestige:32,voiture:78,fiab:85},
+    {id:'kt6',nom:'Kart Passion 45',    prestige:22,voiture:75,fiab:82},
   ],
   f4:[
-    {id:'f4a',nom:'Aurora Motorsport',  prestige:74,voiture:88,fiab:90},
-    {id:'f4b',nom:'Prisme Racing',      prestige:66,voiture:83,fiab:89},
-    {id:'f4c',nom:'Vulcano Corse',      prestige:57,voiture:78,fiab:87},
-    {id:'f4d',nom:'Meridian Junior',    prestige:47,voiture:72,fiab:86},
-    {id:'f4e',nom:'Cobalt Racing',      prestige:37,voiture:66,fiab:84},
-    {id:'f4f',nom:'Team Ardennes',      prestige:27,voiture:59,fiab:81},
+    {id:'f4a',nom:'Aurora Motorsport',  prestige:74,voiture:90,fiab:90},
+    {id:'f4b',nom:'Prisme Racing',      prestige:66,voiture:86,fiab:89},
+    {id:'f4c',nom:'Vulcano Corse',      prestige:57,voiture:82,fiab:87},
+    {id:'f4d',nom:'Meridian Junior',    prestige:47,voiture:78,fiab:86},
+    {id:'f4e',nom:'Cobalt Racing',      prestige:37,voiture:74,fiab:84},
+    {id:'f4f',nom:'Team Ardennes',      prestige:27,voiture:70,fiab:81},
   ],
   f3:[
     {id:'f3a',nom:'Aurora Motorsport',  prestige:80,voiture:90,fiab:91},
-    {id:'f3b',nom:'Vulcano Corse',      prestige:72,voiture:86,fiab:90},
+    {id:'f3b',nom:'Vulcano Corse',      prestige:72,voiture:85,fiab:90},
     {id:'f3c',nom:'Prisme Racing',      prestige:64,voiture:81,fiab:88},
     {id:'f3d',nom:'Northgate GP',       prestige:55,voiture:76,fiab:87},
-    {id:'f3e',nom:'Meridian Junior',    prestige:45,voiture:70,fiab:85},
-    {id:'f3f',nom:'Cobalt Racing',      prestige:34,voiture:63,fiab:82},
+    {id:'f3e',nom:'Meridian Junior',    prestige:45,voiture:71,fiab:85},
+    {id:'f3f',nom:'Cobalt Racing',      prestige:34,voiture:66,fiab:82},
   ],
   f2:[
     {id:'f2a',nom:'Aurora Motorsport',  prestige:86,voiture:92,fiab:91},
@@ -1285,9 +1306,11 @@ function etapeSuivante(){
 function simulationRapide(){
   ouvrirWeekend();
   const w=S.weekend, course=S.saison.calendrier[w.courseIdx], meteo=METEOS.find(m=>m.id===w.meteoId);
-  // Sans travail d'essais, les réglages valent ce que vaut l'ingénieur.
-  const base = 34 + staffNiv('ingenieur')*8 + rnd(10,-5);
-  w.setupAuto = clamp(base,20,88);
+  // Sans travail d'essais, l'ingénieur règle seul : le résultat se situe au
+  // niveau des écuries adverses, un peu en dessous. Travailler soi-même les
+  // essais reste le seul moyen de dépasser 90 (GDD §18, §21.1).
+  const base = 54 + staffNiv('ingenieur')*5.5 + rnd(6,-6);
+  w.setupAuto = clamp(base,40,88);
   w.grille = simulerQualif(course, meteo, w.setupAuto);
   lancerCourse(true);
 }
@@ -2243,6 +2266,65 @@ function partirRetraite(){
   saveGame();
 }
 
+/* ------------------- 17bis. CONDITIONS DE MONTÉE (GDD §8.2) */
+
+/* Budget déjà sécurisé pour la saison à venir : les sponsors sous contrat.
+   La trésorerie du manager n'en fait pas partie (GDD §19.1, option A) — elle
+   ne peut que combler un manque, et cela se paie. */
+function budgetSecurise(){
+  return sum(S.sponsors.actifs, x=>x.montant);
+}
+
+/* Dernier classement de championnat connu du pilote. */
+function dernierClassement(){
+  if(S.saison && S.saison.posChamp) return S.saison.posChamp;
+  const p=S.pilote;
+  if(p && p.palmares.length){
+    const d=p.palmares[p.palmares.length-1];
+    if(!d.interrompue) return d.pos;
+  }
+  return null;
+}
+
+/* Assouplissement du résultat sportif obtenu par le budget apporté
+   (GDD §8.2, « voie du pilote payant »). N'assouplit jamais la superlicence :
+   c'est une règle FIA, elle ne s'achète pas. */
+function assouplissementPayant(catCibleId){
+  const c=CAT[catCibleId];
+  if(!c.cout) return 0;
+  return clamp(Math.floor(budgetSecurise() / c.cout * 6), 0, 6);
+}
+
+/* Les trois conditions du §8.2, évaluées pour une catégorie visée.
+   `ecurieOk` est fourni par l'existence d'une offre : on le passe de l'extérieur. */
+function conditionsMontee(catCibleId, apport){
+  const p=S.pilote, cond=MONTEE[catCibleId];
+  const c=CAT[catCibleId];
+  if(!cond) return null;
+  const pos = dernierClassement();
+  const bonus = assouplissementPayant(catCibleId);
+  const posRequise = cond.pos + bonus;
+  const titre = cond.titreSuffit && pos===1;
+  const sportifOk = pos===null ? false : (pos<=posRequise || titre);
+  const sl = totalSuperlicence();
+  const slOk = sl >= cond.sl;
+  const secure = budgetSecurise();
+  const budgetOk = apport<=0 || secure >= apport;
+  const manque = Math.max(0, apport - secure);
+  return {
+    cond, pos, posRequise, bonus, titre, sportifOk,
+    sl, slRequis:cond.sl, slOk,
+    secure, apport, budgetOk, manque,
+    ageIdeal: cond.age, ageOk: p.age>=cond.age[0]-1 && p.age<=cond.age[1]+2,
+    ok: sportifOk && slOk && budgetOk,
+  };
+}
+/* Une montée est-elle envisageable sportivement ? (avant même de parler d'argent) */
+function montePossibleSportivement(catCibleId){
+  const k=conditionsMontee(catCibleId, 0);
+  return k ? (k.sportifOk && k.slOk) : true;
+}
+
 /* --------------------------- 18. OFFRES & NÉGOCIATION (GDD §9.2, §9.4) */
 /* Un « contrat » en catégorie junior est surtout un baquet à financer.
    En F1, le pilote est payé. Les pilotes payants (GDD §4.6) obtiennent
@@ -2257,9 +2339,10 @@ function genererOffres(){
 
   const cibles=[];
   const sup = catByNiv(catAct.niv+1);
-  // Monter d'une catégorie
+  // Monter d'une catégorie : le résultat sportif et la superlicence font barrage
+  // avant même qu'une écurie se manifeste (GDD §8.2, conditions 1 et 3).
   if(sup && p.age>=sup.ageMin-1 && p.age<=sup.ageMax){
-    if(sup.id!=='f1' || (totalSuperlicence()>=SUPERLIC_REQUIS && p.age>=18)) cibles.push(sup.id);
+    if(montePossibleSportivement(sup.id) && (sup.id!=='f1' || p.age>=18)) cibles.push(sup.id);
   }
   cibles.push(catAct.id);                                     // rester
   // Redescendre est toujours possible : c'est la porte de sortie quand la saison
@@ -2278,7 +2361,17 @@ function genererOffres(){
       const ecart = note + compensation - exigNote;
       if(ecart < -6) continue;
       if(rp < exigRep-2) continue;
-      if(Math.random() > clamp(0.35 + ecart/22, 0.12, 0.95)) continue;
+      // Âge conseillé du §8.2 : hors de la fenêtre, les écuries se montrent
+      // nettement moins intéressées — un pilote qui stagne perd de son attractivité.
+      let appetit = clamp(0.35 + ecart/22, 0.12, 0.95);
+      const mc = MONTEE[catId];
+      if(mc && c.niv>catAct.niv){
+        if(p.age < mc.age[0]-1) appetit *= 0.55;
+        else if(p.age > mc.age[1]) appetit *= clamp(1 - (p.age-mc.age[1])*0.22, 0.15, 1);
+      }
+      const saisonsIci = p.palmares.filter(x=>x.catId===catAct.id).length;
+      if(saisonsIci>=3) appetit *= clamp(1 - (saisonsIci-2)*0.18, 0.3, 1);
+      if(Math.random() > appetit) continue;
 
       const junior = c.niv<8 && Math.random() < clamp(0.10 + ecart/45 + (posChamp&&posChamp<=3?0.25:0), 0, 0.55);
       // Part du budget prise en charge par l'écurie
@@ -2312,6 +2405,7 @@ function genererOffres(){
             : c.niv<catAct.niv ? 'Retour en '+c.court+' pour se relancer'
             : 'Maintien en '+c.court,
         tours:0, retiree:false,
+        montee: c.niv>catAct.niv,
       });
     }
   }
@@ -3380,6 +3474,8 @@ function renderContrats(){
       <button class="btn btn-cta btn-block" data-act="ouvrirOffres">${S.offres?'Reprendre les négociations':'Consulter les offres'}</button></div>`;
   }
 
+  h += panneauMontee();
+
   // superlicence rappel
   const tot=totalSuperlicence();
   h += `<div class="card"><h2>Accès à la Formule 1</h2>
@@ -3405,14 +3501,48 @@ ACTIONS.ouvrirOffres = ()=>{
   saveGame();
   afficherOffres();
 };
+/* GDD §8.2, condition 2 : le budget de la saison suivante doit être sécurisé.
+   Les sponsors sous contrat le sécurisent ; la trésorerie du manager ne fait que
+   combler un manque, et cela se voit. */
+function etatBudgetOffre(o){
+  if(o.apport<=0) return '';
+  const secure = budgetSecurise();
+  const manque = Math.max(0, o.apport - secure);
+  if(manque<=0){
+    return `<div class="note txt-green mt">✓ Budget sécurisé : ${fmtEur(secure)} de sponsors sous contrat couvrent l’apport.</div>`;
+  }
+  const couvrable = S.manager.budget >= manque;
+  return `<div class="note ${couvrable?'warn':'txt-red'} mt">
+    ${couvrable?'⚠':'✗'} Budget non sécurisé : ${fmtEur(secure)} de sponsors pour ${fmtEur(o.apport)} d’apport,
+    il manque <b>${fmtEur(manque)}</b>.<br>
+    ${couvrable
+      ? `Vous pouvez vous porter garant sur votre trésorerie (${fmtEur(S.manager.budget)}), mais elle y passera.`
+      : `Votre trésorerie (${fmtEur(S.manager.budget)}) ne comble pas le manque. Trouvez des sponsors avant de signer.`}
+  </div>`;
+}
+function boutonSignature(o){
+  if(o.apport<=0) return `<button class="btn btn-sm" data-act="accepterOffre" data-id="${o.id}">Accepter</button>`;
+  const manque = Math.max(0, o.apport - budgetSecurise());
+  if(manque<=0) return `<button class="btn btn-sm" data-act="accepterOffre" data-id="${o.id}">Accepter</button>`;
+  if(S.manager.budget >= manque)
+    return `<button class="btn-warn btn-sm" data-act="accepterOffre" data-id="${o.id}">Signer et se porter garant</button>`;
+  return `<button class="btn btn-sm" disabled>Budget insuffisant</button>`;
+}
+
 function afficherOffres(){
   const list = S.offres.filter(o=>!o.retiree);
   if(!list.length){
+    const cs = categorieDeSecours();
+    const descend = cs.niv < CAT[S.pilote.catId].niv;
     openModal('Marché des baquets',
-      `<div class="note mb">Aucune écurie ne se manifeste. Le niveau du pilote, votre réputation ou le budget apporté ne suffisent pas.</div>
-       <div class="note txt-muted">Vous pouvez repartir dans la même catégorie avec l’écurie la plus modeste, le temps de reconstruire.</div>`,
+      `<div class="note mb">Aucune écurie ne se manifeste. Le résultat sportif, votre réputation ou le budget disponible ne suffisent pas.</div>
+       <div class="note mb">Il reste un baquet chez l’écurie la plus modeste de <b>${cs.nom}</b>
+       (apport ${fmtEur(Math.round(cs.cout*0.65))}, l’écurie prend 35 % à sa charge)${descend
+         ? ` — soit une descente d’${CAT[S.pilote.catId].niv-cs.niv===1?'une catégorie':'échelon'}, le temps de reconstruire.`
+         : `, dans la même catégorie.`}</div>
+       <div class="note txt-muted">Le GDD le prévoit : on redescend quand le budget ne suit pas. Ce n’est pas une fin de partie.</div>`,
       `<button class="btn-ghost" data-act="fermerModal">Fermer</button>
-       <button class="btn" data-act="baquetSecours">Prendre un baquet de secours</button>`);
+       <button class="btn" data-act="baquetSecours">Prendre ce baquet</button>`);
     return;
   }
   const body = `<div class="note mb">Comparez au-delà du seul salaire : la vitesse de progression et le risque de renvoi comptent autant.</div>`
@@ -3433,10 +3563,11 @@ function afficherOffres(){
           ? `Apport à financer : <b class="txt-amber">${fmtEurFull(o.apport)}</b> (l’écurie prend ${Math.round(o.partEcurie*100)} % à sa charge)`
           : `<b class="txt-green">Aucun apport</b> — le pilote est payé.`}
           ${o.clauseLiberation?' · clause de libération incluse':''}</div>
+        ${etatBudgetOffre(o)}
         <div class="row mt">
           <button class="btn-ghost btn-sm" data-act="negocierOffre" data-id="${o.id}">Négocier (${o.tours} relance${o.tours>1?'s':''})</button>
           <div class="spacer"></div>
-          <button class="btn btn-sm" data-act="accepterOffre" data-id="${o.id}">Accepter</button>
+          ${boutonSignature(o)}
         </div>
       </div>`;
     }).join('');
@@ -3461,24 +3592,110 @@ ACTIONS.appliquerLevier = d=>{
     `<button class="btn" data-act="retourOffres">Retour aux offres</button>`);
 };
 ACTIONS.retourOffres = ()=>afficherOffres();
+ACTIONS.allerSponsors = ()=>{ closeModal(); go('sponsors'); };
 ACTIONS.accepterOffre = d=>{
   const o=S.offres.find(x=>x.id===d.id); if(!o) return;
+  const manque = o.apport>0 ? Math.max(0, o.apport - budgetSecurise()) : 0;
+  if(manque>0 && S.manager.budget < manque){
+    openModal('Budget non sécurisé',
+      `<div class="note mb">Le §8.2 est sans appel : sans budget, un pilote ne monte pas, quel que soit son talent.</div>
+       <div class="note mb">Apport exigé par ${escapeHtml(o.ecurieNom)} : <b>${fmtEurFull(o.apport)}</b><br>
+       Sponsors sous contrat : <b>${fmtEurFull(budgetSecurise())}</b><br>
+       Trésorerie : <b>${fmtEurFull(S.manager.budget)}</b><br>
+       Il manque <b class="txt-red">${fmtEurFull(manque)}</b>.</div>
+       <div class="note txt-muted">Démarchez des sponsors pendant l’intersaison, ou prenez un baquet moins cher.</div>`,
+      `<button class="btn-ghost" data-act="retourOffres">Retour aux offres</button>
+       <button class="btn" data-act="allerSponsors">Chercher des sponsors</button>`);
+    return;
+  }
+  if(manque>0){
+    msg('finance','Comptabilité','Vous vous portez garant',
+      `Les sponsors sous contrat couvrent ${fmtEurFull(budgetSecurise())} des ${fmtEurFull(o.apport)} exigés par ${o.ecurieNom}.\n\n`+
+      `Le manque de <em>${fmtEurFull(manque)}</em> sera prélevé sur votre trésorerie au fil des manches, `+
+      `sauf si vous trouvez d’autres sponsors d’ici là.`);
+  }
   signerOffre(o);
   S.phase='intersaison';
   S.offres=null;
   closeModal(); saveGame(); go('bureau');
   showToast('Contrat signé avec '+o.ecurieNom);
 };
+/* Baquet de secours. GDD §8.2 : « Descendre d'une catégorie survient après un
+   renvoi, ou lorsqu'aucun budget n'a pu être réuni pour la saison suivante. »
+   On redescend donc jusqu'à la première catégorie réellement finançable, chez
+   l'écurie la plus modeste — qui prend une part du budget à sa charge, faute
+   de mieux. Le bas de l'échelle est toujours accessible : c'est le filet. */
+function categorieDeSecours(){
+  const dispo = budgetSecurise() + Math.max(0, S.manager.budget);
+  const age = S.pilote.age;
+  // On ne redescend pas plus bas que ce que l'âge du pilote autorise : un pilote
+  // de 17 ans n'a rien à faire en Karting Mini, dont la limite est 13 ans.
+  const nivPlancher = Math.max(0, ...CATS.filter(c=>age<=c.ageMax).map(c=>c.niv).length
+    ? [Math.min(...CATS.filter(c=>age<=c.ageMax).map(c=>c.niv))] : [0]);
+  let niv = CAT[S.pilote.catId].niv;
+  while(niv>nivPlancher){
+    const c = catByNiv(niv);
+    if(c.cout*0.65 <= dispo) break;      // l'écurie modeste prend 35 % à sa charge
+    niv--;
+  }
+  return catByNiv(niv);
+}
 ACTIONS.baquetSecours = ()=>{
-  const catId = S.pilote.catId;
-  const e = ecuriesPour(catId).slice(-1)[0];
-  const c = CAT[catId];
-  signerOffre({id:uid(), catId, ecurieId:e.id, ecurieNom:e.nom, prestige:e.prestige, voiture:e.voiture,
-    junior:false, partEcurie:0, apport:c.cout, salaire:0, primeVictoire:0, primePoint:0, duree:1,
+  const c = categorieDeSecours();
+  const e = ecuriesPour(c.id).slice(-1)[0];
+  const partEcurie = 0.35;
+  const apport = Math.max(0, Math.round(c.cout*(1-partEcurie)/1000)*1000);
+  const descente = c.niv < CAT[S.pilote.catId].niv;
+  signerOffre({id:uid(), catId:c.id, ecurieId:e.id, ecurieNom:e.nom, prestige:e.prestige, voiture:e.voiture,
+    junior:false, partEcurie, apport, salaire:0, primeVictoire:0, primePoint:0, duree:1,
     objectifPos:Math.round(c.grille*0.7), clauseLiberation:false, bonusFidelite:0, bonusVoiture:0});
+  if(descente){
+    msg('systeme','Paddock','Retour en '+c.nom,
+      `Faute de budget et d’offre, ${S.pilote.nom} redescend en ${c.nom} chez ${e.nom}.\n\n`+
+      `Ce n’est pas la fin : c’est là qu’on reconstruit une réputation et qu’on retrouve des sponsors.`);
+    gagnerRep(-Math.round(15 + CAT[S.pilote.catId].niv*5), 'descente de catégorie');
+  }
   S.phase='intersaison';
   closeModal(); saveGame(); go('bureau');
 };
+
+/* Panneau des trois conditions cumulatives du GDD §8.2. C'est ce qui explique
+   au joueur pourquoi la montée est ouverte ou fermée, avant qu'il ne cherche. */
+function panneauMontee(){
+  const p=S.pilote, catAct=CAT[p.catId];
+  const sup = catByNiv(catAct.niv+1);
+  if(!sup) return `<div class="card"><h2>Montée de catégorie</h2>
+    <div class="note">${escapeHtml(p.nom)} est en Formule 1 : il n’y a rien au-dessus.</div></div>`;
+  const apportType = Math.round(sup.cout * 0.6);
+  const k = conditionsMontee(sup.id, apportType);
+  if(!k) return '';
+  const ligne = (ok, titre, detail) => `<div class="row" style="align-items:flex-start;gap:8px;padding:6px 0">
+      <span style="flex:0 0 18px;font-weight:700" class="${ok?'txt-green':'txt-red'}">${ok?'✓':'✗'}</span>
+      <div style="flex:1"><div class="b small">${titre}</div><div class="note txt-muted">${detail}</div></div>
+    </div>`;
+
+  const posTxt = k.pos===null
+    ? 'Aucune saison complète terminée pour l’instant.'
+    : `Dernier championnat : <b>${ordinal(k.pos)}</b> — il faut ${k.titre?'un titre':'un top '+k.posRequise}`
+      + (k.bonus>0?` (top ${k.cond.pos} assoupli de ${k.bonus} places par le budget apporté)`:'')+'.';
+  const slTxt = k.slRequis===0
+    ? 'Aucun point de superlicence exigé à ce palier.'
+    : `<b>${k.sl} / ${k.slRequis}</b> points sur 3 ans glissants. Les points ne s’achètent pas.`;
+  const budTxt = `Sponsors sous contrat : <b>${fmtEur(k.secure)}</b>. `
+    + `Un baquet type en ${sup.court} demande environ <b>${fmtEur(apportType)}</b> d’apport`
+    + (k.manque>0 ? `, il manquerait <b class="txt-amber">${fmtEur(k.manque)}</b>.` : ` — c’est couvert.`);
+
+  return `<div class="card ${k.ok?'':'accent'}">
+    <h2>Monter en ${sup.nom}<span class="hint">3 conditions cumulatives</span></h2>
+    <div class="note mb">${escapeHtml(k.cond.lib)} · âge conseillé ${k.cond.age[0]}-${k.cond.age[1]} ans
+      (${p.nom} a ${p.age} ans${k.ageOk?'':', hors fenêtre : les écuries se méfient'}).</div>
+    ${ligne(k.sportifOk, 'Résultat sportif', posTxt)}
+    ${ligne(k.slOk, 'Superlicence', slTxt)}
+    ${ligne(k.budgetOk, 'Budget sécurisé', budTxt)}
+    <div class="note txt-muted mt">La troisième condition — qu’une écurie veuille du pilote — se lit dans les offres.
+      Un champion sans budget ne monte pas : c’est l’argent le vrai filtre.</div>
+  </div>`;
+}
 
 /* ------------------------------------------------- ÉCRAN : STAFF */
 function renderStaff(){

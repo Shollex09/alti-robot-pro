@@ -1,4 +1,4 @@
-# État du prototype — correspondance avec le GDD v0.5
+# État du prototype — correspondance avec le GDD v0.7
 
 Le prototype (`../index.html`) couvre le périmètre **[V1]** du [GDD](GDD.md).
 Ce document dit, section par section, ce qui est réellement codé, ce qui est
@@ -33,8 +33,9 @@ ne les fixait pas.
 | 7.3 | Blessures | ⛔ | V2 |
 | 7.4 | Entourage du pilote | ⛔ | V2 — un apport familial forfaitaire existe en karting |
 | 8.1 | Échelle karting → F1 | ✅ | Les 9 échelons |
-| 8.2 | Superlicence, 40 pts / 3 ans | ✅ | Barème FIA simplifié, âge minimum 18 ans |
-| 8.3 | Voies alternatives (FE, WEC…) | ⛔ | V2 |
+| 8.2 | Conditions de changement de catégorie | ✅ | Les 3 conditions cumulatives, la voie du pilote payant, la descente |
+| 8.3 | Superlicence, 40 pts / 3 ans | ✅ | Barème du §8.3 repris tel quel, âge minimum 18 ans |
+| 8.4 | Voies alternatives (FE, WEC…) | ⛔ | V2 |
 | 9.1 | Écuries fictives | ✅ | Les 4 nommées + 6 autres en F1, écuries propres par catégorie |
 | 9.2 | Offres concurrentes, comparaison | ✅ | Colonnes Salaire / Progression / Risque / Prestige |
 | 9.3 | Durée, clause de libération, bonus de fidélité | ✅ | Droits à l'image : V2 |
@@ -56,6 +57,47 @@ ne les fixait pas.
 | 21.1 | Course détaillée ou simulation rapide | ✅ | Choix manche par manche |
 | 21.2 | 3 formats de week-end | ✅ | Karting / monoplace / F1 |
 | 21.3 | Modèle économique | — | Décision reportée, rien à coder |
+| 22 | Structure du manager (locaux, académie, Team Principal) | ⛔ | V2 / V3 |
+| 23 | Direction artistique et interface | ⛔ | V2 — le §23.1 demande explicitement de ne pas y toucher avant validation du gameplay |
+
+## §8.2 — comment les trois conditions sont codées
+
+Le GDD décrit 6 paliers pour les 9 échelons de l'échelle §8.1. Les trois premiers
+passages de karting partagent la ligne « régional → national » :
+
+| Catégorie visée | Résultat exigé | Superlicence | Âge conseillé |
+|---|---|---|---|
+| Karting Cadet | Top 5 | — | 10-13 |
+| Karting Junior | Top 5 | — | 10-14 |
+| Karting Senior | Top 5 | — | 12-16 |
+| Karting KZ | Top 3 | — | 13-15 |
+| F4 | Top 5 en KZ, ou titre | — | 15-17 |
+| F3 | Top 6 | 12 pts | 17-19 |
+| F2 | Top 5 | 25 pts | 18-21 |
+| F1 | Top 4 | 40 pts | 19-24 |
+
+- **Condition 1, le résultat sportif** : filtre les offres de montée avant même
+  qu'une écurie se manifeste.
+- **Condition 2, le budget sécurisé** : seuls les sponsors sous contrat comptent
+  (option A du §19.1 — la trésorerie du manager n'est pas le budget du pilote).
+  Si l'apport n'est pas couvert mais que la trésorerie comble le manque, la
+  signature reste possible en se portant garant, avec un avertissement explicite ;
+  sinon elle est refusée et le jeu renvoie vers l'onglet Sponsors.
+- **Condition 3, une écurie disposée** : c'est l'existence d'une offre. L'âge
+  conseillé y joue : hors fenêtre, l'appétit des écuries chute, et un pilote qui
+  reste 3 saisons ou plus dans la même catégorie perd encore en attractivité.
+
+**Voie du pilote payant** : le budget sécurisé assouplit le résultat exigé de
+`min(6, budget / coût de la saison × 6)` places. Il n'assouplit **jamais** la
+superlicence, à aucun palier — le GDD ne l'autorise explicitement que pour le
+résultat sportif, et présente les 40 points de F1 comme une règle FIA. Cette
+lecture stricte est à confirmer si vous vouliez que l'argent puisse aussi acheter
+les 12 et 25 points de F3 et F2.
+
+**Descente** : quand aucune offre ne vient, le baquet de secours redescend jusqu'à
+la première catégorie réellement finançable, chez l'écurie la plus modeste, qui
+prend 35 % du budget à sa charge. Le bas de l'échelle est toujours accessible :
+il n'existe aucune situation sans issue.
 
 ## Valeurs arbitrées (à reporter dans le GDD si elles conviennent)
 
@@ -105,6 +147,15 @@ Autres arbitrages :
   (contre 1 à 3), une course 6 à 12, une séance d'entraînement 7 à 13.
   Sur une saison de 24 manches : fatigue finale ~32 sans rien forcer, 100 en
   s'entraînant chaque semaine sans préparateur, ~46 avec un préparateur moyen.
+- **Écart de matériel entre écuries** : il se creuse en montant l'échelle —
+  15 points d'écart en karting, 20 en F4, 24 en F3, 27 en F2, 40 en F1. En
+  karting les châssis sont proches et tout se joue au pilote ; en F1 la voiture
+  décide largement. Mesuré : un pilote noté 85 gagne en Karting Junior quelle que
+  soit son écurie, tandis qu'un pilote noté 92 en F3 finit 1,6e avec la meilleure
+  voiture et 15,2e avec la plus faible. C'est le §17.3 rendu lisible.
+- **Simulation rapide** : l'ingénieur règle seul, à `54 + 5,5 × niveau ± 6`,
+  soit au niveau des écuries adverses ou juste en dessous. Travailler les essais
+  soi-même reste le seul moyen de dépasser 90.
 - **Réglages de l'IA** : `62 + 0,55 × (voiture − 60) ± 7`. Les écuries adverses
   ont elles aussi des ingénieurs et le même temps de piste ; sans ce
   relèvement, le joueur passé à 5-7 runs se retrouvait seul à bien régler sa
@@ -181,6 +232,40 @@ nouveaux runs, la fatigue saturait à 100 dès la 6e course et la forme tombait
 à 41 pour le reste de la saison — le joueur était puni d'utiliser la
 fonctionnalité qu'il venait de demander. Corrigé par une récupération passive
 entre les manches, avec un test de non-régression dédié.
+
+## Suites données au GDD v0.7
+
+La v0.7 apporte une seule mécanique [V1] nouvelle, le **§8.2**, implémentée ici.
+Le §22 (locaux, académie, Team Principal) est marqué V2/V3. Le §23 (direction
+artistique, référence Motorsport Manager) est marqué V2 et son §23.1 demande
+explicitement que l'interface ne soit pas travaillée avant validation du
+gameplay : le prototype garde donc son habillage actuel, qui diverge de la
+référence visuelle (accent rouge plutôt que turquoise, pas de découpes en
+diagonale). C'est un écart assumé, à traiter le jour où le §23 passera en chantier.
+
+L'implémentation du §8.2 a révélé deux défauts du modèle de course, tous deux
+corrigés :
+
+1. **L'écart de matériel entre écuries de karting était aussi large qu'en F1**
+   (57 à 88). Conséquence : un pilote noté 86 finissait 11e en KZ contre un
+   plateau à 61. Une fois le §8.2 en place, ce défaut devenait bloquant — le
+   résultat sportif exigé pour monter devenait inatteignable pour qui n'avait pas
+   le meilleur matériel, même en karting.
+2. **La simulation rapide donnait au joueur des réglages à 34-44** alors que les
+   écuries adverses venaient d'être relevées à 62-85. Un tiers des carrières de
+   test tournaient avec 30 points de handicap sur une variable qui pèse 15 % de
+   la performance, ce qui invalidait les mesures d'équilibrage précédentes.
+3. **Le baquet de secours pouvait renvoyer un pilote de 17 ans en Karting Mini**,
+   dont la limite d'âge est 13 ans. La descente respecte désormais un plancher
+   d'âge : un pilote de 17 ans ne redescend pas plus bas que le Karting Junior,
+   un pilote de 24 ans pas plus bas que la KZ.
+
+Le profil « budget faible + réputation 5 » faisait faillite dans 8 cas sur 8 :
+à ce palier le vivier propose un pilote déjà engagé en F3 (900 k€ de saison) à
+un manager qui dispose de 20 k€. Signer ce pilote est un piège que le §8.2 rend
+maintenant visible avant la signature — et la descente corrigée offre une porte
+de sortie crédible. Le profil retombe à 4 faillites sur 8, avec 4 accès à la F1 :
+dur, comme le §2.2 l'annonce pour cette combinaison, mais jouable.
 
 ## Ce qui reste à faire avant de parler de « jeu »
 

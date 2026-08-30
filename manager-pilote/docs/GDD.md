@@ -1,17 +1,18 @@
 # GAME DESIGN DOCUMENT
 ## Manager de Pilote — Du Karting à la F1
 
-**Version :** 0.5 — Document de travail
+**Version :** 0.7 — Document de travail
 **Plateforme cible :** Mobile (iOS / Android)
 **Genre :** Simulation de gestion sportive (Manager)
-
-> **Légende de priorité**
-> **[V1]** = indispensable pour la première version jouable
-> **[V2]** = évolution prévue après la sortie, à ne pas développer tout de suite
 
 > **Prototype :** un prototype jouable en HTML couvrant le périmètre [V1] se trouve dans
 > [`../index.html`](../index.html). Voir [`ETAT_PROTOTYPE.md`](ETAT_PROTOTYPE.md) pour la
 > correspondance section par section entre ce document et ce qui est réellement codé.
+
+> **Légende de priorité**
+> **[V1]** = indispensable pour la première version jouable
+> **[V2]** = évolution prévue après la sortie, à ne pas développer tout de suite
+> **[V3]** = ambition à long terme, hors périmètre des premières versions
 
 ---
 
@@ -33,7 +34,6 @@ Le jeu vise un haut niveau de réalisme, inspiré de **Football Manager** (progr
 Le joueur configure sa partie via **deux curseurs indépendants**, non liés l'un à l'autre.
 
 ### 2.1 Budget de départ
-
 | Niveau | Budget indicatif |
 |---|---|
 | Faible | ~20 000 € |
@@ -57,7 +57,6 @@ Le joueur configure sa partie via **deux curseurs indépendants**, non liés l'u
 | 10 | Légendaire | Top écuries F1 considèrent le manager comme référence, accès aux meilleurs talents mondiaux dès le karting |
 
 **Combinaison libre des deux curseurs** → 4 × 10 = 40 profils de départ possibles. Exemples de profils extrêmes :
-
 - **Budget élevé + Inconnu** : moyens financiers pour multiplier les essais sur de jeunes pilotes, mais aucune crédibilité de départ.
 - **Budget faible + International** : accès à de bons talents dès le début, mais gestion financière très serrée, peu de marge d'erreur.
 
@@ -86,30 +85,24 @@ C'est au manager de démarcher et négocier les sponsors qui financent la progre
 | 5 | Sponsor mondial (boisson énergisante, horlogerie, pétrolier) | 1 M€ et + | Réputation 9-10 |
 
 ### 4.2 Mécanique de démarchage
-
 - Le manager consulte une **liste de sponsors potentiels** et lance des démarches (chaque démarche coûte du temps, parfois de l'argent — déplacement, dossier de présentation).
 - Chaque sponsor a des **critères d'intérêt** : résultats récents du pilote, sa réputation, son image médiatique, la catégorie dans laquelle il court, et parfois sa région d'origine.
 - Le résultat n'est pas garanti : refus possible, ou contre-proposition à la baisse.
 
 ### 4.3 Contreparties et obligations
-
 Un sponsor n'apporte pas que de l'argent gratuit — il impose des contraintes :
-
 - **Objectifs de résultat** : prime versée seulement si le pilote atteint un certain classement.
 - **Obligations d'image** : journées presse, apparitions publiques, tournage publicitaire → prennent du temps sur l'entraînement et peuvent fatiguer le pilote.
 - **Rupture possible** en cas de mauvaise saison ou de scandale.
 
 ### 4.4 Conflits de sponsors
-
 Deux marques concurrentes (deux boissons énergisantes, deux équipementiers) ne peuvent pas être présentes en même temps. Le manager doit arbitrer entre plusieurs offres incompatibles.
 
 ### 4.5 Sponsors personnels vs sponsors d'écurie
-
 - En **karting/F4**, les sponsors personnels financent directement la saison (c'est vital).
 - En **F2/F1**, le pilote est payé par l'écurie, mais ses sponsors personnels (logo sur la combinaison/casque) restent une source de revenus et un argument de poids lors des négociations — un pilote qui apporte des sponsors est plus attractif pour une écurie.
 
 ### 4.6 Pilotes payants [V1]
-
 Comme dans la vraie F1, un baquet peut être obtenu en apportant un financement conséquent. Le manager qui décroche de gros sponsors peut donc acheter la progression de son pilote, même sans talent exceptionnel. Voie alternative crédible à la pure performance.
 
 ---
@@ -117,15 +110,12 @@ Comme dans la vraie F1, un baquet peut être obtenu en apportant un financement 
 ## 5. Scouting et recrutement [V1]
 
 ### 5.1 Potentiel caché
-
 Le joueur ne voit **jamais la vraie valeur exacte** d'un jeune pilote, seulement une estimation floue fournie par son scout (ex. : « Potentiel : Moyen à Élevé »). Plus le scout est compétent et cher, plus la fourchette est précise. C'est le cœur du plaisir de découverte.
 
 ### 5.2 Réseau de scouts [V2]
-
 Recrutement de scouts par région (France, Italie, Amérique du Sud, Asie...) pour découvrir des talents hors de son territoire habituel.
 
 ### 5.3 Managers rivaux [V2]
-
 Des managers IA convoitent les mêmes pilotes. Course au recrutement : un talent repéré trop tard peut être signé par un concurrent.
 
 ---
@@ -150,7 +140,6 @@ Inspirées du système F1 Manager, réparties en catégories.
 - Défense
 
 ### 6.4 Attributs spécifiques au concept manager
-
 - **Potentiel de progression** (Faible / Moyen / Élevé / Exceptionnel) — plafond de développement, caché ou estimé (voir 5.1).
 - **Agressivité** — plus de dépassements tentés, mais risque de crash accru.
 - **Réputation du pilote** (distincte de celle du manager) — attire sponsors et écuries.
@@ -162,9 +151,7 @@ Inspirées du système F1 Manager, réparties en catégories.
 ## 7. Le pilote comme personnage [V1 partiel]
 
 ### 7.1 Traits de personnalité [V1]
-
 Chaque pilote possède un ou plusieurs traits qui modifient sa progression ET les négociations :
-
 - **Bosseur** : progresse plus vite à l'entraînement
 - **Tête brûlée** : agressivité élevée, plus de crashs mais des dépassements spectaculaires
 - **Chouchou des médias** : attire davantage de sponsors
@@ -172,16 +159,13 @@ Chaque pilote possède un ou plusieurs traits qui modifient sa progression ET le
 - **Fragile mentalement** : chute de moral rapide après un échec
 
 ### 7.2 Vieillissement et retraite [V1]
-
 - Pic de forme entre 25 et 32 ans environ, puis déclin progressif des statistiques physiques.
 - À la retraite du pilote, la partie **continue** avec un nouveau pilote à recruter → carrière de manager sur plusieurs générations, comme dans Football Manager.
 
 ### 7.3 Blessures [V2]
-
 Un gros crash peut entraîner une blessure et faire manquer plusieurs courses.
 
 ### 7.4 Entourage du pilote [V2]
-
 Parents envahissants en karting, qui financent une partie de la saison mais mettent la pression sur les résultats et les choix de carrière.
 
 ---
@@ -189,17 +173,51 @@ Parents envahissants en karting, qui financent une partie de la saison mais mett
 ## 8. Progression dans la hiérarchie du sport [V1]
 
 ### 8.1 Échelle complète
-
 **Karting Mini → Karting Cadet → Karting Junior → Karting Senior → Karting KZ → F4 → F3 → F2 → F1**
 
-### 8.2 Superlicence FIA [V1]
+### 8.2 Conditions de changement de catégorie [V1]
 
-Comme dans la réalité, l'accès à la F1 exige d'accumuler **40 points de superlicence sur 3 ans**, obtenus selon les classements dans les catégories inférieures. Contrainte de progression crédible et incontournable : un pilote ne peut pas sauter directement de la F3 à la F1 sans les points nécessaires.
+**Trois conditions cumulatives** doivent être réunies pour qu'un pilote monte d'une catégorie. Les trois sont obligatoires : un champion sans budget ne monte pas, ce qui reflète fidèlement la réalité du sport automobile.
 
-### 8.3 Voies alternatives [V2]
+1. **Résultat sportif minimum** — le mérite
+2. **Budget de la saison suivante sécurisé** — l'argent, qui constitue le véritable filtre
+3. **Une écurie disposée à recruter le pilote** — l'opportunité
 
+#### Conditions par palier
+
+| Passage | Résultat sportif requis | Âge conseillé |
+|---|---|---|
+| Karting régional → national | Top 5 au championnat | 10 - 13 ans |
+| Karting national → international KZ | Top 3 au championnat | 13 - 15 ans |
+| Karting → F4 | Top 5 international, ou titre national | 15 - 17 ans |
+| F4 → F3 | Top 6 au championnat + 12 points de superlicence | 17 - 19 ans |
+| F3 → F2 | Top 5 au championnat + 25 points de superlicence | 18 - 21 ans |
+| F2 → F1 | Top 4 au championnat + **40 points de superlicence obligatoires** | 19 - 24 ans |
+
+#### Cas de figure particuliers
+
+- **Rester une saison de plus dans la même catégorie** : possible, et parfois judicieux (laisser le pilote mûrir, viser le titre plutôt qu'une montée précipitée). Mais l'âge avance, et un pilote qui stagne trop longtemps perd de son attractivité auprès des écuries.
+- **Descendre d'une catégorie** : survient après un renvoi, ou lorsqu'aucun budget n'a pu être réuni pour la saison suivante.
+- **Voie du pilote payant** : avec un sponsor très important, la montée reste possible malgré un résultat sportif inférieur aux exigences — sauf pour la F1, où les 40 points de superlicence demeurent incontournables (règle FIA).
+
+### 8.3 Superlicence FIA [V1]
+
+Comme dans la réalité, l'accès à la F1 exige d'accumuler **40 points de superlicence sur 3 années glissantes**, obtenus selon les classements dans les catégories inférieures. Un pilote ne peut donc pas sauter directement de la F3 à la F1.
+
+**Barème par saison**
+
+| Position au championnat | F3 | F2 |
+|---|---|---|
+| 1er | 30 | 40 |
+| 2e | 25 | 40 |
+| 3e | 20 | 40 |
+| 4e | 10 | 30 |
+| 5e | 7 | 20 |
+
+Les points se cumulent sur **3 ans glissants** : un pilote qui tarde à progresser perd ses points les plus anciens. Cette règle crée une véritable pression temporelle sur la carrière et renforce l'importance de l'âge du pilote.
+
+### 8.4 Voies alternatives [V2]
 Si la F1 est hors d'atteinte, d'autres carrières restent possibles et valorisantes :
-
 - Formule E
 - Endurance / WEC (24h du Mans)
 - IndyCar
@@ -221,7 +239,6 @@ Un pilote « raté » en F1 peut devenir une légende en endurance — cela évi
 | McLaren | Papaya Racing |
 
 Chaque écurie possède :
-
 - un **seuil de réputation + statistiques minimum** pour proposer un contrat,
 - un **niveau de voiture/budget** propre, influençant la performance indépendamment du pilote,
 - une **exigence de résultat** contractuelle (base d'évaluation d'un éventuel renvoi).
@@ -229,7 +246,6 @@ Chaque écurie possède :
 ### 9.2 Offres multiples et concurrentes [V1]
 
 À partir d'un certain seuil de performance/réputation en fin de saison, plusieurs écuries peuvent proposer une offre simultanément. Chaque offre varie sur plusieurs axes :
-
 - **Salaire fixe + primes** (points, podiums, victoires)
 - **Voie de progression** : place directe dans la catégorie supérieure vs « programme jeunes pilotes » (reste un an de plus dans la catégorie actuelle avec un fort soutien budgétaire et matériel de l'écurie mère)
 - **Visibilité/risque** : petite écurie avec plus de temps de piste et de liberté vs grosse écurie en tant que pilote n°2 avec moins de mise en avant
@@ -237,20 +253,16 @@ Chaque écurie possède :
 Interface de comparaison : colonnes **Salaire / Vitesse de progression prévue / Risque de renvoi / Prestige**.
 
 ### 9.3 Détail des contrats [V1 partiel]
-
 - Durée du contrat
 - Clause de départ / clause de libération si l'écurie ne tient pas ses promesses de performance
 - Bonus de fidélité
 - Droits à l'image [V2]
 
 ### 9.4 Négociation en plusieurs tours [V1]
-
 Le manager peut faire une contre-proposition, mais chaque relance comporte un **risque que l'écurie se retire** de la négociation. Tension réelle entre optimiser le contrat et sécuriser la place.
 
 ### 9.5 Renvoi (mécanique de risque) [V1]
-
 L'écurie évalue les résultats du pilote par rapport aux attentes du contrat :
-
 - Résultats en dessous de l'objectif sur plusieurs courses consécutives → avertissement → rupture de contrat.
 - Un pilote renvoyé doit généralement redescendre en catégorie inférieure pour reconstruire sa réputation.
 
@@ -259,14 +271,12 @@ L'écurie évalue les résultats du pilote par rapport aux attentes du contrat :
 ## 10. Revenus et dépenses du manager [V1]
 
 ### 10.1 Revenus
-
 - **Commission sur les gains de course** du pilote (indicatif : 10-15 %)
 - **Commission sur transfert** lors de la signature d'un nouveau contrat (proportionnelle au prestige de l'écurie)
 - **Prime de championnat** gagné par le pilote (bonus ponctuel)
 - **Commission sur les sponsors** décrochés pour le pilote
 
 ### 10.2 Dépenses
-
 - Inscriptions aux courses, transport, pneus, matériel
 - Salaires du staff (voir section 13)
 - Développement technique du kart / de la monoplace
@@ -339,7 +349,6 @@ Le joueur ne choisit pas librement le nombre de pilotes qu'il gère : ce nombre 
 **Décision : le jeu est entièrement en 2D.** Une scène 3D (podium, personnages, animations) représenterait une charge de production disproportionnée pour un développement solo, sans apporter de valeur décisive à un jeu de gestion, dont l'intérêt repose sur la profondeur de simulation.
 
 **Traitement visuel retenu à la place :**
-
 - **Podium en illustration 2D stylisée** : portrait du pilote, couleurs de son écurie, trophée, confettis.
 - **Portrait de pilote 2D évolutif**, qui vieillit au fil de la carrière.
 - **Courtes animations 2D** pour les moments forts (levée du trophée, signature de contrat).
@@ -380,12 +389,11 @@ Une variation aléatoire de plus ou moins 3 points est appliquée stat par stat,
 | 16 - 21 ans | 1,2 |
 | 22 - 27 ans | 1,0 |
 | 28 - 32 ans | 0,6 |
-| 33 ans et + | 0,2 puis déclin de 1 à 3 points par an sur Réactions et Physique |
+| 33 ans et + | 0,2 puis déclin de 1 a 3 points par an sur Réactions et Physique |
 
 **Autres coefficients**
-
-- **CoeffStaff** : de 1,0 (aucun staff) à 1,4 (ingénieur et préparateur physique de haut niveau).
-- **CoeffMoral** : de 0,7 (moral au plus bas) à 1,3 (pilote en pleine confiance).
+- **CoeffStaff** : de 1,0 (aucun staff) a 1,4 (ingénieur et préparateur physique de haut niveau).
+- **CoeffMoral** : de 0,7 (moral au plus bas) a 1,3 (pilote en pleine confiance).
 
 ### 17.2 Note globale du pilote
 
@@ -393,7 +401,7 @@ Une variation aléatoire de plus ou moins 3 points est appliquée stat par stat,
 Note = Pace × 0,40 + Consistency × 0,30 + Racecraft × 0,30
 ```
 
-Correspond au chiffre unique affiché sur la fiche du pilote (équivalent du « 84 » dans F1 Manager).
+Correspond au chiffre unique affiché sur la fiche du pilote (équivalent du "84" dans F1 Manager).
 
 ### 17.3 Résultat d'une course
 
@@ -403,7 +411,7 @@ PerfTotale = Pilote × 0,40 + Voiture × 0,35 + Réglages × 0,15 + Aléa × 0,1
 
 - La part d'aléa (météo, incidents, fiabilité) empêche que le meilleur pilote gagne systématiquement.
 - Le classement final se calcule en comparant les PerfTotale de tous les pilotes de la grille.
-- La part « Voiture » explique qu'un excellent pilote dans une mauvaise écurie ne gagne pas, exactement comme dans la réalité.
+- La part "Voiture" explique qu'un excellent pilote dans une mauvaise écurie ne gagne pas, exactement comme dans la réalité.
 
 ---
 
@@ -413,8 +421,7 @@ Inspiré directement de F1 Manager : chaque circuit possède un **réglage optim
 
 ### 18.1 Paramètres réglables
 
-**En monoplace (F4 à F1)**
-
+**En monoplace (F4 a F1)**
 - Aileron avant
 - Aileron arrière
 - Barre anti-roulis
@@ -422,13 +429,12 @@ Inspiré directement de F1 Manager : chaque circuit possède un **réglage optim
 - Pincement
 
 **En karting (version simplifiée)**
-
 - Pression des pneus
 - Carburation
 - Rigidité du châssis
 - Rapport de transmission
 
-### 18.2 Calcul de la qualité des réglages
+### 18.2 Calcul de la qualite des réglages
 
 ```
 Écart = |ValeurChoisie - (OptimalCircuit + PréférencePilote)|
@@ -440,10 +446,9 @@ Le score obtenu alimente directement la variable `Réglages` de la formule de co
 ### 18.3 Retour du pilote — mécanique centrale
 
 Après chaque tour d'essai, le pilote décrit ses sensations en langage naturel :
-
-- « La voiture survire en entrée de virage »
-- « Je manque d'appui en ligne droite »
-- « Le train avant ne répond pas assez »
+- "La voiture survire en entrée de virage"
+- "Je manque d'appui en ligne droite"
+- "Le train avant ne répond pas assez"
 
 **La précision de ce retour dépend du niveau de l'ingénieur de course** : un ingénieur débutant donne des indications vagues, un expert oriente précisément vers le bon réglage. C'est ce qui justifie d'investir dans le staff.
 
@@ -458,8 +463,7 @@ Le joueur converge ainsi vers le réglage idéal au fil des séances d'essais, e
 **L'argent des sponsors ne va pas dans la poche du manager : il finance directement la saison du pilote.** Le manager ne perçoit que sa commission.
 
 Conséquences sur le gameplay :
-
-- Le véritable travail du manager devient « trouver assez de sponsors pour que la saison soit finançable ».
+- Le véritable travail du manager devient "trouver assez de sponsors pour que la saison soit finançable".
 - Le budget personnel du manager sert uniquement à couvrir ses propres frais (staff, scouting, déplacements) : c'est une réserve de survie, pas un porte-monnaie illimité.
 - Ce n'est pas l'argent du manager qui fait rouler le pilote, c'est sa capacité à convaincre des sponsors. Fidèle au métier réel d'agent.
 
@@ -515,12 +519,12 @@ Le pilote dispose d'un nombre limité d'emplacements publicitaires, qui augmente
 | Gains de course | 10 % |
 | Salaire du pilote | 10 % |
 | Sponsors décrochés | 15 % |
-| Transfert vers une écurie | 5 % (petite écurie) à 15 % (top écurie) du montant du contrat |
+| Transfert vers une écurie | 5 % (petite écurie) a 15 % (top écurie) du montant du contrat |
 | Titre de champion | 20 % de la prime |
 
 ### 19.7 Salaires du staff (mensuels)
 
-| Rôle | Débutant | Expert |
+| Role | Débutant | Expert |
 |---|---|---|
 | Scout | 800 € | 4 000 € |
 | Ingénieur de course | 1 500 € | 12 000 € |
@@ -533,10 +537,10 @@ Le pilote dispose d'un nombre limité d'emplacements publicitaires, qui augmente
 Les commissions sont dérisoires (10 % de 300 € par victoire). Le budget personnel du manager fond, il faut jongler avec les sponsors locaux pour boucler chaque saison. Tension maximale, chaque euro compte.
 
 **Phase 2 — F4 / F3 / F2 : l'équilibre fragile**
-Les sponsors sont plus conséquents, les commissions commencent à couvrir les frais de staff. Le manager ne s'enrichit pas mais ne coule plus. C'est aussi la phase la plus coûteuse (2,5 M€ à trouver en F2), donc le risque de tout perdre reste élevé.
+Les sponsors sont plus conséquents, les commissions commencent a couvrir les frais de staff. Le manager ne s'enrichit pas mais ne coule plus. C'est aussi la phase la plus coûteuse (2,5 M € à trouver en F2), donc le risque de tout perdre reste élevé.
 
 **Phase 3 — F1 : la rentabilité**
-Le pilote est payé au lieu de payer. Une commission de 10 % sur un salaire de 20 M€ représente 2 M€ par an, auxquels s'ajoutent les sponsors mondiaux. C'est là que le manager rentabilise une décennie d'efforts, et qu'il peut enfin se permettre de gérer plusieurs pilotes (voir section 15).
+Le pilote est payé au lieu de payer. Une commission de 10 % sur un salaire de 20 M € représente 2 M € par an, auxquels s'ajoutent les sponsors mondiaux. C'est là que le manager rentabilise une décennie d'efforts, et qu'il peut enfin se permettre de gérer plusieurs pilotes (voir section 15).
 
 ### 19.9 Exemple de première saison (budget faible : 20 000 €)
 
@@ -544,8 +548,8 @@ Le pilote est payé au lieu de payer. Une commission de 10 % sur un salaire de 2
 |---|---|
 | Saison karting régional | - 8 000 € |
 | Scout débutant (800 € × 12) | - 9 600 € |
-| Commission sur 3 victoires (3 × 300 € à 10 %) | + 90 € |
-| Commission sur 2 sponsors locaux (6 000 € à 15 %) | + 900 € |
+| Commission sur 3 victoires (3 × 300 € a 10 %) | + 90 € |
+| Commission sur 2 sponsors locaux (6 000 € a 15 %) | + 900 € |
 | **Solde de fin de saison** | **- 16 610 €** |
 
 Sans sponsors suffisants pour financer la saison du pilote (option A), le manager est en faillite avant la saison 2. La recherche de sponsors n'est donc pas optionnelle : c'est la condition de survie du jeu.
@@ -588,7 +592,6 @@ Chaque réponse affecte trois jauges : **Moral du pilote**, **Relation avec l'é
 ### 20.3 Interactions du pilote vers le manager
 
 Le pilote écrit spontanément dans la boîte de réception du manager :
-
 - « Je ne me sens pas en confiance avec cette écurie »
 - « J'ai reçu une offre, qu'est-ce que tu en penses ? »
 - « Mon coéquipier reçoit un meilleur matériel que moi »
@@ -631,7 +634,6 @@ Trois formats selon la catégorie, reflétant la réalité du sport et allégean
 **Piste recommandée le cas échéant : achat unique, entre 5 et 8 €, sans publicité ni achats intégrés.**
 
 Justification à conserver pour cette décision future :
-
 - Le public visé (amateurs de F1 et de jeux de gestion) rejette massivement le free-to-play, car payer pour progresser vide un jeu de gestion de son intérêt.
 - Motorsport Manager Mobile a rencontré le succès sur ce modèle payant sans publicité.
 - Un modèle free-to-play imposerait de concevoir le jeu autour de la monétisation (attentes artificielles, système d'énergie, packs de talents), en contradiction directe avec le parti pris réaliste du projet.
@@ -639,7 +641,60 @@ Justification à conserver pour cette décision future :
 
 ---
 
-## 22. Points ouverts / à trancher
+## 22. Développement de la structure du manager [V2]
+
+Ces fonctionnalités constituent le contenu de fin de partie (endgame). Une fois la F1 atteinte et les revenus assurés, le manager réinvestit ses gains dans sa propre structure, ce qui donne un objectif au joueur au-delà de la réussite sportive.
+
+### 22.1 Locaux et bureaux [V2]
+
+Le manager peut acquérir des locaux, chacun avec un coût d'achat et des charges mensuelles :
+
+| Local | Effet |
+|---|---|
+| Bureau de scouting | Permet d'employer davantage de recruteurs |
+| Département marketing | Améliore l'obtention et la valeur des sponsors |
+| Bureau juridique | Améliore les conditions obtenues en négociation de contrat |
+| Antennes à l'étranger (Italie, Brésil, Japon...) | Donne accès aux talents locaux de ces régions |
+
+**Lien avec le multi-pilotes :** les locaux conditionnent la capacité de gestion. Sans structure adaptée, le manager ne peut pas suivre correctement plusieurs pilotes (voir section 15).
+
+### 22.2 Académie de pilotes [V2]
+
+Le véritable contenu de fin de partie : au lieu de chercher des talents, le manager les forme lui-même.
+
+- Recrutement d'enfants de 8 à 12 ans, formés sur plusieurs saisons.
+- Coût élevé et retour sur investissement long (5 à 10 saisons de jeu).
+- En contrepartie, le manager maîtrise leur formation et **connaît leur potentiel réel** (plus d'estimation floue, contrairement au scouting classique).
+- Les pilotes formés en surplus peuvent être vendus à d'autres écuries : nouvelle source de revenus.
+
+### 22.3 Devenir Team Principal en F1 [V3]
+
+Ambition à long terme : monter et diriger sa propre écurie de Formule 1 — recrutement d'ingénieurs, gestion d'une usine, respect du plafond budgétaire, développement de la monoplace, gestion de deux pilotes.
+
+**Avertissement de périmètre :** cette extension représente pratiquement un second jeu greffé sur le premier. Elle est conservée comme ambition, mais explicitement hors périmètre des premières versions, sous peine de ne jamais aboutir.
+
+---
+
+## 23. Direction artistique et interface [V2]
+
+### 23.1 Méthode de travail
+
+**L'interface est travaillée après validation du gameplay, jamais avant.** Le prototype V1 peut être visuellement rudimentaire : son seul objectif est de vérifier que la boucle de jeu est plaisante. Le soin graphique intervient ensuite, une fois le jeu jugé amusant.
+
+### 23.2 Référence visuelle retenue : Motorsport Manager
+
+Le style visuel de Motorsport Manager Mobile est pris comme référence. Son atout majeur : il paraît haut de gamme tout en restant **entièrement réalisable en 2D** — les véhicules sont des rendus fixes, pas de la 3D temps réel.
+
+Éléments à reprendre :
+- **Palette resserrée** : fond bleu-gris foncé, une seule couleur d'accent (turquoise) pour tous les boutons d'action. Deux couleurs dominantes, pas davantage.
+- **Typographie condensée en majuscules** pour les titres, avec une hiérarchie nette entre titre et sous-titre.
+- **Système de cartes** à coins arrondis, chacune illustrée par une vignette — structure facile à décliner sur mobile.
+- **Découpes en diagonale** dans les blocs principaux : c'est ce qui donne l'identité sport automobile et évite l'aspect application administrative.
+- **Densité faible** sur l'écran d'accueil : beaucoup d'espace vide, peu d'informations affichées simultanément.
+
+---
+
+## 24. Points ouverts / à trancher
 
 - Écrans et interface détaillée, à définir une fois la boucle de jeu validée.
 - Ajustement final des coefficients après les premiers tests du prototype.
@@ -647,11 +702,12 @@ Justification à conserver pour cette décision future :
 
 ---
 
-## 23. Prochaines étapes suggérées
+## 25. Prochaines étapes suggérées
 
 1. Définir la boucle de jeu complète écran par écran.
 2. Construire un **prototype jouable en HTML** limité au périmètre V1, pour vérifier que la boucle de base est amusante avant tout développement mobile natif.
 3. Ajuster les formules et l'équilibrage à partir des tests du prototype.
+4. Travailler l'interface une fois le gameplay validé, en s'appuyant sur la référence visuelle de la section 23.2.
 
 ---
 
