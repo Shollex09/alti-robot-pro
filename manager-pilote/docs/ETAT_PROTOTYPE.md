@@ -134,11 +134,12 @@ Autres arbitrages :
 - **Renvoi** : l'écurie fait le point toutes les 4 manches, 3 avertissements
   entraînent la rupture — un renvoi est donc impossible sur une saison de
   karting à 6 manches, ce qui est cohérent.
-- **Temps de piste** : 5 runs d'essais par week-end (6 en F1), plus 1 par
-  tranche de 2 niveaux d'ingénieur de course — soit 5 à 7. Le §18 ne chiffrait
-  pas ce budget ; à 3 runs, trouver un réglage à 4 paramètres relevait du hasard.
-  Chaque run essayé est conservé et peut être remonté sur la voiture à tout
-  moment du week-end, y compris une fois le temps de piste épuisé.
+- **Temps de piste** : 3 runs d'essais par week-end (4 en F1), plus 1 par
+  tranche de 2 niveaux d'ingénieur de course — soit 3 à 6. Le §18 ne chiffrait
+  pas ce budget. Trois runs sont volontairement courts : quand c'est trop juste,
+  la réponse est de recruter un ingénieur, qui achète à la fois du temps de piste
+  et de la précision. Chaque run essayé est conservé et peut être remonté sur la
+  voiture à tout moment du week-end, y compris une fois le temps de piste épuisé.
 - **Fatigue** : plusieurs semaines séparent deux manches, le pilote récupère
   donc `9 + 2,5 × niveau du préparateur` entre chaque course. Sans cette
   récupération, un manager qui utilise tout son temps de piste voyait la
@@ -173,10 +174,11 @@ Autres arbitrages :
   | 4 | tous | 2 crans | + l'ampleur en crans | fourchette ± 2,5 |
   | 5 | tous | 1 cran | + l'ampleur exacte | le chiffre exact |
 
-  Mesuré sur un joueur qui suit son pilote et l'aide-mémoire : réglage final de
-  81/100 sans ingénieur, 90 au niveau 2, 97 au niveau 3, 99 au niveau 4, 100 au
-  niveau 5. Courbe croissante à rendements décroissants — le dernier niveau coûte
-  12 000 €/mois pour trois points.
+  Mesuré sur un joueur qui suit son pilote et l'aide-mémoire, temps de piste
+  inclus : 3 runs et 75/100 sans ingénieur, 4 runs et 81 au niveau 1, 4 et 89 au
+  niveau 2, 5 et 97 au niveau 3, 5 et 99 au niveau 4, 6 runs et 100 au niveau 5.
+  Courbe croissante à rendements décroissants — le dernier niveau coûte
+  12 000 €/mois pour un demi-point.
 
   Un aide-mémoire symptôme → paramètre est affiché en permanence pendant les
   essais : c'est de la connaissance métier, pas l'information cachée du §18
@@ -222,9 +224,13 @@ Premier passage de jeu réel par l'auteur, deux points remontés, tous deux corr
    dans 20 questions situées, chacune avec ses réponses propres.
 2. **« Trois essais pour trouver la combinaison, c'est très dur. »** Exact
    aussi, surtout en karting : 4 paramètres × 20 crans en 3 runs, sans
-   ingénieur pour orienter. Temps de piste porté à 5-7 runs, meilleur réglage
-   rappelable d'un bouton avant les qualifs et avant la course, et
-   aide-mémoire symptôme → paramètre affiché en permanence.
+   ingénieur pour orienter. Meilleur réglage rappelable d'un bouton avant les
+   qualifs et avant la course, et aide-mémoire symptôme → paramètre affiché en
+   permanence. Le temps de piste avait été porté à 5-7 runs, puis **ramené à 3**
+   au passage suivant : une fois le rappel et l'aide-mémoire en place, l'auteur a
+   jugé 3 essais satisfaisants, l'ingénieur devenant la réponse quand c'est trop
+   juste. Les runs supplémentaires sont donc passés du barème de base au barème
+   de l'ingénieur.
 
 Deux effets de bord mesurés et corrigés dans la foulée.
 

@@ -1066,11 +1066,13 @@ function demarrerSaison(catId, ecurieId){
 
 const actionsParSemaine = ()=> 3;
 
-/* Temps de piste disponible sur un week-end. Un bon ingénieur en dégage davantage :
-   c'est la deuxième raison d'investir dans le staff, après la précision du retour. */
+/* Temps de piste disponible sur un week-end. Trois runs de base : c'est court,
+   et c'est voulu — quand c'est trop juste, la réponse est de recruter un
+   ingénieur de course, qui en dégage jusqu'à trois de plus.
+   0 → 3 runs · 1-2 → 4 · 3-4 → 5 · 5 → 6 (un de plus en F1). */
 function runsDisponibles(){
-  const base = CAT[S.saison.catId].format==='f1' ? 6 : 5;
-  return base + Math.floor(staffNiv('ingenieur')/2);
+  const base = CAT[S.saison.catId].format==='f1' ? 4 : 3;
+  return base + Math.ceil(staffNiv('ingenieur')/2);
 }
 
 /* ------------------------------------ 9. RÉGLAGES (GDD §18) */
