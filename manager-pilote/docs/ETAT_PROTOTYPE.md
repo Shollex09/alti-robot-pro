@@ -97,6 +97,14 @@ Autres arbitrages :
   pas ce budget ; à 3 runs, trouver un réglage à 4 paramètres relevait du hasard.
   Chaque run essayé est conservé et peut être remonté sur la voiture à tout
   moment du week-end, y compris une fois le temps de piste épuisé.
+- **Fatigue** : plusieurs semaines séparent deux manches, le pilote récupère
+  donc `9 + 2,5 × niveau du préparateur` entre chaque course. Sans cette
+  récupération, un manager qui utilise tout son temps de piste voyait la
+  fatigue saturer à 100 dès la 6e manche — il était puni d'utiliser la
+  fonctionnalité. Un run d'essais coûte désormais 0 à 2 points de fatigue
+  (contre 1 à 3), une course 6 à 12, une séance d'entraînement 7 à 13.
+  Sur une saison de 24 manches : fatigue finale ~32 sans rien forcer, 100 en
+  s'entraînant chaque semaine sans préparateur, ~46 avec un préparateur moyen.
 - **Retour du pilote** : 2 sensations remontées sans ingénieur, 3 à partir du
   niveau 2, 4 au niveau 4. L'ingénieur ne change pas la quantité d'information
   mais sa nature : sans lui, le pilote décrit un symptôme sans que personne ne
@@ -147,6 +155,13 @@ Premier passage de jeu réel par l'auteur, deux points remontés, tous deux corr
    ingénieur pour orienter. Temps de piste porté à 5-7 runs, meilleur réglage
    rappelable d'un bouton avant les qualifs et avant la course, et
    aide-mémoire symptôme → paramètre affiché en permanence.
+
+Cet ajout a révélé un défaut qui existait déjà, mais que 3 runs masquaient :
+**rien ne faisait récupérer le pilote entre deux manches.** En utilisant les
+nouveaux runs, la fatigue saturait à 100 dès la 6e course et la forme tombait
+à 41 pour le reste de la saison — le joueur était puni d'utiliser la
+fonctionnalité qu'il venait de demander. Corrigé par une récupération passive
+entre les manches, avec un test de non-régression dédié.
 
 ## Ce qui reste à faire avant de parler de « jeu »
 

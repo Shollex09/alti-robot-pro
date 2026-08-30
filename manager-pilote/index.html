@@ -1246,8 +1246,8 @@ function faireRun(){
   const sc = scoreReglages(course, w.setup, S.pilote);
   const ret= retourPilote(course, w.setup, S.pilote);
   w.runs.unshift({setup:{...w.setup}, score:sc.score, lignes:ret.lignes, ing:ret.commentaireIng, n:w.runs.length+1});
-  // Un run coûte un peu de fatigue
-  S.pilote.fatigue = clamp(S.pilote.fatigue + rint(1,3) - staffNiv('prepa'), 0, 100);
+  // Un run coûte quelques tours de fraîcheur, pas beaucoup plus.
+  S.pilote.fatigue = clamp(S.pilote.fatigue + rint(0,2) - staffNiv('prepa'), 0, 100);
   majForme();
   saveGame();
 }
@@ -2495,6 +2495,11 @@ function finirWeekend(){
     S.phase='semaine';
     S.actions=actionsParSemaine();
     S.flags.bonusReglages = 0;
+    // Plusieurs semaines séparent deux manches : le pilote récupère seul.
+    // Sans cela, un manager qui utilise tout son temps de piste finirait
+    // la saison avec un pilote épuisé, ce qui n'a aucun sens.
+    S.pilote.fatigue = clamp(S.pilote.fatigue - (9 + staffNiv('prepa')*2.5), 0, 100);
+    majForme();
     majSponsorsProspects();
   }
   saveGame();
