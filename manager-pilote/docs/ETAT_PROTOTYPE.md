@@ -105,6 +105,10 @@ Autres arbitrages :
   (contre 1 à 3), une course 6 à 12, une séance d'entraînement 7 à 13.
   Sur une saison de 24 manches : fatigue finale ~32 sans rien forcer, 100 en
   s'entraînant chaque semaine sans préparateur, ~46 avec un préparateur moyen.
+- **Réglages de l'IA** : `62 + 0,55 × (voiture − 60) ± 7`. Les écuries adverses
+  ont elles aussi des ingénieurs et le même temps de piste ; sans ce
+  relèvement, le joueur passé à 5-7 runs se retrouvait seul à bien régler sa
+  voiture et les 40 profils de départ se mettaient à se ressembler.
 - **Retour du pilote** : 2 sensations remontées sans ingénieur, 3 à partir du
   niveau 2, 4 au niveau 4. L'ingénieur ne change pas la quantité d'information
   mais sa nature : sans lui, le pilote décrit un symptôme sans que personne ne
@@ -156,7 +160,22 @@ Premier passage de jeu réel par l'auteur, deux points remontés, tous deux corr
    rappelable d'un bouton avant les qualifs et avant la course, et
    aide-mémoire symptôme → paramètre affiché en permanence.
 
-Cet ajout a révélé un défaut qui existait déjà, mais que 3 runs masquaient :
+Deux effets de bord mesurés et corrigés dans la foulée.
+
+Le premier : avec 5-7 runs, le joueur était le seul de la grille à bien régler
+sa voiture, et les profils de départ se sont mis à se ressembler — « budget
+très élevé / Inconnu », qui n'atteignait jamais la F1, y arrivait une fois sur
+deux. Le niveau de réglage des écuries adverses a été relevé en conséquence :
+travailler ses essais reste très payant (18,5e de moyenne en négligeant les
+réglages, 11,4e en les travaillant, soit 7 places d'écart), mais la piste n'est
+plus au joueur tout seul. Après correction, « budget très élevé / Inconnu »
+retombe à 2,0 titres par carrière contre 2,5 avant les deux fonctionnalités.
+
+À noter pour l'équilibrage : un réglage à 95/100 vaut autant qu'à 100/100
+(11,4e contre 12,4e, l'écart est du bruit). Chercher la combinaison parfaite
+n'est pas nécessaire, ce qui répond au fond du retour initial.
+
+Le second : un défaut qui existait déjà, mais que 3 runs masquaient :
 **rien ne faisait récupérer le pilote entre deux manches.** En utilisant les
 nouveaux runs, la fatigue saturait à 100 dès la 6e course et la forme tombait
 à 41 pour le reste de la saison — le joueur était puni d'utiliser la
