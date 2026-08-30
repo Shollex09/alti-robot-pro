@@ -889,18 +889,42 @@ function genererScoutPool(){
     const catKart = age<=10?'kmini' : age<=12?'kcadet' : 'kjunior';
     pool.push(creerPilote({age, potId, role:'candidat', catId:catKart}));
   }
-  // Un manager très réputé voit aussi des pilotes déjà installés en monoplace.
+  // Un manager très réputé voit aussi des pilotes déjà installés en monoplace —
+  // mais seulement dans une catégorie qu'il peut réellement financer. Proposer un
+  // pilote de F3 à un manager qui a 20 000 € n'est pas une opportunité, c'est un
+  // piège : le §8.2 bloquera la suite et la trésorerie fondra pour rien.
   if(rp>=4){
-    const c = rp>=9?'f2' : rp>=7?'f3' : 'f4';
-    for(let i=0;i<(rp>=7?3:2);i++){
-      const p = creerPiloteIA(c);
-      p.role='candidat'; p.observe=0; p.seedEst=Math.random();
-      p.reputation = clamp(Math.round(20+CAT[c].niv*6+rnd(18)),5,90);
-      pool.push(p);
+    const vise = rp>=9?'f2' : rp>=7?'f3' : 'f4';
+    let c = null;
+    for(let niv=CAT[vise].niv; niv>=5; niv--){
+      const cand = catByNiv(niv);
+      if(S.manager.budget + potentielSponsorsSaison(cand.id) >= cand.cout*0.6){ c = cand.id; break; }
+    }
+    if(c){
+      for(let i=0;i<(rp>=7?3:2);i++){
+        const p = creerPiloteIA(c);
+        p.role='candidat'; p.observe=0; p.seedEst=Math.random();
+        p.reputation = clamp(Math.round(20+CAT[c].niv*6+rnd(18)),5,90);
+        pool.push(p);
+      }
     }
   }
   S.monde.scoutPool = pool;
   S.monde.poolAnnee = S.annee;
+}
+
+/* Ce qu'un manager de cette réputation peut raisonnablement lever en sponsors
+   sur une saison, compte tenu des emplacements publicitaires de la catégorie.
+   Sert à ne proposer que des pilotes dont la saison est finançable. */
+function potentielSponsorsSaison(catId){
+  const rp = repPalier(S.manager.repPoints).p;
+  const slots = CAT[catId].slots;
+  const acc = SPONSOR_NIVEAUX.filter(n=>rp >= n.repMin-1);
+  if(!acc.length) return 0;
+  const med = n => (n.min+n.max)/2 * 0.55;      // estimation prudente
+  const top = acc[acc.length-1];
+  const sous = acc[Math.max(0, acc.length-2)];
+  return Math.round(Math.ceil(slots/2)*med(top) + Math.floor(slots/2)*med(sous));
 }
 
 /* Estimation floue d'une valeur — la marge dépend du scout et des observations.
@@ -1065,6 +1089,34 @@ function scoreReglages(course, setup, pilote){
   const score = 100 * (1 - Math.pow(Math.min(1, moy/9), 1.25)) + (S.flags.bonusReglages||0);
   return {score: clamp(score,0,100), ecarts, moy};
 }
+/* Ce que le stand croit savoir de la qualité d'un réglage.
+   Sans ingénieur il n'y a pas de mesure : il ne reste que le ressenti du pilote,
+   qui se trompe. C'est ce qui justifie d'investir dans le staff (GDD §18.3) —
+   sinon il suffirait d'optimiser un chiffre affiché sans jamais écouter personne. */
+const BRUIT_MESURE = [12, 9, 7, 5, 2.5, 0];
+function scorePercu(scoreReel, seed){
+  const niv = staffNiv('ingenieur');
+  const bruit = BRUIT_MESURE[niv];
+  if(bruit<=0) return scoreReel;
+  return clamp(scoreReel + (hash01(String(seed))*2-1)*bruit, 0, 100);
+}
+/* Rendu du score selon ce que l'ingénieur permet de savoir. */
+function afficheScore(percu, nivForce){
+  const niv = nivForce ?? staffNiv('ingenieur');
+  if(niv>=5) return {txt:Math.round(percu)+'/100', cls: percu>78?'t-green':percu>55?'t-amber':'t-red'};
+  if(niv>=3){
+    const m = BRUIT_MESURE[niv];
+    return {txt:Math.max(0,Math.round(percu-m))+'–'+Math.min(100,Math.round(percu+m))+'/100',
+            cls: percu>78?'t-green':percu>55?'t-amber':'t-red'};
+  }
+  const lab = percu<45 ? 'il n’est pas à l’aise'
+            : percu<62 ? 'ça reste moyen'
+            : percu<78 ? 'ça commence à venir'
+            : percu<90 ? 'il est bien dedans'
+            : 'il adore la voiture';
+  return {txt:lab, cls: percu>78?'t-green':percu>55?'t-amber':'t-red'};
+}
+
 /* Retour du pilote en langage naturel. La précision dépend de l'ingénieur (GDD §18.3). */
 function retourPilote(course, setup, pilote){
   const params = setupParams(S.saison.catId);
@@ -1076,10 +1128,13 @@ function retourPilote(course, setup, pilote){
   }).sort((a,b)=>b.abs-a.abs);
 
   const lignes = [];
-  // Sans ingénieur, on a moins de direction — mais autant de sensations :
-  // le pilote décrit plusieurs symptômes, c'est au manager de les traduire.
-  const nbSymptomes = niv>=4?4 : niv>=2?3 : 2;
-  const seuil = niv>=4?1 : 2;
+  // Chaque niveau d'ingénieur achète quelque chose de précis :
+  //   0-1 : le pilote décrit ce qu'il sent, à vous de traduire (aide-mémoire)
+  //   2-3 : l'ingénieur nomme le correctif, sans son ampleur
+  //     4 : il chiffre l'ampleur, et repère les écarts à partir de 2 crans
+  //     5 : il repère jusqu'au cran près, sur tous les paramètres
+  const nbSymptomes = niv>=4 ? params.length : niv===3 ? 4 : niv===2 ? 3 : 2;
+  const seuil       = niv>=5 ? 1 : niv>=3 ? 2 : niv===2 ? 3 : 4;
 
   for(const it of detail.slice(0,nbSymptomes)){
     if(it.abs<seuil) continue;
@@ -1097,11 +1152,13 @@ function retourPilote(course, setup, pilote){
   if(!lignes.length){
     lignes.push(niv>=3 ? 'La voiture est équilibrée, je n’ai plus rien à redire.' : 'Ça va, je m’y retrouve bien.');
   }
+  // Le commentaire doit décrire exactement ce que les lignes ci-dessus disent.
   const commentaireIng = niv===0
-    ? 'Sans ingénieur de course, personne ne traduit ces sensations en réglages.'
-    : niv<=2 ? 'Votre ingénieur reste évasif sur la marche à suivre.'
-    : niv<=4 ? 'Votre ingénieur sait où chercher.'
-    : 'Votre ingénieur identifie précisément le correctif.';
+    ? 'Sans ingénieur, personne ne traduit ces sensations en réglages : à vous de faire le lien.'
+    : niv===1 ? 'Votre ingénieur confirme les sensations sans savoir quoi corriger.'
+    : niv<=3 ? 'Votre ingénieur nomme le correctif, mais pas son ampleur.'
+    : niv===4 ? 'Votre ingénieur chiffre la correction à un cran près.'
+    : 'Votre ingénieur lit la voiture comme un livre : correctif et ampleur exacts.';
   return {lignes, commentaireIng};
 }
 
@@ -1268,7 +1325,11 @@ function faireRun(){
   w.runsRestants--;
   const sc = scoreReglages(course, w.setup, S.pilote);
   const ret= retourPilote(course, w.setup, S.pilote);
-  w.runs.unshift({setup:{...w.setup}, score:sc.score, lignes:ret.lignes, ing:ret.commentaireIng, n:w.runs.length+1});
+  const n = w.runs.length+1;
+  w.runs.unshift({setup:{...w.setup}, score:sc.score,
+    percu: scorePercu(sc.score, course.seed+'|run'+n+'|'+Math.round(sc.score)),
+    nivIng: staffNiv('ingenieur'),
+    lignes:ret.lignes, ing:ret.commentaireIng, n});
   // Un run coûte quelques tours de fraîcheur, pas beaucoup plus.
   S.pilote.fatigue = clamp(S.pilote.fatigue + rint(0,2) - staffNiv('prepa'), 0, 100);
   majForme();
@@ -3147,10 +3208,12 @@ function renderWeekend(){
   });
 }
 
+/* Le « meilleur » run est le meilleur selon ce que le stand croit savoir.
+   Sans ingénieur, ce jugement est celui du pilote — et il peut se tromper. */
 function meilleurRun(){
   const w=S.weekend;
   if(!w || !w.runs.length) return null;
-  return w.runs.reduce((b,r)=> !b || r.score>b.score ? r : b, null);
+  return w.runs.reduce((b,r)=> !b || (r.percu??r.score)>(b.percu??b.score) ? r : b, null);
 }
 function memeSetup(a,b){
   return setupParams(S.saison.catId).every(p=>(a[p.k]??10)===(b[p.k]??10));
@@ -3160,20 +3223,26 @@ function memeSetup(a,b){
 function rappelMeilleurReglage(course){
   const w=S.weekend, best=meilleurRun();
   if(!best) return '';
-  const actuel = scoreReglages(course, w.setup, S.pilote).score;
   const dejaDessus = memeSetup(w.setup, best.setup);
+  const niv = staffNiv('ingenieur');
+  const runMonte = w.runs.find(r=>memeSetup(w.setup, r.setup));
+  const aff = afficheScore(best.percu??best.score, best.nivIng);
+  const affMonte = runMonte ? afficheScore(runMonte.percu??runMonte.score, runMonte.nivIng) : null;
   return `<div class="card ${dejaDessus?'flat':'accent'}">
     <h2>Réglage retenu<span class="hint">${w.runs.length} run(s) fait(s)</span></h2>
     <div class="row" style="align-items:center">
       <div style="flex:1">
-        <div class="note">Réglage actuellement monté sur la voiture :
-          <b class="${actuel>78?'txt-green':actuel>55?'txt-amber':'txt-red'}">${Math.round(actuel)}/100</b></div>
-        <div class="note txt-muted">Meilleur trouvé en essais : <b>${Math.round(best.score)}/100</b> (run ${best.n})</div>
+        <div class="note">Sur la voiture : ${runMonte
+          ? `réglage du run ${runMonte.n} — <b class="${affMonte.cls==='t-green'?'txt-green':affMonte.cls==='t-amber'?'txt-amber':'txt-red'}">${affMonte.txt}</b>`
+          : `<span class="txt-muted">un réglage jamais essayé en piste</span>`}</div>
+        <div class="note txt-muted">${niv>=3?'Meilleur':'Le mieux ressenti'} en essais : <b>${aff.txt}</b> (run ${best.n})</div>
       </div>
       ${dejaDessus
-        ? tag('C’est le meilleur','t-green')
-        : `<button class="btn btn-sm" data-act="reprendreReglage" data-n="${best.n}">Reprendre le meilleur</button>`}
+        ? tag(niv>=3?'C’est le meilleur':'C’est celui-là','t-green')
+        : `<button class="btn btn-sm" data-act="reprendreReglage" data-n="${best.n}">Reprendre ${niv>=3?'le meilleur':'celui-là'}</button>`}
     </div>
+    ${niv<3?`<div class="note txt-muted mt">Sans ingénieur confirmé, personne ne mesure vraiment le réglage :
+      ce classement est le ressenti du pilote, et il peut se tromper.</div>`:''}
   </div>`;
 }
 
@@ -3207,8 +3276,8 @@ function vueEssais(course, meteo){
       h += `<div class="${i?'mt2':''}">
         <div class="row tight">
           <b class="small">Run ${r.n}</b>
-          ${tag('Réglages '+Math.round(r.score)+'/100', r.score>78?'t-green':r.score>55?'t-amber':'t-red')}
-          ${estBest?tag('meilleur','t-amber'):''}
+          ${(()=>{const a=afficheScore(r.percu??r.score, r.nivIng);return tag(a.txt,a.cls);})()}
+          ${estBest?tag(staffNiv('ingenieur')>=3?'meilleur':'le mieux ressenti','t-amber'):''}
           <div class="spacer"></div>
           ${monte
             ? `<span class="small txt-muted">monté sur la voiture</span>`
@@ -3234,8 +3303,10 @@ function vueEssais(course, meteo){
       <tr><td class="wrap">${escapeHtml(pm.lo)}</td><td>${pm.n}</td><td class="txt-green">${escapeHtml(pm.loFix)}</td></tr>
       <tr><td class="wrap">${escapeHtml(pm.hi)}</td><td>${pm.n}</td><td class="txt-blue">${escapeHtml(pm.hiFix)}</td></tr>`).join('')}
     </tbody></table></div>
-    <div class="note txt-muted mt">Qualité actuelle des réglages : <b>${Math.round(sc)}/100</b> —
-    cette variable pèse 15 % de la performance en course.</div>
+    <div class="note txt-muted mt">${staffNiv('ingenieur')>=5
+      ? `Votre ingénieur expert mesure le réglage actuel à <b>${Math.round(sc)}/100</b>.`
+      : `La qualité d’un réglage ne se mesure qu’en piste, et seul un ingénieur expert la chiffre exactement.`}
+      Cette variable pèse 15 % de la performance en course.</div>
   </div>`;
   return h;
 }

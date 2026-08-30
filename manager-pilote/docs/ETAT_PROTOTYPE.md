@@ -160,12 +160,27 @@ Autres arbitrages :
   ont elles aussi des ingénieurs et le même temps de piste ; sans ce
   relèvement, le joueur passé à 5-7 runs se retrouvait seul à bien régler sa
   voiture et les 40 profils de départ se mettaient à se ressembler.
-- **Retour du pilote** : 2 sensations remontées sans ingénieur, 3 à partir du
-  niveau 2, 4 au niveau 4. L'ingénieur ne change pas la quantité d'information
-  mais sa nature : sans lui, le pilote décrit un symptôme sans que personne ne
-  nomme le correctif. Un aide-mémoire symptôme → paramètre est affiché en
-  permanence pendant les essais : c'est de la connaissance métier, pas
-  l'information cachée du §18 (laquelle reste la *valeur* optimale du circuit).
+- **Ce que chaque niveau d'ingénieur achète** (GDD §18.3). Le principe : sans
+  ingénieur, il n'existe aucune *mesure* du réglage — seulement le ressenti du
+  pilote, qui se trompe. C'est ce qui justifie le salaire.
+
+  | Niveau | Sensations remontées | Seuil de détection | Ce qu'il dit | Mesure du réglage |
+  |---|---|---|---|---|
+  | 0 (gratuit) | 2 | 4 crans | le symptôme seul | un ressenti (« il n'est pas à l'aise ») |
+  | 1 | 2 | 4 crans | le symptôme seul | ressenti, ± 9 |
+  | 2 | 3 | 3 crans | + le correctif | ressenti, ± 7 |
+  | 3 | 4 | 2 crans | + le correctif | fourchette ± 5 |
+  | 4 | tous | 2 crans | + l'ampleur en crans | fourchette ± 2,5 |
+  | 5 | tous | 1 cran | + l'ampleur exacte | le chiffre exact |
+
+  Mesuré sur un joueur qui suit son pilote et l'aide-mémoire : réglage final de
+  81/100 sans ingénieur, 90 au niveau 2, 97 au niveau 3, 99 au niveau 4, 100 au
+  niveau 5. Courbe croissante à rendements décroissants — le dernier niveau coûte
+  12 000 €/mois pour trois points.
+
+  Un aide-mémoire symptôme → paramètre est affiché en permanence pendant les
+  essais : c'est de la connaissance métier, pas l'information cachée du §18
+  (laquelle reste la *valeur* optimale du circuit).
 - **Conférence de presse** : 20 questions réparties en 6 situations (victoire,
   podium, points, course neutre, contre-performance, abandon), tirées au sort
   sans répétition immédiate. Chaque question porte ses propres réponses : une
@@ -232,6 +247,26 @@ nouveaux runs, la fatigue saturait à 100 dès la 6e course et la forme tombait
 à 41 pour le reste de la saison — le joueur était puni d'utiliser la
 fonctionnalité qu'il venait de demander. Corrigé par une récupération passive
 entre les manches, avec un test de non-régression dédié.
+
+## Deuxième passage de jeu, retours et suites
+
+1. **« L'ingénieur ne me sert à rien. »** Exact, et c'était structurel : le score
+   du réglage était affiché en clair (« Réglages 88/100 ») à chaque run. On
+   pouvait donc optimiser au chiffre sans jamais lire le pilote, ce qui annulait
+   la raison d'être du poste. La mesure est devenue un service de l'ingénieur —
+   voir la table ci-dessus. S'y ajoutait une incohérence : au niveau 2 le pilote
+   nommait bien le correctif, mais le commentaire affirmait que l'ingénieur
+   « reste évasif ». Les seuils des deux textes sont désormais alignés.
+
+2. **Le vivier proposait des pilotes non finançables** (levier 2 activé à la
+   demande). Un manager de réputation 5 disposant de 20 000 € se voyait offrir un
+   pilote déjà engagé en F3, dont la saison coûte 900 000 €. Le vivier ne propose
+   plus de pilote installé que si sa catégorie est finançable au regard de la
+   trésorerie et du potentiel de sponsors du palier de réputation. Effet mesuré
+   sur le profil « budget faible + réputation 5 » : de 7 faillites sur 10 à 2 sur 8,
+   avec 6 accès à la F1 sur 8. À réputation 9, les pilotes de F2 restent proposés,
+   puisque le potentiel de sponsors couvre réellement la saison — le profil
+   « budget faible + International » du §2.2 garde donc tout son intérêt.
 
 ## Suites données au GDD v0.7
 
