@@ -24,7 +24,7 @@ ne les fixait pas.
 | 4.5 | Sponsors personnels vs écurie | ✅ | En F1 le pilote est payé, les sponsors restent |
 | 4.6 | Pilotes payants | ✅ | Le budget apporté compense jusqu'à 22 pts de note |
 | 5.1 | Potentiel caché | ✅ | Fourchettes, jamais la valeur exacte — y compris pour son propre pilote |
-| 5.2 | Réseau de scouts par région | ⛔ | V2 |
+| 5.2 | Réseau de scouts par région | ✅ | Huit régions, antennes payantes, écoles de pilotage locales |
 | 5.3 | Managers rivaux | ✅ | Six managers IA signent dans le même vivier ; convoitise annoncée, classement des managers |
 | 6 | 9 statistiques en 3 groupes | ✅ | |
 | 6.4 | Potentiel, agressivité, réputation, moral, forme | ✅ | |
@@ -739,10 +739,79 @@ places, l'annonce de la convoitise, l'impossibilité de reprendre le pilote du
 joueur, la progression annuelle des écuries rivales (plafond, âge, retraite), le
 classement, la courbe de risque ci-dessus et l'unicité des patronymes.
 
+## §5.2 — le réseau de scouts par région
+
+Un manager débutant ne voit que son propre territoire. Ouvrir une antenne
+ailleurs élargit le vivier et donne accès à une école de pilotage différente.
+
+### Huit régions
+
+| Région | Coût mensuel | École | Ce qu'on y trouve |
+|---|---|---|---|
+| France | incluse | — | Votre réseau d'origine |
+| Europe de l'Ouest | 900 € | Racecraft | La filière la plus dense, peu de pépites cachées |
+| Europe du Sud | 1 100 € | Pace | Les écoles de karting historiques |
+| Scandinavie | 1 400 € | Consistency | Peu de pilotes, un sang-froid rare |
+| Europe de l'Est | 800 € | — | Un vivier délaissé, donc bon marché |
+| Amérique du Sud | 2 200 € | Pace | Talent brut fréquent, formation inégale |
+| Asie | 2 600 € | Consistency | Discipline de travail, loin de tout |
+| Amérique du Nord | 2 400 € | Racecraft | Des pilotes très adaptables |
+
+Ouvrir coûte trois mois d'avance, puis un loyer mensuel qui entre dans la masse
+salariale. Le vivier ne se recompose qu'à l'intersaison suivante : ouvrir une
+antenne est un investissement, pas un achat immédiat.
+
+### Une école, pas un bonus
+
+Chaque région penche vers une qualité **au détriment des autres** : le total
+reste constant. On ne recrute pas au Brésil pour avoir un pilote meilleur
+partout, mais pour un profil différent. Mesuré sur 40 viviers par région (note
+moyenne du groupe) :
+
+| Région | Pace | Consistency | Racecraft |
+|---|---|---|---|
+| France | 40,0 | 40,0 | 39,9 |
+| Europe du Sud | 40,9 | 38,2 | 38,3 |
+| Scandinavie | 39,0 | 41,5 | 39,1 |
+| Amérique du Nord | 38,9 | 38,9 | 41,4 |
+| Europe de l'Ouest | 37,8 | 37,8 | 40,7 |
+
+L'écart de total entre régions reste sous 4 points : aucune n'est objectivement
+meilleure, elles sont différentes.
+
+### Ce qui rend l'Europe de l'Est intéressante
+
+C'est l'endroit où le §5.2 et le §5.3 s'emboîtent. Chaque manager rival a son
+propre réseau, et toutes les régions ne sont pas également surveillées : sur six
+rivaux, cinq suivent l'Europe de l'Ouest, moins d'un suit l'Europe de l'Est.
+
+La description promise au joueur — « un vivier moins couru, donc moins cher, et
+moins bien évalué par les autres managers » — est donc vraie, et mesurable.
+Risque de se faire doubler après quatre observations :
+
+| Région | Risque |
+|---|---|
+| Europe de l'Ouest | 47 % |
+| Europe du Sud | 47 % |
+| Asie | 20 % |
+| Europe de l'Est | 10 % |
+
+L'antenne la moins chère du jeu (800 €/mois) achète donc un marché tranquille,
+où l'on peut se permettre d'observer avant de signer. C'est une vraie stratégie
+alternative au scout de haut niveau.
+
+### Test
+
+`unit11.js` couvre le §5.2 : 27 assertions sur la couverture initiale,
+l'exclusivité des pays par région, le filtrage du vivier, l'élargissement par
+antenne, les biais d'école (avec la contrainte de somme constante), l'ouverture
+et la fermeture avec leur coût, et la surveillance différenciée des rivaux avec
+son effet mesuré sur le risque.
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - La réglementation évolutive d'une saison à l'autre (§11), marquée V2.
 - La gestion tour par tour de la course (§12) : il n'y a qu'un seul arbitrage
   à mi-course, pas un suivi continu.
-- Le reste du périmètre V2 : réseau de scouts par région (§5.2), blessures (§7.3), entourage du pilote (§7.4), voies
+- Le reste du périmètre V2 : blessures (§7.3), entourage du pilote (§7.4), voies
   alternatives (§8.4), locaux (§22.1) et académie (§22.2).

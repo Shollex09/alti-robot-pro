@@ -703,6 +703,62 @@ const NIV_LABEL = ['—','Débutant','Confirmé','Solide','Très bon','Expert'];
 /* --- 1.9 Noms de pilotes --- */
 const PRENOMS = ['Lucas','Enzo','Mathis','Nathan','Théo','Hugo','Léo','Raphaël','Gabriel','Adam','Jules','Louis','Arthur','Noah','Ethan','Tom','Maël','Sacha','Timéo','Axel','Matteo','Diego','Rafael','Marco','Luca','Andrea','Nico','Kai','Finn','Oscar','Liam','Jack','Oliver','Max','Felix','Jonas','Aaron','Elias','Nikita','Yuki','Sota','Ren','Caio','Bruno','Santiago','Mateo','Emil','Viktor','Lars','Sven'];
 const NOMS = ['Berthier','Vasseur','Lemoine','Chastel','Ferrand','Delaunay','Rochet','Marchal','Aubry','Nivelle','Rossi','Bianchi','Marino','Costa','Ferraro','Moretti','Vidal','Herrera','Márquez','Solano','Duarte','Almeida','Weber','Brandt','Keller','Hofmann','Nyström','Lindqvist','Andersen','Halvorsen','Whitmore','Ashcroft','Bramley','Kingsley','Hartley','Novak','Kovacs','Petrov','Ivanov','Tanaka','Hayashi','Morimoto','Silva','Oliveira','Carvalho','Van Dijk','De Vries','Janssen','Kowalski','Nowak'];
+/* --- 1.9bis Régions de repérage (GDD §5.2) ---------------------------------
+   Un manager débutant ne voit que son propre territoire. Ouvrir une antenne
+   dans une région élargit le vivier, et chaque région a son école : on ne
+   recrute pas au Brésil pour les mêmes qualités qu'en Finlande. */
+const REGIONS = [
+  {id:'fr',   nom:'France',            pays:['France'],
+   cout:0,      lab:'Votre territoire', ecole:null,
+   d:'Votre réseau d’origine. Ouvert dès le départ.'},
+  {id:'eur',  nom:'Europe de l’Ouest', pays:['Royaume-Uni','Allemagne','Pays-Bas','Belgique','Suisse','Autriche'],
+   cout:900,    lab:'Le vivier le plus dense', ecole:'racecraft',
+   d:'La filière la plus fournie : beaucoup de pilotes bien formés, peu de pépites cachées.'},
+  {id:'lat',  nom:'Europe du Sud',     pays:['Italie','Espagne','Portugal'],
+   cout:1100,   lab:'Écoles de karting', ecole:'pace',
+   d:'Les écoles de karting historiques. On y trouve de la vitesse pure.'},
+  {id:'nord', nom:'Scandinavie',       pays:['Danemark','Suède','Finlande'],
+   cout:1400,   lab:'Sang-froid', ecole:'consistency',
+   d:'Peu de pilotes, mais une régularité et un sang-froid rares.'},
+  {id:'est',  nom:'Europe de l’Est',   pays:['Pologne','Tchéquie','Hongrie'],
+   cout:800,   lab:'Bon marché', ecole:null,
+   d:'Un vivier moins couru, donc moins cher — et moins bien évalué par les autres managers.'},
+  {id:'sud',  nom:'Amérique du Sud',   pays:['Brésil','Argentine','Colombie'],
+   cout:2200,   lab:'Talent brut', ecole:'pace',
+   d:'Le talent brut y est plus fréquent, mais la formation est inégale.'},
+  {id:'asie', nom:'Asie',              pays:['Japon','Corée du Sud','Thaïlande'],
+   cout:2600,   lab:'Discipline', ecole:'consistency',
+   d:'Formation méthodique et discipline de travail. Loin de tout, donc cher à couvrir.'},
+  {id:'am',   nom:'Amérique du Nord',  pays:['États-Unis','Canada','Mexique'],
+   cout:2400,   lab:'Polyvalence', ecole:'racecraft',
+   d:'Des pilotes habitués à changer de discipline, très adaptables.'},
+];
+const REGION = Object.fromEntries(REGIONS.map(r=>[r.id,r]));
+/* Probabilité qu'un manager rival surveille la région. Les filières courues le
+   sont par tout le monde ; l'Europe de l'Est ne l'est presque par personne, ce
+   qui fait tout l'intérêt d'y ouvrir une antenne (GDD §5.2 + §5.3). */
+const REGION_SURVEILLANCE = {fr:0.75, eur:0.85, lat:0.75, nord:0.45, est:0.12, sud:0.5, asie:0.3, am:0.4};
+const PAYS_REGION = {};
+for(const r of REGIONS) for(const p of r.pays) PAYS_REGION[p]=r.id;
+
+/* Régions couvertes par le réseau du manager. */
+function regionsCouvertes(){
+  const l = ['fr'];
+  for(const id of (S.scoutsRegion||[])) if(REGION[id] && !l.includes(id)) l.push(id);
+  return l;
+}
+function regionCouverte(id){ return regionsCouvertes().includes(id); }
+/* Pays visibles par le repérage, selon les antennes ouvertes. */
+function paysCouverts(){
+  const out=[];
+  for(const id of regionsCouvertes()) out.push(...REGION[id].pays);
+  return out;
+}
+/* Coût mensuel total des antennes régionales. */
+function coutScoutsRegion(){
+  return sum(regionsCouvertes().map(id=>REGION[id]), r=>r.cout);
+}
+
 const PAYS = ['France','France','France','Italie','Espagne','Royaume-Uni','Allemagne','Pays-Bas','Belgique','Brésil','Japon','Danemark','Suède','Pologne','Portugal','Suisse','Autriche','Finlande'];
 /* Noms déjà servis dans la partie : deux pilotes de la même écurie qui
    partagent leur patronyme donnent l'impression d'un bug. */
@@ -1021,6 +1077,7 @@ function nouvellePartie(budgetId, repPalierId, nomManager){
     manche: 0,                        // tour du calendrier commun
     manches: 0,                       // nombre de tours de la saison en cours
     staff: {},                        // roleId -> {niv, salaire, nom}
+    scoutsRegion: [],                 // antennes régionales ouvertes (GDD §5.2)
     inbox: [],
     finances: [],                     // {annee, lab, montant, type}
     historique: [],                   // saisons terminées
@@ -1068,14 +1125,17 @@ function caisse(lab, montant, type='saison'){
   S.saison.mouvements.unshift({lab, montant, type, date:dateCourante()});
   if(S.saison.mouvements.length>200) S.saison.mouvements.length=200;
 }
-const staffCoutMensuel = ()=> sum(Object.values(S.staff), s=>s.salaire);
+const staffCoutMensuel = ()=> sum(Object.values(S.staff), s=>s.salaire) + coutScoutsRegion();
 function staffNiv(roleId){ return S.staff[roleId] ? S.staff[roleId].niv : 0; }
 
 /* --------------------------------------- 7. SCOUTING (GDD §5, §13) */
 /* Taille et qualité du vivier selon la réputation du manager. */
 function genererScoutPool(){
   const rp = repPalier(S.manager.repPoints).p;
-  const n  = clamp(4 + Math.floor(rp*0.9), 4, 12);
+  // Chaque antenne régionale ouverte élargit le vivier (GDD §5.2).
+  const regions = regionsCouvertes();
+  const n  = clamp(4 + Math.floor(rp*0.9) + (regions.length-1)*2, 4, 20);
+  const pays = paysCouverts();
   const pool = [];
   for(let i=0;i<n;i++){
     // Plus la réputation est haute, plus on tombe sur de vrais talents.
@@ -1083,7 +1143,9 @@ function genererScoutPool(){
     const potId = r>1.02?4 : r>0.78?3 : r>0.38?2 : 1;
     const age = rint(9,14);
     const catKart = age<=10?'kmini' : age<=12?'kcadet' : 'kjunior';
-    pool.push(creerPilote({age, potId, role:'candidat', catId:catKart}));
+    const p = creerPilote({age, potId, role:'candidat', catId:catKart, pays:pick(pays)});
+    ecoleRegionale(p);
+    pool.push(p);
   }
   // Un manager très réputé voit aussi des pilotes déjà installés en monoplace —
   // mais seulement dans une catégorie qu'il peut réellement financer. Proposer un
@@ -1100,6 +1162,8 @@ function genererScoutPool(){
       for(let i=0;i<(rp>=7?3:2);i++){
         const p = creerPiloteIA(c);
         p.role='candidat'; p.observe=0; p.seedEst=Math.random();
+        p.pays = pick(pays);                 // eux aussi viennent des régions couvertes
+        ecoleRegionale(p);
         p.reputation = clamp(Math.round(20+CAT[c].niv*6+rnd(18)),5,90);
         pool.push(p);
       }
@@ -1107,6 +1171,22 @@ function genererScoutPool(){
   }
   S.monde.scoutPool = pool;
   S.monde.poolAnnee = S.annee;
+}
+
+/* Chaque région a son école : la formation locale penche vers une qualité, au
+   détriment des autres. Le total reste constant — on ne recrute pas au Brésil
+   pour avoir un pilote meilleur partout, mais pour un profil différent. */
+function ecoleRegionale(p){
+  const reg = REGION[PAYS_REGION[p.pays]];
+  if(!reg || !reg.ecole) return;
+  for(const g of STAT_GROUPES){
+    const favorise = g.id===reg.ecole;
+    for(const [k] of g.stats){
+      const d = favorise ? rint(3,6) : -rint(1,3);
+      p.plafonds[k] = clamp(p.plafonds[k]+d, 20, 99);
+      p.stats[k]    = clamp(p.stats[k]+Math.round(d*0.6), 8, p.plafonds[k]);
+    }
+  }
 }
 
 /* Ce qu'un manager de cette réputation peut raisonnablement lever en sponsors
@@ -1240,8 +1320,11 @@ function creerManagersRivaux(){
   for(let i=0;i<6;i++){
     const nom = prenoms[i]+' '+patronymes[i];
     pris.add(nom);
+    // Chaque rival a son propre réseau : il ne voit que ce qu'il couvre.
+    const regions = REGIONS.filter(r=>Math.random() < REGION_SURVEILLANCE[r.id]).map(r=>r.id);
+    if(!regions.length) regions.push('eur');
     S.monde.managers.push({
-      id: uid(), nom,
+      id: uid(), nom, regions,
       rep: clamp(rp + rint(-2,3), 1, 10),
       style: STYLES_MANAGER[Math.floor(Math.random()*STYLES_MANAGER.length)].id,
       appetit: round(rnd(1.35,0.55),2),
@@ -1274,7 +1357,9 @@ function mouvementsRivaux(intensite){
   for(const m of S.monde.managers){
     if(m.pilotes.length >= placesRival(m)) continue;
     // il ne regarde que ce que sa réputation lui ouvre
-    const acces = pool.filter(c => CAT[c.catId].niv <= (m.rep>=9?8 : m.rep>=7?6 : m.rep>=4?5 : 2));
+    const acces = pool.filter(c =>
+      CAT[c.catId].niv <= (m.rep>=9?8 : m.rep>=7?6 : m.rep>=4?5 : 2) &&
+      (!m.regions || m.regions.includes(PAYS_REGION[c.pays] || 'fr')));
     if(!acces.length) continue;
     const cible = acces.reduce((b,c)=> !b || attraitPour(m,c)>attraitPour(m,b) ? c : b, null);
     cible.convoite = (cible.convoite||0) + 1;
@@ -3901,6 +3986,28 @@ ACTIONS.mettreEnRetrait = ()=>{
   saveGame(); render();
   showToast(p.nom+' ne courra pas cette saison');
 };
+/* Antennes régionales (GDD §5.2). Ouvrir coûte trois mois d'avance, comme un
+   dépôt : sans cela on ouvrirait et fermerait au gré des intersaisons. */
+ACTIONS.ouvrirAntenne = d=>{
+  const r = REGION[d.r];
+  if(!r || regionCouverte(r.id)) return;
+  const avance = r.cout*3;
+  if(S.manager.budget < avance){ showToast('Il faut '+fmtEur(avance)+' d’avance'); return; }
+  argent('Ouverture d’une antenne — '+r.nom, -avance, 'scouting');
+  S.scoutsRegion = (S.scoutsRegion||[]).concat([r.id]);
+  msg('scout','Votre réseau','Antenne ouverte — '+r.nom,
+    `Vous avez désormais un correspondant en ${r.nom}.\n\n${r.d}\n\n`+
+    `Les jeunes de cette région apparaîtront dans votre vivier à la prochaine intersaison.`);
+  saveGame(); render();
+  showToast('Antenne ouverte : '+r.nom);
+};
+ACTIONS.fermerAntenne = d=>{
+  const r = REGION[d.r];
+  if(!r || r.id==='fr') return;
+  S.scoutsRegion = (S.scoutsRegion||[]).filter(x=>x!==r.id);
+  saveGame(); render();
+  showToast('Antenne fermée : '+r.nom);
+};
 ACTIONS.passerSaisonBlanche = ()=>{
   passerAnneeSuivante();
   render(); showToast('Saison passée');
@@ -4828,6 +4935,32 @@ function renderStaff(){
   }
   h += `<div class="card flat"><div class="note txt-muted">Coach mental et négociateur/avocat sont prévus en V2 (GDD §13).
     Niveaux disponibles limités par votre réputation : ${clamp(1+Math.floor(rp/2),1,5)}/5.</div></div>`;
+  // ---- réseau de scouts par région (GDD §5.2)
+  h += `<div class="card"><h2>Réseau de repérage<span class="hint">${fmtEur(coutScoutsRegion())}/mois</span></h2>
+    <div class="note mb">Vous ne voyez que les jeunes des régions où vous avez une antenne.
+      Chaque antenne élargit le vivier et donne accès à une école de pilotage différente.</div>
+    ${REGIONS.map(r=>{
+      const ouverte = regionCouverte(r.id);
+      const base = r.id==='fr';
+      const ecole = r.ecole ? STAT_GROUPES.find(g=>g.id===r.ecole).nom : null;
+      return `<div class="slider-box">
+        <div class="top"><b>${r.nom}</b>
+          <span>${base?'incluse':(ouverte?fmtEur(r.cout)+'/mois':fmtEur(r.cout)+'/mois')}</span></div>
+        <div class="note">${r.d}</div>
+        <div class="row tight mt">
+          ${ecole?tag('École : '+ecole,'t-blue'):tag('Sans spécialité','t-grey')}
+          ${ouverte?tag(base?'Territoire d’origine':'Antenne ouverte','t-green'):''}
+          <div class="spacer"></div>
+          ${base?'' : ouverte
+            ? `<button class="btn-ghost btn-sm" data-act="fermerAntenne" data-r="${r.id}">Fermer</button>`
+            : `<button class="btn btn-sm" data-act="ouvrirAntenne" data-r="${r.id}">Ouvrir une antenne</button>`}
+        </div>
+      </div>`;
+    }).join('')}
+    <div class="note txt-muted mt">Le vivier ne se recompose qu’à la saison suivante : ouvrir une antenne
+      aujourd’hui vous fera voir ces pilotes à la prochaine intersaison.</div>
+  </div>`;
+
   $('#v-staff').innerHTML=h;
 }
 ACTIONS.modalStaff = d=>{
