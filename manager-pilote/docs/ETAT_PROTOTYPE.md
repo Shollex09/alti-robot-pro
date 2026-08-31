@@ -1116,6 +1116,62 @@ d'un second pilote avec vérification que le premier et sa saison sont intacts.
 `browser5.js` rejoue ce parcours dans le navigateur, par le vrai bouton
 « Reprendre » et de vrais clics.
 
+## §20.4 — mettre fin à une collaboration
+
+Signalé en jouant : ni le manager ni le pilote ne peuvent rompre. Deux manques
+distincts derrière le même symptôme.
+
+### Le manager ne pouvait pas arrêter
+
+Il n'existait aucune action. On était lié à son pilote jusqu'à sa retraite, sauf
+à ce que la famille le reprenne. Un bouton sur la fiche du pilote ouvre
+maintenant une fenêtre qui **annonce le coût avant de le prélever** :
+
+| | Hors saison | En pleine saison |
+|---|---|---|
+| Réputation | 30 + note × 0,9 | + 45 de plus |
+| Indemnité à l'écurie | — | 6 % du budget de la catégorie |
+
+Le coût monte avec la valeur du pilote : lâcher un espoir à 30 de note n'a rien
+à voir avec lâcher un pilote de F2. Rompre doit rester une décision, pas une
+touche « recommencer ».
+
+**Le montant annoncé n'était pas celui prélevé.** La fenêtre affichait 112
+points quand 171 étaient retirés : `perdrePilote()` appliquait sa propre pénalité
+par-dessus celle que la confirmation avait déjà prélevée. C'est le genre d'écart
+qui détruit la confiance dans une interface — corrigé et couvert par un test qui
+compare les deux nombres.
+
+### Le pilote ne partait jamais vraiment
+
+La fiche promettait « un pilote mal suivi change de manager ». En réalité, le
+départ n'était atteignable que par une chaîne improbable : un message aléatoire,
+qui ne pouvait tomber que sous 35 de relation, dans lequel le joueur devait
+**choisir** « le laisser réfléchir ». Un joueur qui répondait toujours « je
+renégocie » gardait son pilote à vie, relation à 5/100 comprise.
+
+`usureRelation()` s'exécute maintenant à chaque manche. Sous 20 de relation, un
+compteur s'arme : premier avertissement, second avertissement, puis départ à la
+troisième — sans que le joueur ait à consentir. Remonter la relation au-dessus
+du seuil désarme le compteur. La fiche du pilote affiche le décompte, il n'y a
+donc pas de surprise.
+
+### Le pilote perdu retourne au vivier
+
+Dans les deux cas il ne disparaît pas du monde : il redevient candidat, avec sa
+relation ramenée à un niveau neutre et un moral entamé. Un manager rival peut le
+signer — et le joueur peut le regretter, ou le reprendre. Attention à l'ordre :
+`genererScoutPool()` régénère le vivier quand la structure se vide, il fallait
+donc réinsérer le pilote **après** cet appel, sans quoi il était effacé.
+
+### Test
+
+`unit18.js` : 26 assertions sur les deux avertissements puis le départ, le
+désarmement par une relation qui remonte, l'absence d'usure au-dessus du seuil,
+le coût de rupture (plus cher en saison, plus cher pour un bon pilote, égal au
+montant annoncé), l'indemnité prélevée, et le retour au vivier en état signable.
+`browser7.js` rejoue les deux chemins par de vrais clics.
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - La réglementation évolutive d'une saison à l'autre (§11), marquée V2.

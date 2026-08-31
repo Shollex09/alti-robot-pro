@@ -2700,6 +2700,50 @@ function effetsPsy(pos, dnf, grilleN){
   S.manager.image = clamp(S.manager.image + dr*0.25 + staffNiv('presse')*0.08, 0, 100);
   // relation : de bons résultats et de la considération l'entretiennent
   p.relation = clamp(p.relation + (dnf?-1: pos<=3?1.2 : pos<=attendu?0.4:-0.8), 0, 100);
+  usureRelation();
+}
+
+/* Un pilote laissé à l'abandon finit par partir — de lui-même, sans que le
+   joueur ait à choisir. La fiche du pilote promettait « un pilote mal suivi
+   change de manager » : ce n'était vrai que si le joueur acceptait de le
+   laisser partir dans un message rare, donc jamais pour qui répondait toujours
+   « je renégocie ». Trois manches sous le seuil et il s'en va, avec deux
+   avertissements avant. */
+const RELATION_RUPTURE = 20;
+
+/* Ce qu'il en coûte de lâcher son pilote. Rompre doit être une décision, pas
+   une touche « recommencer » : le paddock retient qu'on a lâché quelqu'un, et
+   d'autant plus que le pilote valait quelque chose. En pleine saison, on laisse
+   en plus une écurie sans interlocuteur. */
+function coutRupture(){
+  const p = S.pilote;
+  if(!p) return null;
+  const enSaison = !!(S.saison && !S.saison.finie);
+  const niveau = clamp(notePilote(p), 0, 99);
+  const rep = Math.round(30 + niveau*0.9 + (enSaison?45:0));
+  const indem = enSaison && S.contrat
+    ? Math.round(CAT[S.saison.catId].cout * 0.06 / 500)*500
+    : 0;
+  return {rep, indem, enSaison, niveau};
+}
+function usureRelation(){
+  const p = S.pilote;
+  if(!p) return;
+  if(p.relation >= RELATION_RUPTURE){ p.rupture = 0; return; }
+  p.rupture = (p.rupture||0) + 1;
+  if(p.rupture===1){
+    msg('pilote', p.nom, 'Il faut qu’on parle',
+      `« Je ne me sens plus suivi. J’ai l’impression de faire ma carrière tout seul.\n\n`+
+      `Si ça continue comme ça, je vais regarder ailleurs. »\n\n`+
+      `<em>Relation ${Math.round(p.relation)}/100. Parlez-lui, offrez-lui des essais, `+
+      `montez au créneau auprès de l’écurie — ou perdez-le.</em>`);
+  }else if(p.rupture===2){
+    msg('pilote', p.nom, 'J’ai pris contact avec quelqu’un',
+      `« J’ai rencontré un autre manager. Rien n’est signé, mais je ne t’ai pas menti : `+
+      `je cherche. »\n\n<em>Dernier avertissement — relation ${Math.round(p.relation)}/100.</em>`);
+  }else if(p.rupture>=3){
+    perdrePilote('relation');
+  }
 }
 
 /* Position que l'on peut raisonnablement attendre du duo pilote/voiture */
@@ -3324,13 +3368,21 @@ function repondreDemande(msgObj, choix){
   return {txt};
 }
 function perdrePilote(cause){
-  msg('pilote', S.pilote.nom, 'Fin de collaboration',
-    `${S.pilote.nom} change de manager. Toutes vos commissions futures sur lui sont perdues.\n\n`+
-    (cause==='famille'
-      ? `Ce n’est pas lui qui a tranché, mais sa famille : elle finançait la saison, elle a décidé.`
-      : `C’était le risque d’une relation laissée se dégrader. Il faut repartir sur un nouveau pilote.`));
-  gagnerRep(cause==='famille' ? -70 : -120, 'départ du pilote');
-  S.historique.push({annee:S.annee, type:'depart', pilote:S.pilote.nom});
+  const p = S.pilote;
+  msg('pilote', p.nom, cause==='manager' ? 'Vous mettez fin à la collaboration' : 'Fin de collaboration',
+    cause==='manager'
+      ? `Vous ne représentez plus ${p.nom}. Les commissions à venir sur lui vous échappent, `+
+        `et le paddock retiendra que vous avez lâché un pilote en cours de route.`
+      : `${p.nom} change de manager. Toutes vos commissions futures sur lui sont perdues.\n\n`+
+        (cause==='famille'
+          ? `Ce n’est pas lui qui a tranché, mais sa famille : elle finançait la saison, elle a décidé.`
+          : `« Tu ne m’as pas suivi. Je pars avec quelqu’un qui croit en moi. »\n\n`+
+            `C’était le risque d’une relation laissée se dégrader.`));
+  // Quand c'est le manager qui rompt, le coût en réputation a déjà été prélevé
+  // par confirmRompre() — celui qui l'a annoncé au joueur. En rajouter ici
+  // ferait payer plus que le montant affiché.
+  if(cause!=='manager') gagnerRep(cause==='famille' ? -70 : -120, 'départ du pilote');
+  S.historique.push({annee:S.annee, type:'depart', pilote:p.nom, cause:cause||'relation'});
   S.pilote=null; S.contrat=null; S.saison=null; S.weekend=null;
   S.sponsors.actifs=[]; S.sponsors.prospects=[]; S.sponsors.vus=[];
   S.offres=null;
@@ -3338,6 +3390,13 @@ function perdrePilote(cause){
   // Les autres pilotes gérés continuent : on ne retombe au repérage que si la
   // structure se retrouve vide (GDD §15).
   if(!nbPilotes()){ S.phase='scouting'; genererScoutPool(); }
+  // Il ne disparaît pas du monde : il retourne au vivier, où un rival le
+  // signera peut-être — et où vous pourrez le regretter. Après la régénération
+  // du vivier, sans quoi elle l'effacerait.
+  p.role='candidat'; p.relation=45; p.rupture=0;
+  p.moral=clamp(p.moral-8,5,100);
+  S.monde.scoutPool = S.monde.scoutPool.filter(x=>x.id!==p.id);
+  S.monde.scoutPool.unshift(p);
   saveGame();
 }
 
@@ -4351,7 +4410,11 @@ function renderBureau(){
       ${gline('Forme', p.forme, couleurMoral(p.forme))}
       ${gline('Relation', p.relation, couleurMoral(p.relation))}
       ${gline('Réputation', p.reputation, 'blue')}
-      ${p.relation<32?`<div class="note warn mt">⚠ La relation se dégrade sérieusement. Un pilote mal suivi change de manager — et vous perdez toutes vos commissions.</div>`:''}
+      ${p.relation<RELATION_RUPTURE?`<div class="note warn mt">⚠ <b>Rupture imminente.</b>
+        ${(p.rupture||0)>=2?'Il a déjà rencontré un autre manager. Une manche de plus dans cet état et il part.'
+          :'Il ne se sent plus suivi. Encore '+(3-(p.rupture||0))+' manche(s) ainsi et il changera de manager.'}</div>`
+        : p.relation<32?`<div class="note warn mt">⚠ La relation se dégrade sérieusement. Sous ${RELATION_RUPTURE}/100, un pilote mal suivi finit par changer de manager — et vous perdez toutes vos commissions.</div>`:''}
+
     </div>`;
   }
 
@@ -4564,6 +4627,39 @@ ACTIONS.nouvellePartieDepuisFin = ()=>{ wipeGame(); UI.tab='bureau'; render(); }
 /* GDD §15 — avec plusieurs pilotes, engager tout le monde chaque année ruine :
    en karting un pilote ne rapporte aucune commission et sa saison se finance sur
    ses seuls sponsors. Mettre un pilote en retrait est donc une vraie décision. */
+/* Rompre soi-même la collaboration. */
+ACTIONS.modalRompre = ()=>{
+  const p = S.pilote; if(!p) return;
+  const c = coutRupture();
+  openModal('Mettre fin à la collaboration ?',
+    `<div class="note mb">Vous ne représenteriez plus <b>${escapeHtml(p.nom)}</b>.
+       Il retournera dans le vivier, où un autre manager pourra le signer.</div>
+     <div class="note mb">Ce que cela vous coûte :</div>
+     <div class="slider-box">
+       <div class="top"><b>Réputation</b><span class="txt-red">−${c.rep} points</span></div>
+       <div class="note">Le paddock retient qu’on a lâché un pilote${c.enSaison?', et en pleine saison':''}.</div>
+     </div>
+     ${c.indem>0?`<div class="slider-box">
+       <div class="top"><b>Indemnité à l’écurie</b><span class="txt-red">${fmtEurFull(c.indem)}</span></div>
+       <div class="note">Vous rompez un engagement en cours auprès de ${escapeHtml(S.contrat?S.contrat.ecurieNom:'l’écurie')}.</div>
+     </div>`:''}
+     ${c.enSaison?`<div class="note warn mt">La saison en cours s’arrête là pour lui :
+       les points acquis restent à son palmarès, mais vous n’en tirerez plus rien.</div>`:''}
+     <div class="note txt-muted mt">Attendre la fin de saison coûterait nettement moins cher.</div>`,
+    `<button class="btn-ghost" data-act="fermerModal">Annuler</button>
+     <button class="btn" data-act="confirmRompre">Mettre fin à la collaboration</button>`);
+};
+ACTIONS.confirmRompre = ()=>{
+  const p = S.pilote; if(!p) return;
+  const c = coutRupture();
+  if(c.indem>0) argent('Indemnité de rupture — '+(S.contrat?S.contrat.ecurieNom:'écurie'), -c.indem, 'rupture');
+  gagnerRep(-c.rep, 'rupture avec le pilote');
+  perdrePilote('manager');
+  closeModal(); saveGame();
+  UI.tab = nbPilotes() ? 'bureau' : 'pilote';
+  render();
+  showToast('Collaboration terminée');
+};
 ACTIONS.mettreEnRetrait = ()=>{
   const p=S.pilote; if(!p) return;
   S.flags['retrait_'+p.id] = S.annee;
@@ -4725,6 +4821,11 @@ function renderPilote(){
     ${gline('Forme physique', p.forme, couleurMoral(p.forme))}
     ${gline('Fatigue', p.fatigue, p.fatigue>60?'red':p.fatigue>35?'amber':'green')}
     ${gline('Relation avec vous', p.relation, couleurMoral(p.relation))}
+    ${p.relation<RELATION_RUPTURE?`<div class="note warn mt">⚠ <b>Rupture imminente.</b>
+      ${(p.rupture||0)>=2?'Il a déjà rencontré un autre manager. Une manche de plus dans cet état et il part.'
+        :'Il ne se sent plus suivi. Encore '+(3-(p.rupture||0))+' manche(s) ainsi et il changera de manager.'}</div>`:''}
+    <div class="row mt"><div class="spacer"></div>
+      <button class="btn-ghost btn-sm" data-act="modalRompre">Mettre fin à la collaboration</button></div>
     ${gline('Réputation du pilote', p.reputation, 'blue')}
     ${gline('Agressivité', p.agressivite, p.agressivite>75?'red':'amber')}
     <div class="note txt-muted mt">Une agressivité élevée multiplie les dépassements… et les abandons.</div>
