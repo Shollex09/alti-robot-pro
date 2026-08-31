@@ -25,7 +25,7 @@ ne les fixait pas.
 | 4.6 | Pilotes payants | ✅ | Le budget apporté compense jusqu'à 22 pts de note |
 | 5.1 | Potentiel caché | ✅ | Fourchettes, jamais la valeur exacte — y compris pour son propre pilote |
 | 5.2 | Réseau de scouts par région | ⛔ | V2 |
-| 5.3 | Managers rivaux | ⛔ | V2 — des **pilotes** rivaux persistants existent en revanche |
+| 5.3 | Managers rivaux | ✅ | Six managers IA signent dans le même vivier ; convoitise annoncée, classement des managers |
 | 6 | 9 statistiques en 3 groupes | ✅ | |
 | 6.4 | Potentiel, agressivité, réputation, moral, forme | ✅ | |
 | 7.1 | Traits de personnalité | ✅ | Les 5 du GDD + « Métronome » et « Meneur d'hommes » |
@@ -655,11 +655,94 @@ qu'une fois tous les engagés passés, la sauvegarde des deux dossiers, le passa
 d'année, la régression du renvoi décrite plus haut et les deux limites d'âge.
 `browser4.js` déroule une saison complète à deux pilotes dans le navigateur.
 
+## §5.3 — les managers rivaux
+
+Sans eux le vivier est une boutique où personne ne vous double : on peut observer
+un jeune dix fois avant de le signer, sans aucun risque. Le §5.3 demande une
+course au recrutement, et c'est ce qui donne enfin un prix au temps.
+
+### Six concurrents
+
+Six managers IA, chacun avec sa réputation (qui lui ouvre les mêmes places que
+le joueur, table du §15) et son **style de recrutement** :
+
+| Style | Ce qu'il regarde |
+|---|---|
+| Flair | le potentiel brut, et il préfère les plus jeunes |
+| Prudent | la valeur sûre — la note actuelle avant le plafond |
+| Financier | le haut de l'échelle, là où il y a de l'argent |
+
+Les styles comptent : le meilleur plafond du vivier n'est pas forcément le plus
+convoité, ce qui laisse au joueur de la valeur à trouver là où les rivaux ne
+regardent pas. Leurs pilotes progressent d'année en année, montent de catégorie,
+raccrochent à 36 ans, et un manager lâche celui qui stagne — sans ce
+renouvellement, les rivaux remplissaient leurs places une fois pour toutes et le
+marché se figeait.
+
+### L'arbitrage : observer ou signer
+
+C'est le cœur de la mécanique. Le marché bouge **quand le joueur observe** — pas
+avant qu'il regarde le vivier. Une première version faisait tourner le marché
+trois fois à l'intersaison, avant que le joueur ouvre l'écran : il arrivait
+devant un vivier déjà écrémé sans jamais voir partir personne. Le §5.3 parle
+d'un talent « repéré trop tard » : encore faut-il l'avoir repéré.
+
+Mesuré sur 300 parties, risque de perdre le meilleur espoir du vivier :
+
+| | Risque |
+|---|---|
+| Signer tout de suite | 0 % |
+| Après 1 observation | 19 % |
+| Après 2 observations | 41 % |
+| Après 3 observations | 45 % |
+| Après 5 observations | 68 % |
+
+Et la fourchette d'estimation, sans observer, selon le scout employé :
+
+| Scout | Marge |
+|---|---|
+| aucun | ±16 |
+| niveau 1 | ±11 |
+| niveau 3 | ±5,5 |
+| niveau 5 | ±2 |
+
+Les deux tables se lisent ensemble : un scout de niveau 5 donne gratuitement ce
+que cinq observations achètent à 68 % de risque. Le §13 (staff) et le §5.1
+(potentiel caché) prennent tout leur sens ensemble — le scout n'est plus un
+confort, c'est l'alternative au pari.
+
+La convoitise est annoncée avant la signature : « Convoité — un autre manager
+s'y intéresse » ou « Très convoité — 2 managers le suivent », juste sous
+l'estimation, là où la décision se prend. Et si un jeune que le joueur avait
+observé part quand même, un message le lui dit.
+
+### Le classement des managers
+
+Un tableau sur l'écran Championnat situe le joueur parmi les sept managers, sur
+un score qui mêle le niveau atteint par ses pilotes, sa réputation et ses titres.
+C'est sa place dans le métier, indépendamment du championnat de son pilote.
+
+### Deux défauts de génération de noms
+
+Relevés en lisant les captures. Le classement affichait trois « Yamashita »
+d'affilée : le tirage vérifiait l'unicité du nom complet, pas du patronyme. Et
+sur la fiche de comparaison, le coéquipier du pilote portait le même nom de
+famille que lui. Les managers sont maintenant tirés dans des listes mélangées,
+et les pilotes retiennent les patronymes déjà servis — sur un plateau de 26,
+26 patronymes distincts.
+
+### Test
+
+`unit10.js` couvre le §5.3 : 36 assertions sur la forme des managers, les
+différences de style, le retrait effectif des pilotes du vivier, le respect des
+places, l'annonce de la convoitise, l'impossibilité de reprendre le pilote du
+joueur, la progression annuelle des écuries rivales (plafond, âge, retraite), le
+classement, la courbe de risque ci-dessus et l'unicité des patronymes.
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - La réglementation évolutive d'une saison à l'autre (§11), marquée V2.
 - La gestion tour par tour de la course (§12) : il n'y a qu'un seul arbitrage
   à mi-course, pas un suivi continu.
-- Le reste du périmètre V2 : réseau de scouts par région (§5.2), managers
-  rivaux (§5.3), blessures (§7.3), entourage du pilote (§7.4), voies
+- Le reste du périmètre V2 : réseau de scouts par région (§5.2), blessures (§7.3), entourage du pilote (§7.4), voies
   alternatives (§8.4), locaux (§22.1) et académie (§22.2).

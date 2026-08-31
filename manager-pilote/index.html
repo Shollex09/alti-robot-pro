@@ -704,7 +704,20 @@ const NIV_LABEL = ['—','Débutant','Confirmé','Solide','Très bon','Expert'];
 const PRENOMS = ['Lucas','Enzo','Mathis','Nathan','Théo','Hugo','Léo','Raphaël','Gabriel','Adam','Jules','Louis','Arthur','Noah','Ethan','Tom','Maël','Sacha','Timéo','Axel','Matteo','Diego','Rafael','Marco','Luca','Andrea','Nico','Kai','Finn','Oscar','Liam','Jack','Oliver','Max','Felix','Jonas','Aaron','Elias','Nikita','Yuki','Sota','Ren','Caio','Bruno','Santiago','Mateo','Emil','Viktor','Lars','Sven'];
 const NOMS = ['Berthier','Vasseur','Lemoine','Chastel','Ferrand','Delaunay','Rochet','Marchal','Aubry','Nivelle','Rossi','Bianchi','Marino','Costa','Ferraro','Moretti','Vidal','Herrera','Márquez','Solano','Duarte','Almeida','Weber','Brandt','Keller','Hofmann','Nyström','Lindqvist','Andersen','Halvorsen','Whitmore','Ashcroft','Bramley','Kingsley','Hartley','Novak','Kovacs','Petrov','Ivanov','Tanaka','Hayashi','Morimoto','Silva','Oliveira','Carvalho','Van Dijk','De Vries','Janssen','Kowalski','Nowak'];
 const PAYS = ['France','France','France','Italie','Espagne','Royaume-Uni','Allemagne','Pays-Bas','Belgique','Brésil','Japon','Danemark','Suède','Pologne','Portugal','Suisse','Autriche','Finlande'];
-function nomAleatoire(){return pick(PRENOMS)+' '+pick(NOMS);}
+/* Noms déjà servis dans la partie : deux pilotes de la même écurie qui
+   partagent leur patronyme donnent l'impression d'un bug. */
+let NOMS_SERVIS = new Set();
+function nomAleatoire(){
+  // La liste finit par s'épuiser sur une longue carrière : on la recycle plutôt
+  // que de retomber sur le tirage aveugle.
+  if(NOMS_SERVIS.size >= NOMS.length-6) NOMS_SERVIS.clear();
+  for(let i=0;i<40;i++){
+    const p = pick(PRENOMS), n = pick(NOMS);
+    if(!NOMS_SERVIS.has(n)){ NOMS_SERVIS.add(n); return p+' '+n; }
+  }
+  return pick(PRENOMS)+' '+pick(NOMS);      // liste épuisée : on accepte un doublon
+}
+function reinitialiserNoms(){ NOMS_SERVIS = new Set(); }
 
 /* --- 1.10 Stats pilote (GDD §6) --- */
 const STAT_GROUPES = [
@@ -1011,12 +1024,14 @@ function nouvellePartie(budgetId, repPalierId, nomManager){
     inbox: [],
     finances: [],                     // {annee, lab, montant, type}
     historique: [],                   // saisons terminées
-    monde: {rivaux:[], scoutPool:[], poolAnnee:0},
+    monde: {rivaux:[], managers:[], scoutPool:[], poolAnnee:0},
     offres: null,
     actions: 0,
     stats:{coursesGagnees:0, podiums:0, titres:0, sponsorsSignes:0, saisonsJouees:0},
     flags:{},
   };
+  reinitialiserNoms();
+  creerManagersRivaux();
   genererScoutPool();
   msg('scout','Votre réseau','Bienvenue dans le métier',
     `Vous démarrez avec ${fmtEurFull(bud.v)} en trésorerie et une réputation de « ${rep.nom} » (palier ${rep.p}/10).\n\n`+
@@ -1199,6 +1214,160 @@ function creerRivaux(){
   }
 }
 
+/* ================= MANAGERS RIVAUX (GDD §5.3) ==========================
+   Sans eux le vivier est une boutique où personne ne double le joueur : on peut
+   observer un jeune dix fois avant de le signer, sans risque. Des managers IA
+   convoitent les mêmes talents, et un jeune repéré trop tard est signé par un
+   concurrent. La convoitise est annoncée avant la signature — le joueur doit
+   pouvoir arbitrer entre affiner son estimation et sécuriser le pilote. */
+const MANAGERS_PRENOMS = ['Bruno','Carla','Dieter','Elena','Farid','Gino','Helena','Ivan',
+  'Joana','Karl','Lucia','Marek','Nadia','Otto','Paulo','Rita','Sergio','Tomas'];
+const MANAGERS_NOMS = ['Vandenberghe','Castellani','Okonkwo','Lindqvist','Baumgartner','Moreira',
+  'Delacroix','Yamashita','Ferreira','Novak','Haddad','Ellingsen','Rossetti','Pereira'];
+const STYLES_MANAGER = [
+  {id:'flair',  nom:'Flair',      d:'mise sur le potentiel brut'},
+  {id:'sur',    nom:'Prudent',    d:'préfère les valeurs sûres'},
+  {id:'argent', nom:'Financier',  d:'suit l’argent avant le talent'},
+];
+
+function creerManagersRivaux(){
+  const rp = repPalier(S.manager.repPoints).p;
+  const pris = new Set();
+  S.monde.managers = [];
+  // On tire dans des listes mélangées : six « Yamashita » dans le même
+  // classement font tout de suite faux.
+  const prenoms = shuffle(MANAGERS_PRENOMS), patronymes = shuffle(MANAGERS_NOMS);
+  for(let i=0;i<6;i++){
+    const nom = prenoms[i]+' '+patronymes[i];
+    pris.add(nom);
+    S.monde.managers.push({
+      id: uid(), nom,
+      rep: clamp(rp + rint(-2,3), 1, 10),
+      style: STYLES_MANAGER[Math.floor(Math.random()*STYLES_MANAGER.length)].id,
+      appetit: round(rnd(1.35,0.55),2),
+      pilotes: [],            // {nom, catId, note, plafond, age, annee}
+      titres: 0, signatures: 0,
+    });
+  }
+}
+
+/* Ce qu'un rival voit dans un jeune, selon son style. */
+function attraitPour(m, c){
+  const n = notePilote(c), plaf = notePlafond(c);
+  if(m.style==='flair')  return plaf*1.25 - c.age*1.5;
+  if(m.style==='sur')    return n*1.15 + plaf*0.35;
+  return n*0.5 + plaf*0.5 + (CAT[c.catId].niv*4);   // financier : vise le haut de l'échelle
+}
+/* Places libres chez un rival, même table que le joueur (GDD §15). */
+function placesRival(m){ return pilotesMax(m.rep); }
+
+/* Un tour de marché : les rivaux s'intéressent, puis l'un d'eux signe.
+   `intensite` module la pression — forte à l'intersaison, faible en cours de
+   saison, pour que le vivier bouge sans devenir une loterie. */
+function mouvementsRivaux(intensite){
+  if(!S.monde.managers || !S.monde.managers.length) return null;
+  const pool = S.monde.scoutPool;
+  if(!pool.length) return null;
+  for(const c of pool) c.convoite = 0;
+
+  let signe = null;
+  for(const m of S.monde.managers){
+    if(m.pilotes.length >= placesRival(m)) continue;
+    // il ne regarde que ce que sa réputation lui ouvre
+    const acces = pool.filter(c => CAT[c.catId].niv <= (m.rep>=9?8 : m.rep>=7?6 : m.rep>=4?5 : 2));
+    if(!acces.length) continue;
+    const cible = acces.reduce((b,c)=> !b || attraitPour(m,c)>attraitPour(m,b) ? c : b, null);
+    cible.convoite = (cible.convoite||0) + 1;
+    // il ne passe à l'acte que si le jeune l'intéresse vraiment
+    const seuil = 40 + m.rep*2.5;
+    if(!signe && attraitPour(m,cible) > seuil && Math.random() < 0.18*intensite*m.appetit){
+      signe = {m, c:cible};
+    }
+  }
+  if(!signe) return null;
+  const {m, c} = signe;
+  m.pilotes.push({id:c.id, nom:c.nom, catId:c.catId, note:round(notePilote(c),1),
+                  plafond:round(notePlafond(c),1), age:c.age, annee:S.annee});
+  m.signatures++;
+  S.monde.scoutPool = pool.filter(x=>x.id!==c.id);
+  return {manager:m.nom, pilote:c.nom, observe:c.observe||0};
+}
+
+/* Appelé aux moments où le vivier peut bouger. Prévient le joueur seulement
+   quand il avait investi sur ce jeune : sinon c'est du bruit. */
+function tourDeMarche(intensite){
+  const r = mouvementsRivaux(intensite);
+  if(!r) return;
+  if(r.observe>0){
+    msg('scout','Votre réseau','Vous vous êtes fait doubler',
+      `<b>${escapeHtml(r.manager)}</b> vient de signer <b>${escapeHtml(r.pilote)}</b>, `+
+      `que vous aviez observé ${r.observe} fois.\n\n`+
+      `Observer affine l’estimation, mais pendant ce temps le jeune reste sur le marché. `+
+      `À un moment il faut trancher.`);
+  }
+}
+
+/* Progression annuelle des écuries de management rivales. */
+function progresserManagers(){
+  if(!S.monde.managers) return;
+  for(const m of S.monde.managers){
+    for(const p of m.pilotes){
+      p.age++;
+      // il progresse vers son plafond, plus vite s'il est jeune
+      const marge = Math.max(0, p.plafond - p.note);
+      p.note = round(p.note + marge*rnd(0.22,0.08)*coeffAge(p.age), 1);
+      // montée de catégorie quand le niveau et l'âge le permettent
+      const c = CAT[p.catId], sup = catByNiv(c.niv+1);
+      if(sup && p.note > NIVEAU_GRILLE[sup.id]-4 && p.age>=sup.ageMin-1 && p.age<=sup.ageMax)
+        p.catId = sup.id;
+      else if(p.age > c.ageMax){
+        const possible = CATS.filter(x=>p.age>=x.ageMin-1 && p.age<=x.ageMax).sort((a,b)=>a.niv-b.niv)[0];
+        if(possible) p.catId = possible.id;
+      }
+    }
+    // Les pilotes trop vieux raccrochent, et un manager lâche celui qui stagne
+    // sous le niveau de sa catégorie : sans ce renouvellement les rivaux
+    // remplissaient leurs places une fois pour toutes et le marché se figeait.
+    m.pilotes = m.pilotes.filter(p=>{
+      if(p.age>=36) return false;
+      const enRetard = p.note < NIVEAU_GRILLE[p.catId] - 10 && p.age >= 17;
+      return !(enRetard && Math.random()<0.5);
+    });
+    // la réputation du manager suit le niveau de son écurie
+    const meilleur = m.pilotes.reduce((b,p)=> !b || CAT[p.catId].niv>CAT[b.catId].niv ? p : b, null);
+    if(meilleur){
+      const vise = clamp(2 + CAT[meilleur.catId].niv, 1, 10);
+      m.rep = clamp(m.rep + Math.sign(vise-m.rep)*(Math.random()<0.45?1:0), 1, 10);
+    }else if(Math.random()<0.3) m.rep = clamp(m.rep-1, 1, 10);
+  }
+}
+
+/* Classement des managers : le joueur y figure, c'est sa place dans le métier. */
+function classementManagers(){
+  const score = m => m.pilotes.reduce((s,p)=> s + CAT[p.catId].niv*10 + p.note*0.5, 0) + m.rep*8 + m.titres*30;
+  const l = (S.monde.managers||[]).map(m=>({
+    nom:m.nom, rep:m.rep, pilotes:m.pilotes.length, titres:m.titres,
+    meilleur: m.pilotes.reduce((b,p)=> !b || CAT[p.catId].niv>CAT[b.catId].niv ? p : b, null),
+    score: score(m), moi:false,
+  }));
+  const mesPilotes = [];
+  if(S.dossiers) for(let i=0;i<S.dossiers.length;i++){
+    const v = vueDossier(i);
+    if(v.pilote) mesPilotes.push({catId:v.pilote.catId, note:notePilote(v.pilote)});
+  }
+  l.push({
+    nom:S.manager.nom, rep:repPalier(S.manager.repPoints).p, pilotes:mesPilotes.length,
+    titres:S.stats.titres,
+    meilleur: mesPilotes.reduce((b,p)=> !b || CAT[p.catId].niv>CAT[b.catId].niv ? p : b, null),
+    score: mesPilotes.reduce((s,p)=> s + CAT[p.catId].niv*10 + p.note*0.5, 0)
+           + repPalier(S.manager.repPoints).p*8 + S.stats.titres*30,
+    moi:true,
+  });
+  l.sort((a,b)=>b.score-a.score);
+  l.forEach((x,i)=>x.pos=i+1);
+  return l;
+}
+
 function demarrerSaison(catId, ecurieId){
   const c = CAT[catId];
   const ecu = ecuriesPour(catId).find(e=>e.id===ecurieId) || ecuriesPour(catId)[Math.floor(ecuriesPour(catId).length/2)];
@@ -1330,6 +1499,8 @@ function avancerCalendrier(){
   S.manche = (S.manche||0)+1;
   S.phase='semaine';
   S.actions=actionsParSemaine();
+  tourDeMarche(0.5);                 // le vivier bouge aussi pendant la saison
+
   S.flags.bonusReglages = 0;
   // Plusieurs semaines séparent deux manches : les pilotes récupèrent seuls.
   // Sans cela, un manager qui utilise tout son temps de piste finirait la
@@ -2698,6 +2869,9 @@ function passerAnneeSuivante(){
   });
   S.flags.renvoye=false;
   for(const k of Object.keys(S.flags)) if(k.startsWith('retrait_')) delete S.flags[k];
+  progresserManagers();
+  if(!S.monde.managers || !S.monde.managers.length) creerManagersRivaux();
+  tourDeMarche(1.2);      // un mouvement avant que le joueur ouvre le vivier
   S.phase = nbPilotes() ? 'intersaison' : 'scouting';
   S.actions=6;
   if(!nbPilotes()) genererScoutPool();
@@ -2727,9 +2901,12 @@ function partirRetraite(){
   S.historique.push({annee:S.annee, type:'retraite', pilote:p.nom, palmares:p.palmares});
   gagnerRep(Math.round(10 + (meilleur?CAT[meilleur.catId].niv*6:0)), 'carrière accomplie');
   S.pilote=null; S.contrat=null; S.saison=null; S.weekend=null;
-  S.sponsors.actifs=[]; S.sponsors.prospects=[];
-  S.phase='scouting';
-  genererScoutPool();
+  S.sponsors.actifs=[]; S.sponsors.prospects=[]; S.sponsors.vus=[];
+  S.offres=null;
+  syncDossier();
+  // Les autres pilotes gérés continuent : on ne retombe au repérage que si la
+  // structure se retrouve vide (GDD §15).
+  if(!nbPilotes()){ S.phase='scouting'; genererScoutPool(); }
   saveGame();
 }
 
@@ -3850,6 +4027,10 @@ function renderScouting(){
           <div style="font-family:var(--cond);font-size:24px;font-weight:700;color:var(--amber)">${noteEst}</div>
         </div>
       </div>
+      ${c.convoite ? `<div class="note ${c.convoite>=2?'warn':''} mt">
+        ${c.convoite>=2
+          ? `<b class="txt-red">Très convoité</b> — ${c.convoite} managers le suivent. Il ne restera pas longtemps.`
+          : `<b class="txt-amber">Convoité</b> — un autre manager s’y intéresse.`}</div>` : ''}
       <div class="hr"></div>
       <div class="row" style="gap:14px">
         <div><div class="small txt-muted">Potentiel estimé</div><div class="b">${pot}</div></div>
@@ -3869,7 +4050,8 @@ function renderScouting(){
       </div>
     </div>`;
   }
-  h += `<div class="card flat"><div class="note txt-muted">Le vivier se renouvelle à chaque nouvelle saison, et s’élargit avec votre réputation.</div></div>`;
+  h += `<div class="card flat"><div class="note txt-muted">Le vivier se renouvelle à chaque nouvelle saison, et s’élargit avec votre réputation.
+    Vous n’êtes pas seul à le regarder : les managers concurrents signent aussi, et un jeune observé trop longtemps finit par partir.</div></div>`;
   $('#v-pilote').innerHTML = h;
 }
 function traitsRevele(c){
@@ -3885,8 +4067,14 @@ ACTIONS.observer = d=>{
   if(S.manager.budget<cout){ showToast('Trésorerie insuffisante'); return; }
   argent('Observation — '+c.nom, -cout, 'scouting');
   c.observe++;
+  const marg = round(marge(c),1);
+  // Observer prend du temps, et pendant ce temps les autres managers avancent :
+  // c'est l'arbitrage du §5.3 — affiner l'estimation ou sécuriser le pilote.
+  const parti = !!mouvementsRivaux(0.72);
+  const perdu = parti && !S.monde.scoutPool.some(x=>x.id===c.id);
   saveGame(); render();
-  showToast('Fourchette resserrée : ±'+round(marge(c),1));
+  if(perdu) showToast(c.nom+' vous est passé sous le nez');
+  else showToast('Fourchette resserrée : ±'+marg);
 };
 ACTIONS.signerPilote = d=>{
   const c=S.monde.scoutPool.find(x=>x.id===d.id); if(!c) return;
@@ -4656,8 +4844,27 @@ ACTIONS.recruter = d=>{ recruterStaff(d.role, +d.niv, d.nom); closeModal(); rend
 ACTIONS.licencier = d=>{ licencierStaff(d.role); render(); showToast('Contrat rompu'); };
 
 /* --------------------------------------------- ÉCRAN : CHAMPIONNAT */
+/* Classement des écuries de management (GDD §5.3) : la place du joueur dans le
+   métier, indépendamment du championnat de son pilote. */
+function blocManagers(){
+  const l = classementManagers();
+  if(l.length<2) return '';
+  const moi = l.find(x=>x.moi);
+  return `<div class="card"><h2>Managers<span class="hint">${ordinal(moi.pos)} sur ${l.length}</span></h2>
+    <div class="note mb">Vous n’êtes pas seul à chercher des talents. Ces managers signent dans le même vivier.</div>
+    <div class="tw"><table><thead><tr><th>Pos</th><th>Manager</th><th class="num">Rép.</th>
+      <th class="num">Pilotes</th><th>Meilleur</th><th class="num">Titres</th></tr></thead><tbody>
+    ${l.map(x=>`<tr class="${x.moi?'me':''}">
+      <td><span class="pos p${x.pos<=3?x.pos:''}">${x.pos}</span></td>
+      <td>${escapeHtml(x.nom)}${x.moi?' '+tag('vous','t-red'):''}</td>
+      <td class="num">${x.rep}/10</td>
+      <td class="num">${x.pilotes}</td>
+      <td class="txt-2">${x.meilleur?CAT[x.meilleur.catId].court:'—'}</td>
+      <td class="num">${x.titres}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+}
 function renderChamp(){
-  if(!S.saison){ $('#v-champ').innerHTML=`<div class="card"><div class="empty">Aucune saison en cours.</div></div>`; return; }
+  if(!S.saison){ $('#v-champ').innerHTML=`<div class="card"><div class="empty">Aucune saison en cours.</div></div>`+blocManagers(); return; }
   const sa=S.saison, c=CAT[sa.catId], cl=classementChampionnat();
   let h=`<div class="card"><h2>${c.nom} ${sa.annee}<span class="hint">manche ${Math.min(sa.courseIndex+1,c.courses)}/${c.courses}</span></h2>
     <div class="tw"><table><thead><tr><th>Pos</th><th>Pilote</th><th>Écurie</th><th class="num">Pts</th><th class="num">V</th><th class="num">P</th><th class="num">AB</th></tr></thead><tbody>
@@ -4695,6 +4902,7 @@ function renderChamp(){
       <div class="note txt-muted mt">Même voiture, même écurie : l’écart avec le coéquipier est ce que regardent réellement les recruteurs.</div>
     </div>`;
   }
+  h += blocManagers();
   $('#v-champ').innerHTML=h;
 }
 
