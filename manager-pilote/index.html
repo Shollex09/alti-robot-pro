@@ -693,6 +693,60 @@ function coeffAge(age){
 /* Progression totale visée sur une saison complète, répartie sur les courses */
 const GAIN_SAISON = 12;
 
+/* --- 1.10bis Développement technique (GDD §11) ---
+   Le budget R&D se répartit sur trois axes, et chaque type de circuit en
+   privilégie un : le moteur sur un tracé rapide, le châssis sur un tracé
+   technique. Le calendrier étant connu d'avance, où investir devient une
+   vraie décision plutôt qu'un curseur unique. */
+const AXES_DEV = {
+  mono: [
+    {k:'chassis', nom:'Châssis',       desc:'Comportement en appui, passage sur les vibreurs.'},
+    {k:'aero',    nom:'Aérodynamique', desc:'Appui en courbe, traînée en ligne droite.'},
+    {k:'moteur',  nom:'Moteur',        desc:'Puissance et vitesse de pointe.'},
+  ],
+  kart: [
+    {k:'chassis', nom:'Châssis',       desc:'Rigidité, comportement en entrée de virage.'},
+    {k:'aero',    nom:'Train roulant', desc:'Moyeux, axe arrière, liaison au sol.'},
+    {k:'moteur',  nom:'Moteur',        desc:'Préparation moteur et échappement.'},
+  ],
+};
+/* Les poids doivent être franchement tranchés : s'ils sont proches, répartir
+   également reste mathématiquement optimal et le choix d'axe ne veut rien dire. */
+const POIDS_DEV = {
+  'Rapide':    {chassis:0.15, aero:0.20, moteur:0.65},
+  'Technique': {chassis:0.55, aero:0.35, moteur:0.10},
+  'Mixte':     {chassis:0.34, aero:0.33, moteur:0.33},
+};
+const PLAFOND_AXE = 18;
+const axesDev = ()=> AXES_DEV[CAT[S.saison.catId].format==='kart' ? 'kart' : 'mono'];
+
+/* Gain de performance apporté par la R&D sur un circuit donné. */
+function bonusDev(course){
+  const d = (S.saison && S.saison.dev) || {chassis:0,aero:0,moteur:0};
+  const w = POIDS_DEV[course.type] || POIDS_DEV['Mixte'];
+  return d.chassis*w.chassis + d.aero*w.aero + d.moteur*w.moteur;
+}
+/* Performance réelle de la voiture sur ce circuit : base de l'écurie + R&D. */
+function voitureEffective(course){
+  return clamp(S.saison.voiture + bonusDev(course), 30, 99);
+}
+/* Bonus moyen sur les manches qui restent — sert aux estimations. */
+function bonusDevMoyen(){
+  if(!S.saison) return 0;
+  const restantes = S.saison.calendrier.slice(S.saison.courseIndex);
+  const src = restantes.length ? restantes : S.saison.calendrier;
+  return avg(src, c=>bonusDev(c));
+}
+/* Répartition des types de circuits encore à courir. */
+function mixCircuits(){
+  if(!S.saison) return {};
+  const restantes = S.saison.calendrier.slice(S.saison.courseIndex);
+  const src = restantes.length ? restantes : S.saison.calendrier;
+  const m = {};
+  for(const c of src) m[c.type] = (m[c.type]||0)+1;
+  return m;
+}
+
 /* --- 1.11 Météo (GDD §12) --- */
 const METEOS = [
   {id:'sec',      nom:'Sec',            ico:'☀️', pluie:0,   incident:1.0, adapt:0.0},
@@ -1038,6 +1092,7 @@ function demarrerSaison(catId, ecurieId){
     resultats: [],
     avertissements: 0,
     devDepense: 0,
+    dev: {chassis:0, aero:0, moteur:0},
     finie:false,
   };
   // Apport de l'écurie (programme jeunes) : elle prend une part du budget à sa charge
@@ -1255,7 +1310,7 @@ function simulerQualif(course, meteo, reglagesJoueur){
   const res = [];
   const p = S.pilote;
   res.push({id:p.id, nom:p.nom, moi:true, ecurie:S.saison.ecurieNom,
-    perf: perfTotale(notePondere(p,course,meteo), S.saison.voiture, reglagesJoueur, 0.7)});
+    perf: perfTotale(notePondere(p,course,meteo), voitureEffective(course), reglagesJoueur, 0.7)});
   for(const g of S.saison.grille){
     res.push({id:g.id, nom:g.nom, moi:false, ecurie:g.ecurie,
       perf: perfTotale(notePondereIA(g,course,meteo), g.voiture, reglagesIA(g), 0.7)});
@@ -1274,7 +1329,7 @@ function preparerCourse(course, meteo, reglagesJoueur, grilleDepart, strat){
   const st = STRATS.find(s=>s.id===strat) || STRATS[1];
   const field = [];
 
-  const perfJoueur = perfTotale(notePondere(p,course,meteo), S.saison.voiture, reglagesJoueur, 1)
+  const perfJoueur = perfTotale(notePondere(p,course,meteo), voitureEffective(course), reglagesJoueur, 1)
                    + st.perf
                    + (p.traits.includes('regulier')?1.0:0);
   field.push({id:p.id, nom:p.nom, moi:true, ecurie:S.saison.ecurieNom, perf:perfJoueur,
@@ -1678,7 +1733,7 @@ function effetsPsy(pos, dnf, grilleN){
 /* Position que l'on peut raisonnablement attendre du duo pilote/voiture */
 function positionAttendue(){
   const sa=S.saison;
-  const perfMoi = notePilote(S.pilote)*0.53 + sa.voiture*0.47;
+  const perfMoi = notePilote(S.pilote)*0.53 + (sa.voiture + bonusDevMoyen())*0.47;
   const tous = sa.grille.map(g=>g.note*0.53 + g.voiture*0.47);
   const mieux = tous.filter(v=>v>perfMoi).length;
   return mieux+1;
@@ -2731,20 +2786,29 @@ function repos(){
   saveGame();
   return {recup:r};
 }
-function developpement(montant){
+function developpement(axe, montant){
   if(S.actions<=0){ showToast('Plus d’action disponible'); return null; }
   if(!S.saison){ return null; }
+  if(!S.saison.dev) S.saison.dev = {chassis:0, aero:0, moteur:0};
+  if(!(axe in S.saison.dev)){ return null; }
   if(S.saison.caisse < montant){ showToast('La caisse de saison ne le permet pas'); return null; }
   S.actions--;
-  caisse('Développement technique', -montant, 'dev');
+  const nom = axesDev().find(a=>a.k===axe).nom;
+  caisse('Développement — '+nom, -montant, 'dev');
   S.saison.devDepense += montant;
-  // rendement décroissant : plus on a déjà investi, moins ça rapporte
+  // rendement décroissant : plus on a déjà investi sur cet axe, moins ça rapporte
   const ref = Math.max(20000, CAT[S.saison.catId].cout*0.25);
-  const gain = 3.2 * Math.log10(1 + montant/ref*9) * (1 - S.saison.devDepense/(ref*14));
-  const g = clamp(gain, 0, 4);
-  S.saison.voiture = clamp(S.saison.voiture + g, 30, 99);
+  // Rendement décroissant sur la dépense totale, mais pas par axe : sinon se
+  // spécialiser est toujours perdant, puisque les poids somment à 1 et que
+  // répartir capte alors 100 % de chaque euro investi.
+  // La décroissance est asymptotique : elle ralentit le gain sans jamais
+  // l'annuler, contrairement à une pénalité linéaire qui finit par passer
+  // sous zéro et rendre tout investissement supplémentaire inutile.
+  const fatigue = 1 / (1 + S.saison.devDepense/(ref*9));
+  const g = clamp(6.0 * Math.log10(1 + montant/ref*9) * fatigue, 0, 5);
+  S.saison.dev[axe] = clamp(S.saison.dev[axe] + g, 0, PLAFOND_AXE);
   saveGame();
-  return {gain:g};
+  return {gain:g, axe, nom};
 }
 
 /* --------------------------------------------- 21. BOUCLE DE JEU */
@@ -3002,7 +3066,7 @@ function renderBureau(){
         ${kpi('Manche', (sa.courseIndex+1)+' / '+c.courses, prochaine?prochaine.nom:'—','')}
         ${kpi('Points', sa.pts, ordinal(positionChampionnat())+' au général','')}
         ${kpi('Victoires', sa.victoires, sa.podiums+' podium(s)', sa.victoires?'amber':'')}
-        ${kpi('Voiture', Math.round(sa.voiture), 'Performance matériel','blue')}
+        ${kpi('Voiture', Math.round(sa.voiture + bonusDevMoyen()), bonusDevMoyen()>0.05?`base ${Math.round(sa.voiture)} + R&D ${round(bonusDevMoyen(),1)}`:'Performance matériel','blue')}
       </div>
       ${gline('Financement couvert', cv*100, cv>=1?'green':cv>=0.7?'amber':'red','%')}
       ${cv<1?`<div class="note warn mt">Il manque du sponsoring pour boucler la saison. Chaque manche non financée est prélevée sur votre trésorerie.</div>`:''}
@@ -3312,6 +3376,8 @@ function renderWeekend(){
     </div>
     <div class="center"><div style="font-size:26px">${meteo.ico}</div><div class="small txt-2">${meteo.nom}</div></div></div>
     <div class="strip mt">
+      <div class="it">Voiture ici <b class="txt-blue">${Math.round(voitureEffective(course))}</b></div>
+      <div class="sep"></div>
       ${w.etapes.map((e,i)=>`<div class="it">${i<w.etape?'✓':i===w.etape?'▶':'·'} <b class="${i===w.etape?'txt-red':''}">${ETAPE_NOM[e]}</b></div>`).join('<div class="sep"></div>')}
       <div class="sep"></div><div class="it">${w.etape>=w.etapes.length?'▶ <b class="txt-red">Débrief</b>':'· Débrief'}</div>
     </div>
@@ -4157,23 +4223,52 @@ ACTIONS.tonPilote = d=>{
      <div class="note">Moral ${r.dm>0?'+':''}${round(r.dm,1)} · relation ${r.dr>0?'+':''}${round(r.dr,1)}${r.dagr?` · agressivité +${round(r.dagr,1)}`:''}</div>`,
     `<button class="btn" data-act="fermerEtRender">Fermer</button>`);
 };
+/* Paliers d'investissement lisibles, sans doublon : un arrondi fixe à 500 €
+   écrasait les trois paliers en un seul sur les catégories bon marché. */
+function paliersDev(cout){
+  const arrondi = v => v<2000 ? Math.round(v/50)*50 : v<20000 ? Math.round(v/500)*500 : Math.round(v/5000)*5000;
+  return [...new Set([0.02,0.05,0.10].map(x=>arrondi(cout*x)).filter(x=>x>0))];
+}
 ACTIONS.modalDev = ()=>{
   if(!S.saison){ showToast('Hors saison'); return; }
-  const c=CAT[S.saison.catId];
-  const paliers=[0.02,0.05,0.10].map(x=>Math.round(c.cout*x/500)*500).filter(x=>x>0);
+  const c=CAT[S.saison.catId], axes=axesDev(), dev=S.saison.dev||{chassis:0,aero:0,moteur:0};
+  const mix=mixCircuits(), total=sum(Object.values(mix));
+  // poids moyen de chaque axe sur les circuits qui restent à courir
+  const poidsMoyen = k => total ? sum(Object.entries(mix), ([t,n])=>(POIDS_DEV[t]||POIDS_DEV['Mixte'])[k]*n)/total : 1/3;
+  const meilleur = axes.map(a=>({k:a.k, p:poidsMoyen(a.k)})).sort((x,y)=>y.p-x.p)[0];
   openModal('Développement technique',
-    `<div class="note mb">Investir sur le matériel (châssis, aéro, moteur) améliore la performance de la voiture,
-     indépendamment du talent du pilote. L’argent sort de la <b>caisse de saison</b>.</div>
-     <div class="note mb">Voiture actuelle : <b>${Math.round(S.saison.voiture)}/100</b> · caisse : <b>${fmtEur(S.saison.caisse)}</b>
-     · déjà investi cette saison : ${fmtEur(S.saison.devDepense)}</div>
-     ${paliers.map(m=>`<button class="choice" data-act="investir" data-m="${m}" ${S.saison.caisse<m?'disabled':''}>
-       <b>${fmtEurFull(m)}</b><small>${S.saison.caisse<m?'Caisse insuffisante':'Rendement décroissant : les gros investissements rapportent proportionnellement moins.'}</small></button>`).join('')}`,
-    `<button class="btn-ghost" data-act="fermerModal">Annuler</button>`);
+    `<div class="note mb">Le budget R&D se répartit sur trois axes. Chaque type de circuit en privilégie un :
+     le moteur sur un tracé rapide, le châssis sur un tracé technique. L’argent sort de la <b>caisse de saison</b>.</div>
+     <div class="note mb">Base de l’écurie : <b>${Math.round(S.saison.voiture)}/100</b> · caisse : <b>${fmtEur(S.saison.caisse)}</b>
+     · déjà investi : ${fmtEur(S.saison.devDepense)}</div>
+     <div class="card flat" style="margin-bottom:12px">
+       <div class="small txt-muted b" style="text-transform:uppercase;letter-spacing:.05em">Circuits restants</div>
+       <div class="note">${total?Object.entries(mix).map(([t,n])=>`${n} ${t.toLowerCase()}`).join(' · '):'—'}</div>
+       <div class="note txt-muted mt">Sur ce calendrier, l’axe le plus rentable est
+         <b class="txt-amber">${escapeHtml(axes.find(a=>a.k===meilleur.k).nom)}</b>.</div>
+     </div>
+     ${axes.map(a=>{
+       const niv=dev[a.k]||0, pm=poidsMoyen(a.k);
+       return `<div class="grp">
+         <div class="h"><b>${escapeHtml(a.nom)}</b><span>${round(niv,1)}</span></div>
+         <div class="note txt-muted">${escapeHtml(a.desc)} — pèse ${Math.round(pm*100)} % sur les circuits restants.</div>
+         ${gline('Niveau', niv/PLAFOND_AXE*100, niv/PLAFOND_AXE>0.66?'green':'blue','')}
+         <div class="row tight mt">${paliersDev(c.cout).map(m=>
+           `<button class="btn-ghost btn-sm" data-act="investir" data-axe="${a.k}" data-m="${m}"
+             ${S.saison.caisse<m?'disabled':''}>${fmtEurFull(m)}</button>`).join('')}</div>
+       </div>`;
+     }).join('')}
+     <div class="note txt-muted">Rendement décroissant sur le <b>total dépensé</b> dans la saison, pas par axe :
+     concentrer tout sur un seul axe reste payant si le calendrier s’y prête.</div>`,
+    `<button class="btn-ghost" data-act="fermerModal">Fermer</button>`);
 };
 ACTIONS.investir = d=>{
-  const r=developpement(+d.m); if(!r) return;
+  const r=developpement(d.axe, +d.m); if(!r) return;
+  const prochaine = S.saison.calendrier[S.saison.courseIndex];
   openModal('Développement livré',
-    `<div class="note">Performance de la voiture : <b class="txt-green">+${round(r.gain,2)}</b> → ${Math.round(S.saison.voiture)}/100.</div>
+    `<div class="note">${escapeHtml(r.nom)} : <b class="txt-green">+${round(r.gain,2)}</b> — niveau ${round(S.saison.dev[r.axe],1)}/${PLAFOND_AXE}.</div>
+     ${prochaine?`<div class="note mt">Voiture sur la prochaine manche (${escapeHtml(prochaine.nom)}, ${prochaine.type.toLowerCase()}) :
+       <b>${Math.round(voitureEffective(prochaine))}/100</b> — base ${Math.round(S.saison.voiture)} + R&D ${round(bonusDev(prochaine),1)}.</div>`:''}
      <div class="note txt-muted mt">Caisse restante : ${fmtEur(S.saison.caisse)}</div>`,
     `<button class="btn" data-act="fermerEtRender">Fermer</button>`);
 };
