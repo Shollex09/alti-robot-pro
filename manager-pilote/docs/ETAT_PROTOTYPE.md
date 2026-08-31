@@ -42,7 +42,7 @@ ne les fixait pas.
 | 9.4 | Négociation en plusieurs tours | ✅ | 5 leviers, risque de retrait croissant |
 | 9.5 | Renvoi | ✅ | Bilan toutes les 4 manches, 3 avertissements |
 | 10 | Revenus et dépenses du manager | ✅ | |
-| 11 | Développement technique, fiabilité | 🟡 | R&D en un seul curseur, pas réparti châssis/aéro/moteur |
+| 11 | Développement technique, fiabilité | ✅ | R&D répartie sur trois axes, pondérés par le type de circuit |
 | 12 | Météo, stratégie, qualifs, incidents, circuits réels | ✅ | Stratégie avant le départ **et** un arbitrage à mi-course |
 | 13 | Staff | ✅ | Les 4 rôles V1, 5 niveaux ; coach mental et avocat en V2 |
 | 14 | Boîte de réception, comparaison coéquipier | ✅ | Récompenses de fin de saison et historique complet : V2 |
@@ -258,6 +258,58 @@ nouveaux runs, la fatigue saturait à 100 dès la 6e course et la forme tombait
 fonctionnalité qu'il venait de demander. Corrigé par une récupération passive
 entre les manches, avec un test de non-régression dédié.
 
+## §11 — la R&D répartie sur trois axes
+
+Le §11 veut un « budget R&D réparti entre châssis, aérodynamique, moteur ».
+C'était un curseur unique qui montait la performance de la voiture, sans choix.
+
+Trois axes désormais, et chaque type de circuit en privilégie un :
+
+| Type de circuit | Châssis | Aéro / train roulant | Moteur |
+|---|---|---|---|
+| Rapide | 15 % | 20 % | **65 %** |
+| Technique | **55 %** | 35 % | 10 % |
+| Mixte | 34 % | 33 % | 33 % |
+
+En karting, l'axe « aérodynamique » devient « train roulant » — il n'y a pas
+d'aéro sur un kart. Le calendrier étant connu d'avance, la modale affiche le
+mix des circuits restants et nomme l'axe le plus rentable.
+
+**Deux pièges rencontrés en réglant ça, et qui méritent d'être notés :**
+
+1. La première version ajoutait un rendement décroissant *par axe*. Résultat
+   mesuré : cibler le bon axe ne rapportait strictement rien de plus que
+   répartir également (71,63 contre 71,70). C'est mathématique — comme les poids
+   somment à 1, répartir capte 100 % de chaque euro, alors que se spécialiser
+   n'en capte que le poids de l'axe. Le rendement décroissant par axe empêchait
+   la concentration de compenser. Il a été retiré ; seul le rendement sur la
+   dépense totale subsiste.
+2. Ce rendement global était une pénalité *linéaire*, qui finissait par passer
+   sous zéro : après quelques investissements, un euro de plus ne rapportait
+   plus rien du tout, même sur un axe vierge. Remplacé par une décroissance
+   asymptotique, qui ralentit sans jamais annuler.
+
+Effet mesuré après correction, base de voiture 70 en F3 :
+
+| Part du budget de saison | Mauvais axe | Répartition égale | Bon axe |
+|---|---|---|---|
+| 5 % | 71,2 | 71,4 | 71,5 |
+| 15 % | 72,9 | 73,3 | 73,7 |
+| 30 % | 74,7 | 75,2 | 75,8 |
+
+Sur un calendrier **homogène** (tous les circuits rapides), l'écart devient
+décisif : 80,2 en ciblant le moteur contre 75,2 en répartissant et 72,3 en se
+trompant d'axe. Lire son calendrier paie quand il est tranché, et le choix est
+presque neutre quand il est équilibré — c'est la forme recherchée.
+
+En karting l'effet reste dérisoire (moins d'un point), faute de budget : c'est
+cohérent avec le §19.8, où la phase 1 est celle de la survie.
+
+Le coût est réel : la R&D se paie sur la caisse de saison, donc elle concurrence
+directement le paiement des manches. Mesuré sur 24 carrières, avec et sans R&D :
++0,3 à +0,8 titre par carrière quand on peut se le permettre, et une faillite
+supplémentaire sur le profil le plus serré.
+
 ## §12 — la décision de mi-course
 
 Le §12 demande que la stratégie se décide « avant **et pendant** la course ».
@@ -370,7 +422,7 @@ dur, comme le §2.2 l'annonce pour cette combinaison, mais jouable.
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - Le podium illustré, le portrait de pilote évolutif et les animations du §16.
-- Le développement technique réparti sur trois axes (§11).
+- La réglementation évolutive d'une saison à l'autre (§11), marquée V2.
 - La gestion tour par tour de la course (§12) : il n'y a qu'un seul arbitrage
   à mi-course, pas un suivi continu.
 - Tout le périmètre V2, à commencer par le multi-pilotes (§15) qui est la
