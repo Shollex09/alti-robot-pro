@@ -86,6 +86,10 @@ passages de karting partagent la ligne « régional → national » :
 - **Condition 3, une écurie disposée** : c'est l'existence d'une offre. L'âge
   conseillé y joue : hors fenêtre, l'appétit des écuries chute, et un pilote qui
   reste 3 saisons ou plus dans la même catégorie perd encore en attractivité.
+- **L'âge est une quatrième ligne affichée**, et la table du §8.2 en est la seule
+  source de vérité (`ageAutoriseMontee`). Les bornes d'âge des catégories, écrites
+  avant le §8.2, ne servent plus qu'à peupler les grilles adverses et à borner la
+  descente. On tolère un an avant la fenêtre conseillée, pour les talents précoces.
 
 **Voie du pilote payant** : le budget sécurisé assouplit le résultat exigé de
 `min(6, budget / coût de la saison × 6)` places. Il n'assouplit **jamais** la
@@ -273,6 +277,31 @@ entre les manches, avec un test de non-régression dédié.
    avec 6 accès à la F1 sur 8. À réputation 9, les pilotes de F2 restent proposés,
    puisque le potentiel de sponsors couvre réellement la saison — le profil
    « budget faible + International » du §2.2 garde donc tout son intérêt.
+
+## Troisième passage de jeu : une montée bloquée en silence
+
+**« Je ne peux pas dépasser le Karting Junior, j'ai déjà gagné 3 fois. »**
+Diagnostic à pilote constant, 200 tirages par facteur : les sponsors n'y étaient
+pour rien, le nombre de titres non plus. **C'était l'âge — 0 % d'offres à 12 et
+13 ans, 98 % dès 14 ans.**
+
+Deux tables se contredisaient. La fenêtre du §8.2 pour le Karting Senior est
+12-16 ans, et le panneau l'affichait ainsi ; mais la génération d'offres lisait
+`ageMin` de la table des catégories, écrite avant le §8.2, qui exigeait 15 ans
+(donc 14 avec la tolérance). Un champion de 13 ans était donc refusé partout,
+sans qu'aucun écran ne le dise.
+
+Corrigé sur trois plans :
+
+1. Les bornes d'âge du karting sont alignées sur le §8.2 (Cadet 10, Junior 11,
+   Senior 12, KZ 13 au lieu de 11/13/15/15).
+2. La montée ne lit plus qu'une seule table, celle du §8.2.
+3. **L'âge devient une condition affichée** dans le panneau, avec sa coche : il
+   ne peut plus bloquer sans le dire. Le panneau en compte désormais quatre.
+
+Vérifié sur toute l'échelle, avec la réputation qu'on a réellement à chaque
+étage : un champion au bon âge reçoit une offre de montée dans 95 à 100 % des
+cas, de Karting Mini jusqu'à la F1.
 
 ## Suites données au GDD v0.7
 

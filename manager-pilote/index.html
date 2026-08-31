@@ -396,10 +396,10 @@ function showToast(m){const t=$('#toast');t.textContent=m;t.classList.add('show'
 /* --- 1.1 Échelle des catégories (GDD §8.1, §19.2, §19.3, §21.2) --- */
 const CATS = [
   {id:'kmini',  nom:'Karting Mini',   court:'K-Mini',  niv:0, cout:8000,    courses:6,  grille:24, ageMin:8,  ageMax:13, format:'kart', slots:2, vict:300,   titre:1500,   ptsSys:'kart', prestige:8},
-  {id:'kcadet', nom:'Karting Cadet',  court:'K-Cadet', niv:1, cout:14000,   courses:6,  grille:24, ageMin:11, ageMax:15, format:'kart', slots:2, vict:400,   titre:2200,   ptsSys:'kart', prestige:14},
-  {id:'kjunior',nom:'Karting Junior', court:'K-Junior',niv:2, cout:22000,   courses:7,  grille:26, ageMin:13, ageMax:17, format:'kart', slots:2, vict:800,   titre:4000,   ptsSys:'kart', prestige:22},
-  {id:'ksenior',nom:'Karting Senior', court:'K-Senior',niv:3, cout:35000,   courses:8,  grille:28, ageMin:15, ageMax:22, format:'kart', slots:3, vict:1500,  titre:8000,   ptsSys:'kart', prestige:30},
-  {id:'kz',     nom:'Karting KZ',     court:'KZ',      niv:4, cout:100000,  courses:8,  grille:28, ageMin:15, ageMax:26, format:'kart', slots:3, vict:3000,  titre:15000,  ptsSys:'kart', prestige:40},
+  {id:'kcadet', nom:'Karting Cadet',  court:'K-Cadet', niv:1, cout:14000,   courses:6,  grille:24, ageMin:10, ageMax:15, format:'kart', slots:2, vict:400,   titre:2200,   ptsSys:'kart', prestige:14},
+  {id:'kjunior',nom:'Karting Junior', court:'K-Junior',niv:2, cout:22000,   courses:7,  grille:26, ageMin:11, ageMax:17, format:'kart', slots:2, vict:800,   titre:4000,   ptsSys:'kart', prestige:22},
+  {id:'ksenior',nom:'Karting Senior', court:'K-Senior',niv:3, cout:35000,   courses:8,  grille:28, ageMin:12, ageMax:22, format:'kart', slots:3, vict:1500,  titre:8000,   ptsSys:'kart', prestige:30},
+  {id:'kz',     nom:'Karting KZ',     court:'KZ',      niv:4, cout:100000,  courses:8,  grille:28, ageMin:13, ageMax:26, format:'kart', slots:3, vict:3000,  titre:15000,  ptsSys:'kart', prestige:40},
   {id:'f4',     nom:'Formule 4',      court:'F4',      niv:5, cout:250000,  courses:15, grille:22, ageMin:15, ageMax:22, format:'mono',slots:4, vict:3000,  titre:30000,  ptsSys:'f1',   prestige:52},
   {id:'f3',     nom:'Formule 3',      court:'F3',      niv:6, cout:900000,  courses:18, grille:26, ageMin:16, ageMax:24, format:'mono',slots:5, vict:15000, titre:150000, ptsSys:'f1',   prestige:66},
   {id:'f2',     nom:'Formule 2',      court:'F2',      niv:7, cout:2500000, courses:24, grille:22, ageMin:17, ageMax:27, format:'mono',slots:6, vict:40000, titre:400000, ptsSys:'f1',   prestige:80},
@@ -2358,6 +2358,15 @@ function assouplissementPayant(catCibleId){
   return clamp(Math.floor(budgetSecurise() / c.cout * 6), 0, 6);
 }
 
+/* Âge autorisé pour monter dans une catégorie. C'est la table du §8.2 qui fait
+   foi — une seule source de vérité. On tolère un an avant la fenêtre conseillée
+   (un talent précoce), et jusqu'à la limite d'âge de la catégorie ensuite. */
+function ageAutoriseMontee(catCibleId, age){
+  const cond = MONTEE[catCibleId], c = CAT[catCibleId];
+  if(!cond) return age>=c.ageMin-1 && age<=c.ageMax;
+  return age >= cond.age[0]-1 && age <= c.ageMax;
+}
+
 /* Les trois conditions du §8.2, évaluées pour une catégorie visée.
    `ecurieOk` est fourni par l'existence d'une offre : on le passe de l'extérieur. */
 function conditionsMontee(catCibleId, apport){
@@ -2378,8 +2387,9 @@ function conditionsMontee(catCibleId, apport){
     cond, pos, posRequise, bonus, titre, sportifOk,
     sl, slRequis:cond.sl, slOk,
     secure, apport, budgetOk, manque,
-    ageIdeal: cond.age, ageOk: p.age>=cond.age[0]-1 && p.age<=cond.age[1]+2,
-    ok: sportifOk && slOk && budgetOk,
+    ageIdeal: cond.age, ageOk: ageAutoriseMontee(catCibleId, p.age),
+    ageConseille: p.age>=cond.age[0] && p.age<=cond.age[1],
+    ok: sportifOk && slOk && budgetOk && ageAutoriseMontee(catCibleId, p.age),
   };
 }
 /* Une montée est-elle envisageable sportivement ? (avant même de parler d'argent) */
@@ -2404,7 +2414,7 @@ function genererOffres(){
   const sup = catByNiv(catAct.niv+1);
   // Monter d'une catégorie : le résultat sportif et la superlicence font barrage
   // avant même qu'une écurie se manifeste (GDD §8.2, conditions 1 et 3).
-  if(sup && p.age>=sup.ageMin-1 && p.age<=sup.ageMax){
+  if(sup && ageAutoriseMontee(sup.id, p.age)){
     if(montePossibleSportivement(sup.id) && (sup.id!=='f1' || p.age>=18)) cibles.push(sup.id);
   }
   cibles.push(catAct.id);                                     // rester
@@ -3760,10 +3770,12 @@ function panneauMontee(){
 
   return `<div class="card ${k.ok?'':'accent'}">
     <h2>Monter en ${sup.nom}<span class="hint">3 conditions cumulatives</span></h2>
-    <div class="note mb">${escapeHtml(k.cond.lib)} · âge conseillé ${k.cond.age[0]}-${k.cond.age[1]} ans
-      (${p.nom} a ${p.age} ans${k.ageOk?'':', hors fenêtre : les écuries se méfient'}).</div>
+    <div class="note mb">${escapeHtml(k.cond.lib)} · âge conseillé ${k.cond.age[0]}-${k.cond.age[1]} ans.</div>
     ${ligne(k.sportifOk, 'Résultat sportif', posTxt)}
     ${ligne(k.slOk, 'Superlicence', slTxt)}
+    ${ligne(k.ageOk, 'Âge', k.ageOk
+      ? `${p.age} ans : les écuries de ${sup.court} peuvent l’engager${k.ageConseille?'':' — hors de la fenêtre idéale, elles seront plus difficiles à convaincre'}.`
+      : `${p.age} ans : trop ${p.age<k.cond.age[0]?'jeune':'âgé'} pour la ${sup.court}, qui recrute entre ${k.cond.age[0]-1} et ${sup.ageMax} ans.`)}
     ${ligne(k.budgetOk, 'Budget sécurisé', budTxt)}
     <div class="note txt-muted mt">La troisième condition — qu’une écurie veuille du pilote — se lit dans les offres.
       Un champion sans budget ne monte pas : c’est l’argent le vrai filtre.</div>
