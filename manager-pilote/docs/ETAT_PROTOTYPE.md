@@ -47,7 +47,7 @@ ne les fixait pas.
 | 13 | Staff | ✅ | Les 4 rôles V1, 5 niveaux ; coach mental et avocat en V2 |
 | 14 | Boîte de réception, comparaison coéquipier | ✅ | Récompenses de fin de saison et historique complet : V2 |
 | 15 | Un seul pilote en V1 | ✅ | Le multi-pilotes est affiché comme verrouillé |
-| 16 | 2D, pas de 3D | 🟡 | Interface données conforme ; podium illustré, portrait évolutif et animations non faits |
+| 16 | 2D, pas de 3D | ✅ | Portrait de pilote généré et vieillissant, podium illustré, scène de signature, animations sobres |
 | 17.1 | Formule de progression | ✅ | Formule du GDD à l'identique |
 | 17.2 | Note globale | ✅ | Pace ×0,40 + Consistency ×0,30 + Racecraft ×0,30 |
 | 17.3 | Résultat de course | ✅ | Pilote ×0,40 + Voiture ×0,35 + Réglages ×0,15 + Aléa ×0,10 |
@@ -419,9 +419,96 @@ maintenant visible avant la signature — et la descente corrigée offre une por
 de sortie crédible. Le profil retombe à 4 faillites sur 8, avec 4 accès à la F1 :
 dur, comme le §2.2 l'annonce pour cette combinaison, mais jouable.
 
+## §16 — la couche visuelle
+
+Le §23.1 demande de ne travailler l'habillage qu'« après validation du gameplay,
+jamais avant ». La condition est remplie : la boucle a été jouée sur plusieurs
+sessions et validée. Tout est en SVG écrit à la volée — aucune image à produire,
+aucun fichier à charger, la page reste un seul fichier.
+
+### Portrait de pilote
+
+`portraitPilote(p, opt)` dessine un visage déterministe à partir de l'identité du
+pilote : `traitsPortrait()` tire teint, cheveux, coupe (4 variantes), couleur des
+yeux, largeur du visage, épaisseur des sourcils et forme des oreilles d'un hachage
+stable. Le même pilote donne toujours le même visage, sans rien stocker en
+sauvegarde.
+
+Le portrait vieillit avec le pilote, ce qui donne à une carrière de quinze ans
+une trace visible :
+
+| Âge | Ce qui change |
+|---|---|
+| < 18 ans | Visage plus rond et plus large, sourire un peu plus marqué |
+| ≥ 19 ans | Une barbe naissante apparaît, et s'affirme avec les années |
+| > 32 ans | Rides du front et patte d'oie, cheveux qui grisonnent |
+| 43 ans | Grisonnement maximal (75 % vers le gris) |
+
+La palette de cheveux ne contient **aucun gris** : un jeune de 14 ans ne doit pas
+naître avec des cheveux blancs, le grisonnement ne vient que de l'âge.
+
+La combinaison reprend la couleur de l'écurie. Les 34 écuries ont reçu un champ
+`coul`. `coulPilote()` prend celle de la saison en cours, et à défaut celle du
+contrat déjà signé — sans quoi le portrait redevenait gris entre la signature et
+le lancement de la saison.
+
+### Podium
+
+`scenePodium(pos, noms)` s'affiche au débrief quand le pilote finit dans les
+trois. Le pilote est debout sur sa marche, aux couleurs de son écurie, avec le
+trophée posé à côté de lui en cas de victoire, et vingt confettis animés.
+
+Quatre défauts de géométrie relevés en lisant les captures, et corrigés :
+
+1. **Le trophée se dessinait en haut à gauche du cadre.** L'animation CSS pose un
+   `transform`, qui écrase l'attribut `transform` du SVG. Le placement vit
+   maintenant sur un groupe parent, l'animation sur un groupe enfant.
+2. **La troisième marche dépassait du cadre** (x 166 + 56 > 200). Géométrie
+   refaite : `viewBox` 200×132, marches de 52 aux abscisses 12 / 74 / 136.
+3. **Le portrait arrivait sous forme de `<svg>` imbriqué**, donc avec son fond
+   opaque et son propre recadrage : un carré sombre autour de la tête. Le mode
+   `opt.integre` renvoie le dessin nu, sans balise `<svg>` ni fond.
+4. **La combinaison et la marche avaient exactement la même couleur**, le pilote
+   disparaissait dedans. La marche du vainqueur est assombrie de 45 % et cerclée
+   d'un trait à la couleur pleine — ce qui la distingue aussi des marches
+   neutres pour les livrées argentées.
+
+Un cinquième défaut ne venait pas du podium mais du portrait lui-même : la nuque
+se réduisait à une pastille au niveau du col, la tête flottait au-dessus des
+épaules dès que le fond devenait transparent. Le cou va maintenant du menton au
+col, avec une ombre sous le menton, et les épaules ont été remontées.
+
+### Animations
+
+Trois seulement, toutes sobres : la chute des confettis, la levée du trophée, et
+l'entrée de la carte de signature. Les délais des confettis sont **négatifs**,
+donc la chute est déjà entamée au premier rendu — sans quoi la scène s'ouvre sur
+un ciel vide. Le tout est désactivé sous `prefers-reduced-motion: reduce`.
+
+### Ce que la simulation rapide coûte
+
+Mesuré au passage, sur 8 profils × 8 carrières × 15 saisons : un bot qui utilise
+la simulation rapide à **toutes** les courses n'atteint la F1 que dans 0 à 2 cas
+sur 8 (contre 4 à 8 en course détaillée) et gagne 1 à 3 titres au lieu de 8 à 12.
+L'écart vient des réglages : la simulation rapide plafonne à 88 (54 + 5,5 par
+niveau d'ingénieur), le travail d'essais atteint 95. C'est conforme au §18 et au
+§21.1 — travailler les essais est le levier du manager — et aucun joueur humain
+ne joue quinze saisons en simulation rapide intégrale. Rien n'a donc été
+rééquilibré, mais le chiffre est noté ici pour ne pas être redécouvert plus tard.
+
+### Test
+
+`unit8.js` couvre le §16 : 35 assertions sur le déterminisme du portrait, le
+mode intégré, le vieillissement, l'absence de gris dans la palette, la présence
+d'une couleur sur les 34 écuries, la livrée héritée du contrat hors saison, et
+le fait que rien du podium ne sorte du cadre pour les trois positions.
+
+Le harnais de test lisait un `game.js` extrait à la main, qui pouvait être
+périmé — les tests passaient alors sur du code ancien. Il lit maintenant
+`index.html` directement.
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
-- Le podium illustré, le portrait de pilote évolutif et les animations du §16.
 - La réglementation évolutive d'une saison à l'autre (§11), marquée V2.
 - La gestion tour par tour de la course (§12) : il n'y a qu'un seul arbitrage
   à mi-course, pas un suivi continu.

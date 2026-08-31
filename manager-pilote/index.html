@@ -292,6 +292,30 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
 .slider-box .top{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
 .slider-box .top b{font-family:var(--cond);font-size:17px;text-transform:uppercase;letter-spacing:.04em}
 .slider-box .top span{margin-left:auto;font-family:var(--cond);font-size:20px;font-weight:700;color:var(--amber)}
+/* ---- portraits et podium (GDD §16) ---- */
+.portrait{width:100%;height:100%;display:block;border-radius:12px}
+.portrait-box{width:76px;height:91px;flex:0 0 76px;border-radius:12px;overflow:hidden;
+  border:1.5px solid var(--border2);background:var(--card2)}
+.portrait-box.sm{width:46px;height:55px;flex-basis:46px;border-radius:9px}
+.portrait-box.lg{width:104px;height:125px;flex-basis:104px}
+.podium{width:100%;max-width:340px;height:auto;display:block;margin:0 auto;overflow:hidden}
+.podium-noms{display:flex;justify-content:center;gap:11px;flex-wrap:wrap;margin-top:8px;
+  font-size:12px;color:var(--text2)}
+.podium-noms .moi{color:var(--amber);font-weight:700}
+.podium-carte{background:linear-gradient(180deg,#1d2430,var(--card));border-color:var(--amber)}
+@keyframes tombe{0%{transform:translateY(0) rotate(0);opacity:0}
+  8%{opacity:1}88%{opacity:1}100%{transform:translateY(172px) rotate(420deg);opacity:0}}
+.confetti{animation:tombe 2.6s linear infinite}
+@keyframes leve{0%{transform:translateY(10px) scale(.6);opacity:0}
+  60%{transform:translateY(-3px) scale(1.06);opacity:1}100%{transform:translateY(0) scale(1);opacity:1}}
+.trophee{animation:leve .9s cubic-bezier(.2,.9,.3,1.2) both;transform-origin:center}
+@keyframes apparait{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.anim-entree{animation:apparait .45s ease both}
+@media (prefers-reduced-motion: reduce){
+  .confetti{display:none}
+  .trophee,.anim-entree{animation:none}
+}
+
 .ladder{display:flex;gap:3px;align-items:flex-end;margin:10px 0}
 .ladder .st{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:4px 4px 0 0;
   padding:5px 2px;text-align:center;font-size:9px;font-weight:700;color:var(--muted);line-height:1.15;
@@ -414,8 +438,9 @@ const catByNiv = n=>CATS.find(c=>c.niv===n);
 const NIVEAU_GRILLE = {kmini:32, kcadet:40, kjunior:48, ksenior:55, kz:61, f4:67, f3:74, f2:81, f1:87};
 
 /* Conditions de changement de catégorie (GDD §8.2).
-   Trois conditions cumulatives : un résultat sportif, un budget sécurisé,
-   une écurie disposée à recruter. Le budget est le véritable filtre —
+   Quatre conditions cumulatives se cochent ici — résultat sportif, points de
+   superlicence, âge, budget sécurisé — et une cinquième se lit dans les offres :
+   qu'une écurie veuille du pilote. Le budget reste le véritable filtre —
    un champion sans argent ne monte pas.
    Table indexée par catégorie visée. Le GDD décrit 6 paliers pour 9 échelons :
    les trois premiers passages de karting partagent la ligne « régional → national ». */
@@ -518,48 +543,48 @@ const setupParams = catId => CAT[catId].format==='kart' ? SETUP_KART : SETUP_MON
    bloqué en milieu de grille en karting, ce qui n'a aucun sens. */
 const ECURIES = {
   kart:[
-    {id:'kt1',nom:'Rapida Kart',        prestige:70,voiture:90,fiab:92},
-    {id:'kt2',nom:'Vertigo Racing Kart',prestige:62,voiture:87,fiab:90},
-    {id:'kt3',nom:'Team Chicane',       prestige:52,voiture:84,fiab:89},
-    {id:'kt4',nom:'Piste Nord',         prestige:42,voiture:81,fiab:87},
-    {id:'kt5',nom:'Écurie Bellevue',    prestige:32,voiture:78,fiab:85},
-    {id:'kt6',nom:'Kart Passion 45',    prestige:22,voiture:75,fiab:82},
+    {id:'kt1',nom:'Rapida Kart',        prestige:70,voiture:90,fiab:92, coul:'#e03131'},
+    {id:'kt2',nom:'Vertigo Racing Kart',prestige:62,voiture:87,fiab:90, coul:'#7048e8'},
+    {id:'kt3',nom:'Team Chicane',       prestige:52,voiture:84,fiab:89, coul:'#1c7ed6'},
+    {id:'kt4',nom:'Piste Nord',         prestige:42,voiture:81,fiab:87, coul:'#2f9e44'},
+    {id:'kt5',nom:'Écurie Bellevue',    prestige:32,voiture:78,fiab:85, coul:'#f08c00'},
+    {id:'kt6',nom:'Kart Passion 45',    prestige:22,voiture:75,fiab:82, coul:'#868e96'},
   ],
   f4:[
-    {id:'f4a',nom:'Aurora Motorsport',  prestige:74,voiture:90,fiab:90},
-    {id:'f4b',nom:'Prisme Racing',      prestige:66,voiture:86,fiab:89},
-    {id:'f4c',nom:'Vulcano Corse',      prestige:57,voiture:82,fiab:87},
-    {id:'f4d',nom:'Meridian Junior',    prestige:47,voiture:78,fiab:86},
-    {id:'f4e',nom:'Cobalt Racing',      prestige:37,voiture:74,fiab:84},
-    {id:'f4f',nom:'Team Ardennes',      prestige:27,voiture:70,fiab:81},
+    {id:'f4a',nom:'Aurora Motorsport',  prestige:74,voiture:90,fiab:90, coul:'#1971c2'},
+    {id:'f4b',nom:'Prisme Racing',      prestige:66,voiture:86,fiab:89, coul:'#c2255c'},
+    {id:'f4c',nom:'Vulcano Corse',      prestige:57,voiture:82,fiab:87, coul:'#e8590c'},
+    {id:'f4d',nom:'Meridian Junior',    prestige:47,voiture:78,fiab:86, coul:'#2b8a3e'},
+    {id:'f4e',nom:'Cobalt Racing',      prestige:37,voiture:74,fiab:84, coul:'#5f3dc4'},
+    {id:'f4f',nom:'Team Ardennes',      prestige:27,voiture:70,fiab:81, coul:'#6b7785'},
   ],
   f3:[
-    {id:'f3a',nom:'Aurora Motorsport',  prestige:80,voiture:90,fiab:91},
-    {id:'f3b',nom:'Vulcano Corse',      prestige:72,voiture:85,fiab:90},
-    {id:'f3c',nom:'Prisme Racing',      prestige:64,voiture:81,fiab:88},
-    {id:'f3d',nom:'Northgate GP',       prestige:55,voiture:76,fiab:87},
-    {id:'f3e',nom:'Meridian Junior',    prestige:45,voiture:71,fiab:85},
-    {id:'f3f',nom:'Cobalt Racing',      prestige:34,voiture:66,fiab:82},
+    {id:'f3a',nom:'Aurora Motorsport',  prestige:80,voiture:90,fiab:91, coul:'#1971c2'},
+    {id:'f3b',nom:'Vulcano Corse',      prestige:72,voiture:85,fiab:90, coul:'#e8590c'},
+    {id:'f3c',nom:'Prisme Racing',      prestige:64,voiture:81,fiab:88, coul:'#c2255c'},
+    {id:'f3d',nom:'Northgate GP',       prestige:55,voiture:76,fiab:87, coul:'#0c8599'},
+    {id:'f3e',nom:'Meridian Junior',    prestige:45,voiture:71,fiab:85, coul:'#2b8a3e'},
+    {id:'f3f',nom:'Cobalt Racing',      prestige:34,voiture:66,fiab:82, coul:'#5f3dc4'},
   ],
   f2:[
-    {id:'f2a',nom:'Aurora Motorsport',  prestige:86,voiture:92,fiab:91},
-    {id:'f2b',nom:'Vulcano Corse',      prestige:78,voiture:87,fiab:90},
-    {id:'f2c',nom:'Northgate GP',       prestige:70,voiture:82,fiab:89},
-    {id:'f2d',nom:'Prisme Racing',      prestige:61,voiture:77,fiab:87},
-    {id:'f2e',nom:'Hexagone Racing',    prestige:50,voiture:71,fiab:85},
-    {id:'f2f',nom:'Meridian Junior',    prestige:38,voiture:64,fiab:83},
+    {id:'f2a',nom:'Aurora Motorsport',  prestige:86,voiture:92,fiab:91, coul:'#1971c2'},
+    {id:'f2b',nom:'Vulcano Corse',      prestige:78,voiture:87,fiab:90, coul:'#e8590c'},
+    {id:'f2c',nom:'Northgate GP',       prestige:70,voiture:82,fiab:89, coul:'#0c8599'},
+    {id:'f2d',nom:'Prisme Racing',      prestige:61,voiture:77,fiab:87, coul:'#c2255c'},
+    {id:'f2e',nom:'Hexagone Racing',    prestige:50,voiture:71,fiab:85, coul:'#2b8a3e'},
+    {id:'f2f',nom:'Meridian Junior',    prestige:38,voiture:64,fiab:83, coul:'#5f3dc4'},
   ],
   f1:[
-    {id:'rossa', nom:'Scuderia Rossa',        prestige:96,voiture:92,fiab:90},
-    {id:'toro',  nom:'Toro Energia',          prestige:92,voiture:94,fiab:91},
-    {id:'silver',nom:'Silver Star Motorsport',prestige:93,voiture:88,fiab:93},
-    {id:'papaya',nom:'Papaya Racing',         prestige:84,voiture:90,fiab:91},
-    {id:'emer',  nom:'Émeraude Racing',       prestige:72,voiture:78,fiab:89},
-    {id:'azur',  nom:'Azur Grand Prix',       prestige:66,voiture:74,fiab:87},
-    {id:'albion',nom:'Albion GP',             prestige:58,voiture:69,fiab:86},
-    {id:'nordic',nom:'Nordic Motorsport',     prestige:50,voiture:64,fiab:85},
-    {id:'sirius',nom:'Sirius Racing',         prestige:42,voiture:59,fiab:83},
-    {id:'falcon',nom:'Falcon GP',             prestige:34,voiture:54,fiab:81},
+    {id:'rossa', nom:'Scuderia Rossa',        prestige:96,voiture:92,fiab:90, coul:'#d62828'},
+    {id:'toro',  nom:'Toro Energia',          prestige:92,voiture:94,fiab:91, coul:'#1e2a78'},
+    {id:'silver',nom:'Silver Star Motorsport',prestige:93,voiture:88,fiab:93, coul:'#8f9aa6'},
+    {id:'papaya',nom:'Papaya Racing',         prestige:84,voiture:90,fiab:91, coul:'#ff7a18'},
+    {id:'emer',  nom:'Émeraude Racing',       prestige:72,voiture:78,fiab:89, coul:'#0b6b3a'},
+    {id:'azur',  nom:'Azur Grand Prix',       prestige:66,voiture:74,fiab:87, coul:'#1c7ed6'},
+    {id:'albion',nom:'Albion GP',             prestige:58,voiture:69,fiab:86, coul:'#0b3d6b'},
+    {id:'nordic',nom:'Nordic Motorsport',     prestige:50,voiture:64,fiab:85, coul:'#2f9e44'},
+    {id:'sirius',nom:'Sirius Racing',         prestige:42,voiture:59,fiab:83, coul:'#7048e8'},
+    {id:'falcon',nom:'Falcon GP',             prestige:34,voiture:54,fiab:81, coul:'#b08900'},
   ],
 };
 function ecuriesPour(catId){
@@ -1110,6 +1135,7 @@ function demarrerSaison(catId, ecurieId){
   S.phase = 'semaine';
   S.actions = actionsParSemaine();
   S.stats.saisonsJouees++;
+  S.flags.signatureRecente = null;
   majSponsorsProspects();
   msg('systeme','Fédération','Engagement validé — saison '+S.annee,
     `${S.pilote.nom} est engagé en ${c.nom} avec ${ecu.nom}.\n\n`+
@@ -2714,6 +2740,7 @@ function signerOffre(offre){
       `${S.pilote.nom} est officiellement pilote de Formule 1 chez ${offre.ecurieNom}.\n\n`+
       `C’est l’aboutissement de tout ce que vous avez construit depuis le karting.`);
   }
+  S.flags.signatureRecente = {ecurie:offre.ecurieNom, cat:c.court, annee:S.annee};
   msg('ecurie', offre.ecurieNom, 'Contrat signé — saison '+S.annee,
     `${S.pilote.nom} rejoint ${offre.ecurieNom} en ${c.nom}.\n\n`+
     (offre.salaire>0 ? `Salaire annuel : <em>${fmtEurFull(offre.salaire)}</em>. Votre commission : 10 %.\n` :
@@ -2866,6 +2893,173 @@ function openModal(title, body, foot){
 function closeModal(){ $('#overlay').classList.remove('on'); }
 $('#modalX').onclick = closeModal;
 $('#overlay').addEventListener('click', e=>{ if(e.target.id==='overlay') closeModal(); });
+
+/* ================= PORTRAITS ET PODIUM (GDD §16) =================
+   Tout est en 2D, dessiné en SVG à la volée : aucune image à produire, et le
+   portrait est déterministe — un pilote donné a toujours le même visage, qui
+   vieillit au fil de sa carrière. */
+
+const TEINTS  = ['#f2d0b3','#e8bd97','#d8a074','#b87d4f','#8d5a34','#6b4226'];
+// pas de gris dans la palette de base : le grisonnement vient de l'âge seul
+const CHEVEUX = ['#2b1b12','#4a2f1c','#7a4a22','#b57a37','#d9c07a','#9c3f1f','#1a1a1a'];
+
+/* Traits stables d'un pilote, tirés de son identifiant. */
+function traitsPortrait(p){
+  const h = k => hash01(p.id + '|' + k);
+  return {
+    teint:   TEINTS[Math.floor(h('teint')*TEINTS.length)],
+    cheveux: CHEVEUX[Math.floor(h('cheveux')*CHEVEUX.length)],
+    coupe:   Math.floor(h('coupe')*4),
+    yeux:    h('yeux')<0.5 ? '#3a2a1a' : (h('yeux2')<0.5 ? '#2f5d3a' : '#2a4a6b'),
+    largeur: 0.92 + h('largeur')*0.16,
+    sourcil: 0.8 + h('sourcil')*0.6,
+    oreilles:h('oreilles')<0.5,
+  };
+}
+/* Mélange une couleur vers le gris, pour le grisonnement. */
+function grisonne(hex, part){
+  const n = parseInt(hex.slice(1),16);
+  const r = (n>>16)&255, g = (n>>8)&255, b = n&255;
+  const m = (v)=>Math.round(v + (170-v)*part);
+  return '#' + [m(r),m(g),m(b)].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+/* Assombrit une couleur (0 = inchangée, 1 = noire). Pendant de grisonne(). */
+function assombrir(hex, part){
+  const n = parseInt(hex.slice(1),16);
+  const c = [(n>>16)&255,(n>>8)&255,n&255].map(v=>Math.round(v*(1-part)));
+  return '#' + c.map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+/* Portrait SVG. `opt.casque` met le casque aux couleurs de l'écurie ;
+   `opt.integre` renvoie le dessin nu (sans <svg> ni fond) pour l'insérer
+   dans une autre scène SVG — le podium, par exemple. */
+function portraitPilote(p, opt={}){
+  if(!p) return '';
+  const t = traitsPortrait(p);
+  const age = p.age||16;
+  const coul = opt.coul || '#3a4552';
+  // vieillissement : proportions plus juvéniles avant 16 ans, grisonnement après 30
+  const jeune = clamp((18-age)/10, 0, 1);
+  const vieux = clamp((age-29)/14, 0, 1);
+  const cheveux = grisonne(t.cheveux, vieux*0.75);
+  const lx = 50, ty = 46 - jeune*2;              // centre du visage
+  const rx = 22*t.largeur*(1+jeune*0.06), ry = 27*(1-jeune*0.04);
+  const coupes = [
+    `<path d="M${lx-rx-1} ${ty-6} q2 -22 ${rx+1} -22 q ${rx-1} 0 ${rx+1} 22 q-6 -12 -${rx} -13 q-14 -1 -${rx+1} 13z" fill="${cheveux}"/>`,
+    `<path d="M${lx-rx} ${ty-4} q0 -24 ${rx} -24 q${rx} 0 ${rx} 24 q-4 -16 -8 -17 q-12 8 -30 2 q-6 3 -8 15z" fill="${cheveux}"/>`,
+    `<path d="M${lx-rx-2} ${ty-2} q1 -26 ${rx+2} -26 q${rx+2} 0 ${rx+2} 26 q-3 -9 -9 -11 q-4 8 -13 6 q-9 2 -13 -6 q-6 2 -9 11z" fill="${cheveux}"/>`,
+    `<path d="M${lx-rx+2} ${ty-8} q4 -18 ${rx-2} -18 q${rx-2} 0 ${rx-2} 18 q-8 -9 -${rx-2} -9 q-11 0 -${rx-2} 9z" fill="${cheveux}"/>`,
+  ];
+  const barbe = age>=19 ? `<ellipse cx="${lx}" cy="${ty+16}" rx="${rx*0.62}" ry="9" fill="${cheveux}" opacity="${0.10+Math.min(0.16,(age-19)*0.02)}"/>` : '';
+  const rides = vieux>0.25 ? `
+    <path d="M${lx-13} ${ty-11} q6 -2 11 0" stroke="#00000022" stroke-width="1.1" fill="none"/>
+    <path d="M${lx+2} ${ty-11} q6 -2 11 0" stroke="#00000022" stroke-width="1.1" fill="none"/>
+    <path d="M${lx-rx+4} ${ty+2} q3 4 0 7" stroke="#00000018" stroke-width="1.1" fill="none"/>` : '';
+  const casque = opt.casque ? `
+    <path d="M${lx-rx-3} ${ty+2} a${rx+3} ${ry+2} 0 0 1 ${(rx+3)*2} 0 v10 h-${(rx+3)*2}z" fill="${coul}"/>
+    <ellipse cx="${lx}" cy="${ty-1}" rx="${rx+3}" ry="${ry+2}" fill="${coul}"/>
+    <path d="M${lx-rx+1} ${ty+1} a${rx-1} ${ry*0.62} 0 0 1 ${(rx-1)*2} 0 a${rx-1} ${ry*0.5} 0 0 1 -${(rx-1)*2} 0z" fill="#0d1117" opacity=".85"/>
+    <path d="M${lx-rx-3} ${ty-6} h${(rx+3)*2}" stroke="#ffffff" stroke-width="2.5" opacity=".8"/>` : '';
+
+  const fond = opt.integre ? '' : `<rect width="100" height="120" fill="#161b22"/>
+      <circle cx="50" cy="44" r="40" fill="${coul}" opacity=".16"/>`;
+  const dessin = `
+      ${fond}
+      <path d="M42 ${ty+16} h16 v${100-ty-16} h-16z" fill="${t.teint}"/>
+      <ellipse cx="50" cy="${ty+20}" rx="8.5" ry="4" fill="#00000022"/>
+      <path d="M14 120 q3 -34 36 -40 q33 6 36 40z" fill="${coul}"/>
+      <path d="M14 120 q3 -34 36 -40 q4 16 0 40z" fill="#ffffff" opacity=".10"/>
+      <ellipse cx="${lx}" cy="${ty}" rx="${rx}" ry="${ry}" fill="${t.teint}"/>
+      ${t.oreilles?`<ellipse cx="${lx-rx}" cy="${ty+3}" rx="3.4" ry="5" fill="${t.teint}"/>
+        <ellipse cx="${lx+rx}" cy="${ty+3}" rx="3.4" ry="5" fill="${t.teint}"/>`:''}
+      ${barbe}
+      ${casque || coupes[t.coupe]}
+      ${opt.casque?'':`
+        <rect x="${lx-15}" y="${ty-9}" width="10" height="${2*t.sourcil}" rx="1" fill="${cheveux}"/>
+        <rect x="${lx+5}" y="${ty-9}" width="10" height="${2*t.sourcil}" rx="1" fill="${cheveux}"/>
+        <ellipse cx="${lx-10}" cy="${ty-3}" rx="3.6" ry="2.6" fill="#fff"/>
+        <ellipse cx="${lx+10}" cy="${ty-3}" rx="3.6" ry="2.6" fill="#fff"/>
+        <circle cx="${lx-10}" cy="${ty-3}" r="1.7" fill="${t.yeux}"/>
+        <circle cx="${lx+10}" cy="${ty-3}" r="1.7" fill="${t.yeux}"/>
+        <path d="M${lx-2} ${ty+2} q2 4 4 0" stroke="#00000030" stroke-width="1.3" fill="none"/>
+        <path d="M${lx-6} ${ty+11} q6 ${3+jeune*1.5} 12 0" stroke="#00000055" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        ${rides}`}`;
+  if(opt.integre) return dessin;
+  return `<svg viewBox="0 0 100 120" class="portrait" role="img" aria-label="Portrait de ${escapeHtml(p.nom)}">
+    <defs><clipPath id="pc${p.id}"><rect x="0" y="0" width="100" height="120" rx="14"/></clipPath></defs>
+    <g clip-path="url(#pc${p.id})">${dessin}</g>
+  </svg>`;
+}
+
+/* Livrée du pilote : l'écurie de la saison en cours, sinon celle du contrat
+   déjà signé pour la saison à venir — sans quoi le portrait redevient gris
+   entre la signature et le lancement de la saison. */
+function coulPilote(){
+  if(!S.pilote) return '#3a4552';
+  if(S.saison && S.saison.ecurieId) return coulEcurie(S.saison.ecurieId, S.saison.catId);
+  if(S.contrat && S.contrat.ecurieId) return coulEcurie(S.contrat.ecurieId, S.contrat.catId);
+  return '#3a4552';
+}
+
+/* Couleur de l'écurie courante du pilote. */
+function coulEcurie(ecurieId, catId){
+  if(!ecurieId) return '#3a4552';
+  const e = (ecuriesPour(catId||(S.pilote?S.pilote.catId:'kmini'))||[]).find(x=>x.id===ecurieId);
+  return (e && e.coul) || '#3a4552';
+}
+
+/* Podium 2D : marches, portrait du vainqueur, trophée, confettis (GDD §16).
+   Géométrie : viewBox 200×160, trois marches de 52 de large centrées, tout
+   tient dans le cadre — rien ne doit déborder sur la carte qui l'entoure. */
+function scenePodium(pos, nomsTop3){
+  const p = S.pilote, coul = coulPilote();
+  const SOL = 150, L = 52;
+  const X = {1:74, 2:12, 3:136};             // abscisse de chaque marche
+  const H = {1:60, 2:44, 3:34};              // hauteur de chaque marche
+  // la marche du joueur reprend la couleur de l'écurie, assombrie pour que
+  // la combinaison du pilote (même couleur) se détache dessus
+  const marche = rang => {
+    const x = X[rang], haut = H[rang], moi = rang===pos;
+    return `<g transform="translate(${x},${SOL-haut})">
+      <rect width="${L}" height="${haut}" rx="3" fill="${moi?assombrir(coul,0.45):'#2a323d'}"
+        ${moi?`stroke="${coul}" stroke-width="1.5"`:''}/>
+      <rect width="${L}" height="4" rx="2" fill="#ffffff" opacity=".18"/>
+      <text x="${L/2}" y="${haut/2+8}" text-anchor="middle" font-family="Barlow Condensed, sans-serif"
+        font-size="22" font-weight="700" fill="${moi?'#fff':'#8d98a5'}">${rang}</text>
+    </g>`;
+  };
+  const xMoi = X[pos], yMoi = SOL - H[pos];
+  const confettis = pos===1 ? Array.from({length:20},(_,i)=>{
+    const cx = 6 + (i*97)%188, delai = -(i%10)*0.26;   // négatif : chute déjà entamée
+    const cc = ['#ffd257','#ff6b6b','#4dabf7','#69db7c','#ffffff'][i%5];
+    return `<rect class="confetti" x="${cx}" y="-6" width="4" height="7" rx="1" fill="${cc}"
+      style="animation-delay:${delai}s"/>`;
+  }).join('') : '';
+  // trophée posé à côté du vainqueur. L'animation CSS pose un `transform` qui
+  // écraserait celui de l'attribut : le placement va donc sur un groupe parent.
+  const trophee = pos===1
+    ? `<g transform="translate(${xMoi+27},${yMoi-25})"><g class="trophee">
+        <path d="M4 0 h18 v8 a9 9 0 0 1 -18 0z" fill="#ffd257"/>
+        <path d="M2 1 h3 v5 a4.5 4.5 0 0 1 -3 -5z M21 1 h3 a4.5 4.5 0 0 1 -3 5z" fill="#ffd257"/>
+        <rect x="11" y="16" width="4" height="6" fill="#e0b43f"/>
+        <rect x="7" y="21" width="12" height="3" rx="1" fill="#e0b43f"/>
+      </g></g>` : '';
+  // portrait inséré en dessin nu : un <svg> imbriqué se recadrerait tout seul
+  const ECH = 0.46;
+  const decale = pos===1 ? -8 : (L-100*ECH)/2;   // le vainqueur laisse la place au trophée
+  const figure = `<g transform="translate(${xMoi+decale},${yMoi-120*ECH+4}) scale(${ECH})">
+    ${portraitPilote(p,{coul, integre:true})}</g>`;
+  return `<svg viewBox="0 22 200 132" class="podium" role="img"
+      aria-label="Podium, ${escapeHtml(p.nom)} ${ordinal(pos)}">
+    ${confettis}
+    ${marche(2)}${marche(3)}
+    ${figure}
+    ${marche(1)}
+    ${trophee}
+  </svg>
+  <div class="podium-noms">${nomsTop3.map((n,i)=>`<span class="${i+1===pos?'moi':''}">${i+1}. ${escapeHtml(n)}</span>`).join('')}</div>`;
+}
 
 /* --- composants --- */
 function bar(nom, val, plaf){
@@ -3040,7 +3234,9 @@ function renderBureau(){
   if(p){
     const n=notePilote(p);
     h += `<div class="card"><h2>Votre pilote</h2>
-      <div class="ovr">${noteBadge(n)}
+      <div class="ovr">
+        <div class="portrait-box">${portraitPilote(p,{coul:coulPilote()})}</div>
+        ${noteBadge(n)}
         <div style="flex:1">
           <div style="font-family:var(--cond);font-size:20px;font-weight:700">${escapeHtml(p.nom)}</div>
           <div class="note">${p.age} ans · ${p.pays} · ${CAT[p.catId].nom}</div>
@@ -3093,6 +3289,27 @@ function ctaBureau(){
     return `<div class="card accent"><h2>À faire maintenant</h2>
       <div class="note mb">Vous n’avez pas de pilote. Sans pilote, pas de commission, et le staff continue de coûter.</div>
       <button class="btn btn-cta btn-block" data-act="tab" data-tab="pilote">Consulter le vivier de jeunes pilotes</button></div>`;
+  }
+  if(S.phase==='intersaison' && S.contrat && S.contrat.anneeDebut===S.annee && S.flags.signatureRecente){
+    const sg = S.flags.signatureRecente;
+    const coul = coulEcurie(S.contrat.ecurieId, S.contrat.catId);
+    return `<div class="card accent anim-entree">
+      <h2>Contrat signé</h2>
+      <div class="row" style="align-items:center;gap:14px">
+        <div class="portrait-box lg">${portraitPilote(p,{coul})}</div>
+        <div style="flex:1">
+          <div style="font-family:var(--cond);font-size:20px;font-weight:700">${escapeHtml(p.nom)}</div>
+          <div class="note">rejoint <b style="color:${coul}">${escapeHtml(sg.ecurie)}</b> en ${sg.cat} pour ${sg.annee}.</div>
+          ${S.contrat.apport>0
+            ? `<div class="note mt">Apport à financer : <b class="txt-amber">${fmtEurFull(S.contrat.apport)}</b>.</div>`
+            : `<div class="note mt txt-green">Le pilote est payé par l’écurie.</div>`}
+        </div>
+      </div>
+      <div class="row mt">
+        <button class="btn-ghost" data-act="tab" data-tab="sponsors">Chercher des sponsors</button>
+        <button class="btn btn-cta" style="flex:1" data-act="lancerSaison">Lancer la saison</button>
+      </div>
+    </div>`;
   }
   if(S.phase==='intersaison'){
     if(!S.contrat || S.contrat.anneeDebut!==S.annee){
@@ -3158,8 +3375,11 @@ function renderPilote(){
   const p=S.pilote, n=notePilote(p), plaf=notePlafond(p);
   const ePlaf = estimTexte(p, plaf, 'plafGlobal');
   let h='';
+  const coulP = coulPilote();
   h += `<div class="card">
-    <div class="ovr">${noteBadge(n)}
+    <div class="ovr">
+      <div class="portrait-box lg">${portraitPilote(p,{coul:coulP})}</div>
+      ${noteBadge(n)}
       <div style="flex:1">
         <div style="font-family:var(--cond);font-size:23px;font-weight:700;line-height:1.05">${escapeHtml(p.nom)}</div>
         <div class="note">${p.age} ans · ${p.pays} · ${CAT[p.catId].nom}${S.contrat?' · '+escapeHtml(S.contrat.ecurieNom):''}</div>
@@ -3234,6 +3454,7 @@ function renderScouting(){
     const coutObs = 400 + c.observe*700 + CAT[c.catId].niv*450;
     h += `<div class="card">
       <div class="row" style="align-items:flex-start">
+        <div class="portrait-box">${portraitPilote(c)}</div>
         <div style="flex:1">
           <div style="font-family:var(--cond);font-size:19px;font-weight:700">${escapeHtml(c.nom)}</div>
           <div class="note">${c.age} ans · ${c.pays} · ${CAT[c.catId].nom}</div>
@@ -3553,7 +3774,15 @@ function vueDebrief(course){
   const w=S.weekend, r=w.resultat, sa=S.saison;
   if(!r) return `<div class="card"><div class="empty">—</div></div>`;
   const moi = r.classement.find(x=>x.moi);
-  let h = `<div class="card ${moi.pos===1?'accent':''}"><h2>Résultat — ${escapeHtml(course.nom)}</h2>
+  let h = '';
+  if(!moi.abandon && moi.pos<=3){
+    const top3 = r.classement.filter(x=>!x.abandon).slice(0,3).map(x=>x.nom);
+    h += `<div class="card podium-carte anim-entree">
+      <h2>${moi.pos===1?'Victoire':'Podium'} — ${escapeHtml(course.nom)}<span class="hint">${ordinal(moi.pos)} place</span></h2>
+      ${scenePodium(moi.pos, top3)}
+    </div>`;
+  }
+  h += `<div class="card ${moi.pos===1?'accent':''}"><h2>Résultat — ${escapeHtml(course.nom)}</h2>
     <div class="row" style="align-items:center;gap:16px">
       <div class="center"><div class="pos p${moi.pos<=3?moi.pos:''}" style="font-size:44px;width:auto">${moi.abandon?'AB':moi.pos}</div>
         <div class="small txt-muted">${moi.abandon?escapeHtml(moi.abandon):'à l’arrivée'}</div></div>
@@ -3936,8 +4165,8 @@ ACTIONS.baquetSecours = ()=>{
   closeModal(); saveGame(); go('bureau');
 };
 
-/* Panneau des trois conditions cumulatives du GDD §8.2. C'est ce qui explique
-   au joueur pourquoi la montée est ouverte ou fermée, avant qu'il ne cherche. */
+/* Panneau des conditions cumulatives du GDD §8.2. C'est ce qui explique au
+   joueur pourquoi la montée est ouverte ou fermée, avant qu'il ne cherche. */
 function panneauMontee(){
   const p=S.pilote, catAct=CAT[p.catId];
   const sup = catByNiv(catAct.niv+1);
@@ -3963,7 +4192,7 @@ function panneauMontee(){
     + (k.manque>0 ? `, il manquerait <b class="txt-amber">${fmtEur(k.manque)}</b>.` : ` — c’est couvert.`);
 
   return `<div class="card ${k.ok?'':'accent'}">
-    <h2>Monter en ${sup.nom}<span class="hint">3 conditions cumulatives</span></h2>
+    <h2>Monter en ${sup.nom}<span class="hint">4 conditions cumulatives</span></h2>
     <div class="note mb">${escapeHtml(k.cond.lib)} · âge conseillé ${k.cond.age[0]}-${k.cond.age[1]} ans.</div>
     ${ligne(k.sportifOk, 'Résultat sportif', posTxt)}
     ${ligne(k.slOk, 'Superlicence', slTxt)}
@@ -3971,8 +4200,8 @@ function panneauMontee(){
       ? `${p.age} ans : les écuries de ${sup.court} peuvent l’engager${k.ageConseille?'':' — hors de la fenêtre idéale, elles seront plus difficiles à convaincre'}.`
       : `${p.age} ans : trop ${p.age<k.cond.age[0]?'jeune':'âgé'} pour la ${sup.court}, qui recrute entre ${k.cond.age[0]-1} et ${sup.ageMax} ans.`)}
     ${ligne(k.budgetOk, 'Budget sécurisé', budTxt)}
-    <div class="note txt-muted mt">La troisième condition — qu’une écurie veuille du pilote — se lit dans les offres.
-      Un champion sans budget ne monte pas : c’est l’argent le vrai filtre.</div>
+    <div class="note txt-muted mt">Une dernière condition ne se coche pas ici — qu’une écurie veuille du pilote :
+      elle se lit dans les offres. Un champion sans budget ne monte pas : c’est l’argent le vrai filtre.</div>
   </div>`;
 }
 
