@@ -30,8 +30,8 @@ ne les fixait pas.
 | 6.4 | Potentiel, agressivité, réputation, moral, forme | ✅ | |
 | 7.1 | Traits de personnalité | ✅ | Les 5 du GDD + « Métronome » et « Meneur d'hommes » |
 | 7.2 | Vieillissement, retraite, génération suivante | ✅ | La partie continue avec un nouveau pilote |
-| 7.3 | Blessures | ⛔ | V2 |
-| 7.4 | Entourage du pilote | ⛔ | V2 — un apport familial forfaitaire existe en karting |
+| 7.3 | Blessures | ✅ | Cinq blessures, gravité liée à la catégorie, forfaits et convalescence |
+| 7.4 | Entourage du pilote | ✅ | Quatre entourages : plus la famille paie, plus elle décide |
 | 8.1 | Échelle karting → F1 | ✅ | Les 9 échelons |
 | 8.2 | Conditions de changement de catégorie | ✅ | Les 3 conditions cumulatives, la voie du pilote payant, la descente |
 | 8.3 | Superlicence, 40 pts / 3 ans | ✅ | Barème du §8.3 repris tel quel, âge minimum 18 ans |
@@ -808,10 +808,95 @@ antenne, les biais d'école (avec la contrainte de somme constante), l'ouverture
 et la fermeture avec leur coût, et la surveillance différenciée des rivaux avec
 son effet mesuré sur le risque.
 
+## §7.3 — les blessures
+
+Le seul aléa que le manager ne peut pas anticiper. Il ne peut que s'en prémunir :
+payer un préparateur physique, et ne pas demander au pilote de tout risquer à
+chaque course.
+
+Cinq blessures, de la contusion à la commotion cérébrale. Le risque ne se
+déclenche que sur un abandon **de pilotage** — une panne mécanique ne blesse
+jamais — et la gravité suit la vitesse de la catégorie : un accrochage en F1 n'a
+rien à voir avec une sortie de piste en Karting Mini.
+
+| Catégorie | Risque après un accrochage |
+|---|---|
+| Karting Mini | 14 % |
+| Formule 3 | 30 % |
+| Formule 1 | 40 % |
+
+Un préparateur physique de niveau 4 ou 5 raccourcit la convalescence d'une
+manche. Il n'empêche pas le choc, il abrège l'arrêt.
+
+Un pilote blessé déclare forfait : la manche est comptée non disputée, le
+championnat continue sans lui, et une manche de convalescence est purgée. Le
+retour coûte 12 points de forme — il faut quelques tours pour retrouver ses
+repères.
+
+### Le trou qui rendait la mécanique invisible
+
+Première mesure : 0,03 blessure par saison et **zéro manche manquée** sur 114
+saisons simulées. Deux causes.
+
+Le taux de base était trop faible pour que la mécanique se rencontre jamais — une
+carrière de quinze saisons voyait une demi-blessure. Il a été relevé pour viser
+trois ou quatre rencontres par carrière.
+
+Surtout, rien n'empêchait *réellement* un pilote blessé de courir : seule
+l'interface cachait le bouton. `ouvrirWeekend()` et `simulationRapide()` refusent
+maintenant un pilote blessé, ce qui ferme aussi le contournement par la
+simulation. Mesuré après correction, sur 10 carrières de 15 saisons :
+
+| | avant | après |
+|---|---|---|
+| Blessures par carrière | 0,5 | 2,0 |
+| Manches manquées par carrière | 0 | 3,9 |
+
+## §7.4 — l'entourage du pilote
+
+Le §7.4 demande des « parents envahissants en karting, qui financent une partie
+de la saison mais mettent la pression sur les résultats ». L'apport familial
+existait déjà, anonyme et sans contrepartie : un chèque de 22 % du budget, sans
+personne derrière. Il a maintenant un visage.
+
+| Entourage | Part financée | Exigence |
+|---|---|---|
+| Famille absente | 4 % | aucune |
+| Famille discrète | 14 % | faible |
+| Famille présente | 26 % | réelle |
+| Famille envahissante | 42 % | forte |
+
+Le principe est explicite : **plus la famille paie, plus elle décide**. Une
+jauge de patience s'use à chaque saison décevante, d'autant plus vite que la
+famille est exigeante, et se reconstitue sur les bons résultats. La famille
+s'exprime au bilan de saison, sur un ton qui suit sa patience — fière, tendue,
+ou en remise en cause. À bout, une famille présente ou envahissante peut confier
+le pilote à un autre manager : c'est le revers de l'apport.
+
+Calibrage : la pression est évaluée une fois par saison, et une famille
+envahissante tient trois ou quatre saisons décevantes avant de partir. La
+première version usait la patience de 92 points par saison ratée — elle
+reprenait le pilote après un seul mauvais exercice, ce que le joueur n'avait
+aucun moyen de voir venir.
+
+L'apport ne vaut qu'en karting : au-delà, les budgets sont hors de portée d'une
+famille et le sponsoring prend le relais. L'entourage est visible sur la fiche
+du pilote, et dans le vivier dès qu'on a un scout de niveau 2 ou une
+observation — c'est une information de repérage comme une autre.
+
+### Test
+
+`unit12.js` couvre le §7.3 (27 assertions : risque par catégorie et par type
+d'abandon, gravité croissante, effet du préparateur, forfait et purge, garde
+contre le départ d'un blessé par tous les chemins) et `unit13.js` le §7.4
+(22 assertions : tirage des entourages, apport proportionnel à la part annoncée
+et nul hors karting, usure et reconstitution de la patience, différenciation par
+exigence, ton du message, retrait du pilote).
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - La réglementation évolutive d'une saison à l'autre (§11), marquée V2.
 - La gestion tour par tour de la course (§12) : il n'y a qu'un seul arbitrage
   à mi-course, pas un suivi continu.
-- Le reste du périmètre V2 : blessures (§7.3), entourage du pilote (§7.4), voies
-  alternatives (§8.4), locaux (§22.1) et académie (§22.2).
+- Le reste du périmètre V2 : voies alternatives (§8.4), locaux (§22.1) et
+  académie (§22.2).

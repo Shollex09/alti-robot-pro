@@ -1019,6 +1019,9 @@ function creerPilote(opt={}){
     // préférences de réglages : le style propre du pilote (GDD §18)
     prefs: Object.fromEntries([...SETUP_MONO,...SETUP_KART].map(s=>[s.k, rint(-3,3)])),
     catId: opt.catId || 'kmini',
+    entourage: opt.entourage || tirerEntourage(),   // GDD §7.4
+    patienceFamille: 100,
+    blessure: null,                                  // GDD §7.3
     superlicence: [],       // [{annee, pts}]
     palmares: [],           // [{annee, catId, pos, pts, victoires, podiums}]
     retraite: false,
@@ -1294,6 +1297,148 @@ function creerRivaux(){
   }
 }
 
+/* ================= ENTOURAGE DU PILOTE (GDD §7.4) ======================
+   « Parents envahissants en karting, qui financent une partie de la saison mais
+   mettent la pression sur les résultats et les choix de carrière. » L'apport
+   familial existait déjà, anonyme et sans contrepartie. Il a maintenant un
+   visage : plus la famille paie, plus elle a son mot à dire. */
+const ENTOURAGES = [
+  {id:'absent',    nom:'Famille absente',   part:0.04, exigence:0,
+   d:'Le pilote se débrouille seul. Personne pour payer, personne pour peser.'},
+  {id:'discret',   nom:'Famille discrète',  part:0.14, exigence:1,
+   d:'Ils suivent de loin, aident quand ils peuvent, et vous laissent travailler.'},
+  {id:'present',   nom:'Famille présente',  part:0.26, exigence:2,
+   d:'Ils sont à chaque course et financent une bonne part de la saison. Ils attendent des résultats.'},
+  {id:'envahissant',nom:'Famille envahissante', part:0.42, exigence:3,
+   d:'Ils paient beaucoup, et le font savoir. Chaque week-end sans podium devient une discussion.'},
+];
+const ENTOURAGE = Object.fromEntries(ENTOURAGES.map(e=>[e.id,e]));
+
+/* Tiré à la création du pilote : l'entourage fait partie du personnage. */
+function tirerEntourage(){
+  const r = Math.random();
+  return r<0.18 ? 'absent' : r<0.52 ? 'discret' : r<0.83 ? 'present' : 'envahissant';
+}
+/* L'apport familial ne vaut qu'en karting : au-delà, les budgets sont hors de
+   portée d'une famille et c'est le sponsoring qui prend le relais. */
+function apportFamilial(catId, p){
+  if(CAT[catId].format!=='kart') return 0;
+  const e = ENTOURAGE[p.entourage||'discret'];
+  return Math.round(CAT[catId].cout * e.part * rnd(1.25,0.8));
+}
+/* La patience de la famille : elle s'use sur les mauvais résultats et se
+   reconstitue sur les bons. À zéro, elle vous retire le pilote. */
+function pressionFamille(pos, attendu){
+  const p = S.pilote;
+  if(!p || CAT[p.catId].format!=='kart') return;
+  const e = ENTOURAGE[p.entourage||'discret'];
+  if(!e.exigence) return;
+  if(p.patienceFamille===undefined) p.patienceFamille = 100;
+  // Appelé une fois par saison. Calibré pour qu'une famille envahissante tienne
+  // trois ou quatre saisons décevantes avant de reprendre le pilote : assez pour
+  // que le joueur voie venir, pas assez pour qu'il puisse l'ignorer.
+  const ecart = attendu - pos;                       // positif = mieux qu'attendu
+  const d = ecart>=0 ? 4 + ecart*1.8 : ecart*0.9*(0.6 + e.exigence*0.5);
+  p.patienceFamille = clamp(p.patienceFamille + d, 0, 100);
+}
+/* Message de la famille, au bilan de saison. Elle parle d'autant plus fort
+   qu'elle paie et qu'elle est déçue. */
+function motDeLaFamille(pos, attendu){
+  const p = S.pilote;
+  if(!p || CAT[p.catId].format!=='kart') return null;
+  const e = ENTOURAGE[p.entourage||'discret'];
+  if(!e.exigence) return null;
+  const pat = p.patienceFamille===undefined ? 100 : p.patienceFamille;
+  if(pos<=attendu){
+    if(e.id!=='envahissant' && Math.random()<0.5) return null;
+    return {ton:'bon', txt:`« ${ordinal(pos)} au championnat, on est fiers. `+
+      `Continuez comme ça, on suivra. »`};
+  }
+  if(pat<25) return {ton:'rupture', txt:`« On a payé ${e.part>0.3?'une grosse partie':'notre part'} `+
+    `de la saison pour ${ordinal(pos)}. On se demande sérieusement si vous êtes le bon manager pour lui. »`};
+  if(pat<55) return {ton:'tendu', txt:`« ${ordinal(pos)}. Ce n’est pas ce qu’on espérait. `+
+    `On aimerait comprendre ce que vous comptez changer. »`};
+  return {ton:'neutre', txt:`« La saison n’a pas été celle qu’on voulait, mais on garde confiance. `+
+    `L’an prochain doit être différent. »`};
+}
+
+/* ================= BLESSURES (GDD §7.3) ================================
+   Un gros crash peut coûter plusieurs manches. C'est le seul aléa du jeu que
+   le manager ne peut pas anticiper — il ne peut que s'en prémunir, en payant
+   un préparateur physique et en ne demandant pas au pilote de tout risquer à
+   chaque course. */
+const BLESSURES = [
+  {id:'contusion', nom:'Contusions',            manches:[0,1], gravite:1,
+   txt:'Secoué mais entier. Quelques jours de repos suffiront.'},
+  {id:'poignet',   nom:'Poignet fracturé',      manches:[1,2], gravite:2,
+   txt:'Le poignet a pris le choc. Plâtre, et pas de volant avant plusieurs semaines.'},
+  {id:'cotes',     nom:'Côtes fêlées',          manches:[2,3], gravite:3,
+   txt:'Respirer fait mal, alors piloter… Il faut attendre que ça se ressoude.'},
+  {id:'jambe',     nom:'Jambe fracturée',       manches:[3,5], gravite:4,
+   txt:'Opération, broches, rééducation. La saison est compromise.'},
+  {id:'commotion', nom:'Commotion cérébrale',   manches:[2,4], gravite:4,
+   txt:'Aucun médecin ne le laissera repartir avant les examens. On ne discute pas avec ça.'},
+];
+
+/* Un pilote blessé compte-t-il des manches à purger ? */
+function blesse(p){ return !!(p && p.blessure && p.blessure.manches>0); }
+
+/* Risque de blessure après un abandon. Un accrochage à 200 km/h en F2 n'a rien
+   à voir avec une sortie de piste en Karting Mini : la gravité suit la vitesse
+   de la catégorie. Le préparateur physique n'empêche pas le choc, il raccourcit
+   la convalescence. */
+function risqueBlessure(catId, abandon){
+  if(!abandon || abandon==='Panne mécanique') return 0;
+  const c = CAT[catId];
+  // Calibré pour qu'une carrière de quinze saisons croise la mécanique trois ou
+  // quatre fois : assez pour qu'elle existe, assez peu pour ne pas frustrer.
+  const base = abandon==='Accrochage' ? 0.30 : 0.20;
+  return base * (0.45 + c.niv*0.11);
+}
+function tirerBlessure(catId){
+  const c = CAT[catId];
+  // plus la catégorie est rapide, plus le tirage penche vers le grave
+  const r = Math.random() + c.niv*0.035;
+  const b = r>0.93 ? BLESSURES[4] : r>0.80 ? BLESSURES[3]
+          : r>0.58 ? BLESSURES[2] : r>0.30 ? BLESSURES[1] : BLESSURES[0];
+  const soin = staffNiv('prepa');            // le préparateur raccourcit l'arrêt
+  const manches = Math.max(0, rint(b.manches[0], b.manches[1]) - (soin>=4?1:0));
+  return {id:b.id, nom:b.nom, txt:b.txt, gravite:b.gravite, manches, total:manches};
+}
+
+/* Appliqué après la course, quand le pilote a abandonné. */
+function verifierBlessure(course, abandon){
+  const p = S.pilote, sa = S.saison;
+  if(!p || !sa) return null;
+  if(Math.random() >= risqueBlessure(sa.catId, abandon)) return null;
+  const b = tirerBlessure(sa.catId);
+  p.blessure = b;
+  p.moral = clamp(p.moral - (6 + b.gravite*4), 5, 100);
+  p.fatigue = clamp(p.fatigue + b.gravite*8, 0, 100);
+  msg('pilote', p.nom, b.manches>0 ? 'Blessé — '+b.nom : 'Plus de peur que de mal',
+    `${escapeHtml(course.nom)} : ${b.txt}\n\n`+
+    (b.manches>0
+      ? `<em>${b.nom}</em> — ${b.manches} manche${b.manches>1?'s':''} sans rouler.\n\n`+
+        `Un préparateur physique de bon niveau raccourcit ce genre d’arrêt.`
+      : `<em>${b.nom}</em> — il sera au départ de la prochaine manche.`));
+  return b;
+}
+
+/* Une manche purgée à chaque tour de calendrier où le pilote aurait dû courir. */
+function purgerBlessure(){
+  const p = S.pilote;
+  if(!blesse(p)) return false;
+  p.blessure.manches--;
+  if(p.blessure.manches<=0){
+    msg('pilote', p.nom, 'De retour',
+      `${p.nom} est déclaré apte. Il reprend le volant à la prochaine manche.\n\n`+
+      `Il lui faudra quelques tours pour retrouver ses repères.`);
+    p.blessure = null;
+    p.forme = clamp((p.forme||70) - 12, 20, 100);   // reprise difficile
+  }
+  return true;
+}
+
 /* ================= MANAGERS RIVAUX (GDD §5.3) ==========================
    Sans eux le vivier est une boutique où personne ne double le joueur : on peut
    observer un jeune dix fois avant de le signer, sans risque. Des managers IA
@@ -1483,10 +1628,11 @@ function demarrerSaison(catId, ecurieId){
     S.saison.coutTotal   -= part;
     S.saison.priseEnCharge = part;
   }
-  // Apport familial en karting (petit, mais il sauve les débuts)
-  if(c.format==='kart'){
-    const fam = Math.round(c.cout * rnd(0.22,0.10));
-    caisse('Apport de la famille du pilote', fam, 'famille');
+  // Apport familial en karting : son montant dépend de l'entourage (GDD §7.4)
+  const fam = apportFamilial(catId, S.pilote);
+  if(fam>0){
+    const e = ENTOURAGE[S.pilote.entourage||'discret'];
+    caisse('Apport familial — '+e.nom.toLowerCase(), fam, 'famille');
   }
   // Le tour du calendrier commun ne repart à zéro que pour la première saison
   // engagée dans l'année : engager un second pilote ne rembobine pas l'année.
@@ -1567,6 +1713,19 @@ function coursesDuTour(){
     const pi = i===S.actif ? S.pilote : S.dossiers[i].pilote;
     if(!pi || !sa || sa.finie) continue;
     const idx = courseDuTour(sa, S.manche||0);
+    if(idx>=0 && sa.courseIndex<=idx && !blesse(pi)) l.push({i, idx, sa, pilote:pi});
+  }
+  return l;
+}
+/* Pilotes qui devraient courir cette manche mais sont blessés (GDD §7.3). */
+function forfaitsDuTour(){
+  const l=[];
+  if(!S.dossiers) return l;
+  for(let i=0;i<S.dossiers.length;i++){
+    const sa = i===S.actif ? S.saison : S.dossiers[i].saison;
+    const pi = i===S.actif ? S.pilote : S.dossiers[i].pilote;
+    if(!pi || !sa || sa.finie || !blesse(pi)) continue;
+    const idx = courseDuTour(sa, S.manche||0);
     if(idx>=0 && sa.courseIndex<=idx) l.push({i, idx, sa, pilote:pi});
   }
   return l;
@@ -1574,6 +1733,27 @@ function coursesDuTour(){
 /* Passe au tour suivant une fois que tous les engagés ont couru. */
 function avancerCalendrier(){
   syncDossier();
+  // Les blessés déclarent forfait pour la manche : elle est purgée de leur
+  // convalescence et comptée comme non disputée (GDD §7.3).
+  const forfaits = forfaitsDuTour();
+  if(forfaits.length){
+    const retour = S.actif;
+    for(const f of forfaits){
+      S.actif = f.i;
+      for(const k of CHAMPS_DOSSIER) S[k] = S.dossiers[f.i][k];
+      const course = S.saison.calendrier[S.saison.courseIndex];
+      S.saison.courseIndex++;
+      S.saison.forfaits = (S.saison.forfaits||0)+1;
+      msg('systeme','Fédération','Forfait — '+(course?course.nom:'manche'),
+        `${S.pilote.nom} est déclaré forfait : ${S.pilote.blessure.nom}.\n\n`+
+        `Encore ${Math.max(0,S.pilote.blessure.manches-1)} manche(s) d’indisponibilité.`);
+      purgerBlessure();
+      if(S.saison.courseIndex >= S.saison.calendrier.length) terminerSaison(false);
+      syncDossier();
+    }
+    S.actif = retour;
+    for(const k of CHAMPS_DOSSIER) S[k] = S.dossiers[retour][k];
+  }
   if(coursesDuTour().length){ S.phase='semaine'; return; }   // un autre pilote attend
   const N = manchesTotales();
   if(N===0 || coursesRestantes()===0 || (S.manche||0)+1 >= N){
@@ -1925,6 +2105,9 @@ function etapesWeekend(catId){
 const ETAPE_NOM = {libres:'Essais libres', essais:'Essais', qualifs:'Qualifications', course:'Course'};
 
 function ouvrirWeekend(){
+  // Garde de fond : cacher le bouton ne suffit pas, un pilote blessé ne doit
+  // pas pouvoir prendre le départ par un autre chemin (GDD §7.3).
+  if(blesse(S.pilote)) return;
   const course = S.saison.calendrier[S.saison.courseIndex];
   if(!course) return;
   const meteo  = meteoPour(course);
@@ -1989,7 +2172,9 @@ function etapeSuivante(){
 
 /* Simulation rapide d'un week-end complet (GDD §21.1) */
 function simulationRapide(){
+  if(blesse(S.pilote)) return;
   ouvrirWeekend();
+  if(!S.weekend) return;
   const w=S.weekend, course=S.saison.calendrier[w.courseIdx], meteo=METEOS.find(m=>m.id===w.meteoId);
   // Sans travail d'essais, l'ingénieur règle seul : le résultat se situe au
   // niveau des écuries adverses, un peu en dessous. Travailler soi-même les
@@ -2044,6 +2229,7 @@ function traiterResultat(course, meteo, r, reg){
   const p=S.pilote, sa=S.saison, c=CAT[sa.catId];
   const moi = r.classement.find(f=>f.moi);
   const pos = moi.pos, dnf = !!moi.abandon;
+  if(dnf) verifierBlessure(course, moi.abandon);       // GDD §7.3
   const pts = dnf?0:pointsPour(sa.catId,pos);
 
   // --- championnat
@@ -2825,11 +3011,13 @@ function repondreDemande(msgObj, choix){
   saveGame();
   return {txt};
 }
-function perdrePilote(){
+function perdrePilote(cause){
   msg('pilote', S.pilote.nom, 'Fin de collaboration',
     `${S.pilote.nom} change de manager. Toutes vos commissions futures sur lui sont perdues.\n\n`+
-    `C’était le risque d’une relation laissée se dégrader. Il faut repartir sur un nouveau pilote.`);
-  gagnerRep(-120,'départ du pilote');
+    (cause==='famille'
+      ? `Ce n’est pas lui qui a tranché, mais sa famille : elle finançait la saison, elle a décidé.`
+      : `C’était le risque d’une relation laissée se dégrader. Il faut repartir sur un nouveau pilote.`));
+  gagnerRep(cause==='famille' ? -70 : -120, 'départ du pilote');
   S.historique.push({annee:S.annee, type:'depart', pilote:S.pilote.nom});
   S.pilote=null; S.contrat=null; S.saison=null; S.weekend=null;
   S.sponsors.actifs=[]; S.sponsors.prospects=[]; S.sponsors.vus=[];
@@ -2898,6 +3086,29 @@ function terminerSaison(interrompue){
     }
   }
 
+  // --- l'entourage se manifeste (GDD §7.4)
+  if(!interrompue && CAT[sa.catId].format==='kart'){
+    const att = positionAttendue() || Math.round(CAT[sa.catId].grille*0.5);
+    pressionFamille(pos, att);
+    const mot = motDeLaFamille(pos, att);
+    const ent = ENTOURAGE[p.entourage||'discret'];
+    if(mot){
+      msg('pilote','Famille de '+p.nom.split(' ').slice(-1)[0],
+        mot.ton==='rupture' ? 'Nous voulons revoir la situation'
+        : mot.ton==='bon'   ? 'Merci pour cette saison'
+        : 'Un mot sur la saison',
+        `${mot.txt}\n\n<em>${ent.nom} — ils ont financé ${Math.round(ent.part*100)} % de la saison `+
+        `et leur patience est à ${Math.round(p.patienceFamille)} / 100.</em>`);
+    }
+    // À bout de patience, une famille qui paie peut retirer le pilote.
+    if(p.patienceFamille<=8 && ent.exigence>=2 && Math.random()<0.45){
+      msg('pilote','Famille de '+p.nom.split(' ').slice(-1)[0],'Nous arrêtons là',
+        `« Nous avons décidé de confier ${p.nom} à quelqu’un d’autre. Merci pour ce que vous avez fait. »\n\n`+
+        `C’est le revers de l’apport familial : plus ils paient, plus ils décident.`);
+      S.flags.familleRetire = true;
+    }
+  }
+
   p.palmares.push({annee:S.annee, catId:sa.catId, pos, pts:sa.pts, victoires:sa.victoires,
                    podiums:sa.podiums, abandons:sa.abandons, interrompue:!!interrompue});
   // Une saison complète passée avec lui vaut une observation de scout.
@@ -2938,6 +3149,12 @@ function passerAnneeSuivante(){
   pourChaqueDossier(d=>{
     const p=S.pilote;
     if(!p) return;
+    // Une famille à bout de patience reprend son pilote (GDD §7.4)
+    if(S.flags.familleRetire){
+      S.flags.familleRetire = false;
+      perdrePilote('famille');
+      return;
+    }
     p.age++;
     const proba = p.age<33?0 : clamp((p.age-32)*0.13 + (notePilote(p)<55?0.15:0), 0, 1);
     if(p.age>=34 && Math.random()<proba){ partirRetraite(); return; }
@@ -3592,7 +3809,8 @@ function renderBarrePilotes(){
       <span class="av">${portraitPilote(v.pilote,{coul})}</span>
       <span class="tx"><span class="nm">${escapeHtml(v.pilote.nom)}</span><br>
         <span class="ct">${cat.court}${v.saison&&!v.saison.finie?` · ${v.saison.pts} pts`:''}</span></span>
-      ${aCourir.has(i)?'<span class="pastille" title="Court cette manche"></span>':''}
+      ${blesse(v.pilote)?'<span class="pastille" style="background:var(--red)" title="Blessé"></span>'
+        : aCourir.has(i)?'<span class="pastille" title="Court cette manche"></span>':''}
     </div>`;
   });
   if(resteDeLaPlace() && nbPilotes()<placesPilotes())
@@ -3653,6 +3871,7 @@ ACTIONS.choisirDossier = d=>{
 /* Aucun pilote engagé cette manche : on avance le calendrier commun. */
 ACTIONS.passerManche = ()=>{
   if(coursesDuTour().length){ showToast('Un pilote court encore cette manche'); return; }
+  if(!forfaitsDuTour().length && manchesTotales()===0){ showToast('Aucune saison en cours'); return; }
   avancerCalendrier();
   saveGame(); render();
 };
@@ -3925,6 +4144,22 @@ function ctaBureau(){
         + autres.map(x=>`<b>${escapeHtml(x.pilote.nom)}</b> (${CAT[x.sa.catId].court})`).join(' · ')
         + ` — passez à leur dossier depuis la barre du haut.</div>`
       : '';
+    if(blesse(p)){
+      const b = p.blessure;
+      return `<div class="card accent"><h2>${escapeHtml(p.nom)} est blessé<span class="hint">${S.actions} action(s) restante(s)</span></h2>
+        <div class="note mb"><b class="txt-red">${escapeHtml(b.nom)}</b> — ${escapeHtml(b.txt)}</div>
+        <div class="note mb">Indisponible pour <b>${b.manches} manche${b.manches>1?'s':''}</b>.
+          Il déclarera forfait, et le championnat continuera sans lui.</div>
+        <div class="row tight mb">
+          <button class="btn-ghost btn-sm" data-act="modalDiscussion" ${S.actions<=0?'disabled':''}>Parler au pilote</button>
+          <button class="btn-ghost btn-sm" data-act="tab" data-tab="sponsors" ${S.actions<=0?'disabled':''}>Démarcher un sponsor</button>
+          <button class="btn-ghost btn-sm" data-act="tab" data-tab="staff">Préparateur physique</button>
+        </div>
+        ${listeAutres}
+        ${coursesDuTour().length?'':`<button class="btn btn-cta btn-block" data-act="passerManche">Passer la manche</button>`}
+        <div class="note txt-muted mt">Un préparateur physique de bon niveau raccourcit les convalescences.</div>
+      </div>`;
+    }
     if(!moiCeTour){
       return `<div class="card"><h2>Manche ${(S.manche||0)+1}<span class="hint">${S.actions} action(s) restante(s)</span></h2>
         <div class="note mb">${escapeHtml(S.pilote.nom)} ne court pas cette manche — son championnat compte
@@ -4030,6 +4265,27 @@ function renderPilote(){
   const ePlaf = estimTexte(p, plaf, 'plafGlobal');
   let h='';
   const coulP = coulPilote();
+  if(CAT[p.catId].format==='kart'){
+    const e = ENTOURAGE[p.entourage||'discret'];
+    const pat = p.patienceFamille===undefined ? 100 : p.patienceFamille;
+    const apport = apportFamilial(p.catId, p);
+    h += `<div class="card"><h2>Entourage<span class="hint">${escapeHtml(e.nom)}</span></h2>
+      <div class="note mb">${escapeHtml(e.d)}</div>
+      ${e.part>0.05 ? `<div class="note mb">Apport à la saison : environ
+        <b class="txt-green">${fmtEur(apport)}</b> (${Math.round(e.part*100)} % du budget de la catégorie).</div>` : ''}
+      ${e.exigence ? gline('Patience de la famille', pat, couleurMoral(pat)) : ''}
+      ${e.exigence>=2 && pat<40 ? `<div class="note warn mt">Ils financent une part importante de la saison
+        et n’en voient pas le retour. À bout de patience, ils peuvent confier le pilote à un autre manager.</div>` : ''}
+      <div class="note txt-muted mt">L’apport familial ne vaut qu’en karting : au-delà, les budgets
+        sont hors de portée d’une famille et le sponsoring prend le relais.</div>
+    </div>`;
+  }
+  if(blesse(p)){
+    h += `<div class="card accent"><h2>Infirmerie</h2>
+      <div class="note"><b class="txt-red">${escapeHtml(p.blessure.nom)}</b> — ${escapeHtml(p.blessure.txt)}</div>
+      <div class="note mt">Indisponible pour <b>${p.blessure.manches}</b> manche(s)
+        sur les ${p.blessure.total} d’arrêt initial.</div></div>`;
+  }
   h += `<div class="card">
     <div class="ovr">
       <div class="portrait-box lg">${portraitPilote(p,{coul:coulP})}</div>
@@ -4143,7 +4399,10 @@ function renderScouting(){
         <div><div class="small txt-muted">Potentiel estimé</div><div class="b">${pot}</div></div>
         <div><div class="small txt-muted">Observations</div><div class="b">${c.observe} · marge ±${round(marge(c),1)}</div></div>
       </div>
-      <div class="row tight mt">${traitsRevele(c).map(t=>tag(TRAITS[t].nom,TRAITS[t].coul)).join('') || tag('Personnalité inconnue','t-grey')}</div>
+      <div class="row tight mt">${traitsRevele(c).map(t=>tag(TRAITS[t].nom,TRAITS[t].coul)).join('') || tag('Personnalité inconnue','t-grey')}
+        ${(staffNiv('scout')>=2 || c.observe>=1)
+          ? tag(ENTOURAGE[c.entourage||'discret'].nom, c.entourage==='envahissant'?'t-amber':'t-grey')
+          : tag('Entourage inconnu','t-grey')}</div>
       <div class="mt">${STAT_GROUPES.map(g=>{
         const v = noteGroupe(c,g.id);
         return `<div class="stat-line"><span class="n">${g.nom}</span>
