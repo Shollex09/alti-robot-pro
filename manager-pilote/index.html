@@ -445,8 +445,58 @@ const CATS = [
   {id:'f2',     nom:'Formule 2',      court:'F2',      niv:7, cout:2500000, courses:24, grille:22, ageMin:17, ageMax:27, format:'mono',slots:6, vict:40000, titre:400000, ptsSys:'f1',   prestige:80},
   {id:'f1',     nom:'Formule 1',      court:'F1',      niv:8, cout:0,       courses:24, grille:20, ageMin:18, ageMax:40, format:'f1',  slots:8, vict:0,     titre:0,      ptsSys:'f1',   prestige:100},
 ];
-const CAT = Object.fromEntries(CATS.map(c=>[c.id,c]));
-const catByNiv = n=>CATS.find(c=>c.niv===n);
+/* Voies alternatives (GDD §8.4). Elles ne font pas partie de l'échelle vers la
+   F1 : on n'y « monte » pas, on y bifurque. Un pilote qui n'atteindra jamais la
+   F1 peut y devenir une légende — c'est ce qui évite le sentiment de partie
+   perdue. Elles ont deux différences économiques décisives : le pilote y est
+   payé au lieu de payer, et il peut y courir jusqu'à un âge avancé. */
+const CATS_ALT = [
+  {id:'fe',  nom:'Formule E',      court:'FE',   niv:7, cout:0, courses:16, grille:22,
+   ageMin:19, ageMax:40, format:'mono', slots:6, vict:60000, titre:500000, ptsSys:'f1',
+   prestige:72, alt:true, salaire:[300000,1400000], risque:0.85,
+   d:'Monoplaces électriques en ville. Prestige technique, calendrier mondial.'},
+  {id:'wec', nom:'Endurance (WEC)',court:'WEC',  niv:7, cout:0, courses:8,  grille:20,
+   ageMin:20, ageMax:45, format:'mono', slots:7, vict:80000, titre:600000, ptsSys:'f1',
+   prestige:78, alt:true, salaire:[250000,1800000], risque:0.75,
+   d:'Le championnat du monde d’endurance, et les 24 Heures du Mans. On y court longtemps, et plus sûrement qu’ailleurs.'},
+  {id:'indy',nom:'IndyCar',        court:'Indy', niv:7, cout:0, courses:17, grille:24,
+   ageMin:20, ageMax:44, format:'mono', slots:6, vict:90000, titre:700000, ptsSys:'f1',
+   prestige:76, alt:true, salaire:[350000,2000000], risque:1.6,
+   d:'Ovales et circuits routiers aux États-Unis. Les mieux payés, et de loin les plus exposés.'},
+  {id:'sf',  nom:'Super Formula',  court:'SF',   niv:7, cout:0, courses:9,  grille:20,
+   ageMin:19, ageMax:38, format:'mono', slots:5, vict:50000, titre:400000, ptsSys:'f1',
+   prestige:70, alt:true, salaire:[200000,900000], risque:1.0,
+   d:'Le championnat japonais, réputé pour ses monoplaces parmi les plus rapides après la F1.'},
+];
+const CAT = Object.fromEntries([...CATS, ...CATS_ALT].map(c=>[c.id,c]));
+const CAT_ALT = Object.fromEntries(CATS_ALT.map(c=>[c.id,c]));
+/* catByNiv ne doit jamais renvoyer une voie alternative : l'échelle vers la F1
+   reste celle du §8.1. */
+const catByNiv = n=>CATS.find(c=>c.niv===n && !c.alt);
+const estAlternative = catId => !!(CAT[catId] && CAT[catId].alt);
+
+/* Quand la F1 cesse d'être un horizon réaliste, les voies alternatives
+   s'ouvrent (GDD §8.4). Trois portes, cumulatives :
+   — le pilote a passé l'âge où les filières F1 recrutent encore ;
+   — il stagne depuis plusieurs saisons dans la même catégorie de monoplace ;
+   — il a déjà couru en F1 et en est sorti.
+   Le karting n'y donne jamais accès : ces championnats recrutent des pilotes
+   de monoplace confirmés. */
+function voiesOuvertes(){
+  const p = S.pilote;
+  if(!p) return [];
+  const c = CAT[p.catId];
+  if(!c || c.format==='kart') return [];
+  const dejaAlt = c.alt;
+  const saisonsIci = p.palmares.filter(x=>x.catId===p.catId).length;
+  const dejaF1 = p.palmares.some(x=>x.catId==='f1');
+  const sup = catByNiv(c.niv+1);
+  const tropVieuxPourMonter = !!sup && p.age > (MONTEE[sup.id] ? MONTEE[sup.id].age[1] : sup.ageMax);
+  const ouvert = dejaAlt || dejaF1 || tropVieuxPourMonter || (p.age>=22 && saisonsIci>=2) || p.age>=25;
+  if(!ouvert) return [];
+  return CATS_ALT.filter(a => p.age>=a.ageMin && p.age<=a.ageMax);
+}
+
 
 /* Niveau moyen attendu de la grille dans chaque catégorie.
    C'est ce qui fait qu'une catégorie « demande » un certain niveau de pilote :
@@ -603,8 +653,42 @@ const ECURIES = {
     {id:'falcon',nom:'Falcon GP',             prestige:34,voiture:54,fiab:81, coul:'#b08900'},
   ],
 };
+/* Écuries des voies alternatives (GDD §8.4). Noms fictifs, comme partout. */
+const ECURIES_ALT = {
+  fe:[
+    {id:'fe1',nom:'Voltaic Racing',      prestige:82,voiture:90,fiab:92,coul:'#00b4d8'},
+    {id:'fe2',nom:'Helios E-Team',       prestige:74,voiture:86,fiab:91,coul:'#f7b32b'},
+    {id:'fe3',nom:'Nordwatt Motorsport', prestige:66,voiture:81,fiab:89,coul:'#2f9e44'},
+    {id:'fe4',nom:'Ampere Grand Prix',   prestige:55,voiture:75,fiab:87,coul:'#7048e8'},
+    {id:'fe5',nom:'Kinetic Racing',      prestige:43,voiture:69,fiab:85,coul:'#e8590c'},
+  ],
+  wec:[
+    {id:'wec1',nom:'Rossa Corse Endurance',prestige:90,voiture:92,fiab:93,coul:'#d62828'},
+    {id:'wec2',nom:'Silber Motorsport',    prestige:83,voiture:88,fiab:94,coul:'#8f9aa6'},
+    {id:'wec3',nom:'Sarthe Compétition',   prestige:71,voiture:82,fiab:91,coul:'#1971c2'},
+    {id:'wec4',nom:'Bayline Racing',       prestige:58,voiture:76,fiab:89,coul:'#0b6b3a'},
+    {id:'wec5',nom:'Meridian Endurance',   prestige:45,voiture:70,fiab:86,coul:'#b08900'},
+  ],
+  indy:[
+    {id:'in1',nom:'Sterling Speedway',   prestige:86,voiture:90,fiab:90,coul:'#e03131'},
+    {id:'in2',nom:'Great Lakes Racing',  prestige:76,voiture:85,fiab:89,coul:'#1c7ed6'},
+    {id:'in3',nom:'Redstone Motorsports',prestige:64,voiture:79,fiab:88,coul:'#f08c00'},
+    {id:'in4',nom:'Cascade Racing',      prestige:52,voiture:73,fiab:86,coul:'#2b8a3e'},
+    {id:'in5',nom:'Liberty Autosport',   prestige:40,voiture:67,fiab:84,coul:'#5f3dc4'},
+  ],
+  sf:[
+    {id:'sf1',nom:'Kaze Racing',         prestige:80,voiture:89,fiab:93,coul:'#c2255c'},
+    {id:'sf2',nom:'Tsubasa Motorsport',  prestige:70,voiture:84,fiab:92,coul:'#0c8599'},
+    {id:'sf3',nom:'Hoshi Racing Team',   prestige:58,voiture:78,fiab:90,coul:'#495057'},
+    {id:'sf4',nom:'Akatsuki Sport',      prestige:46,voiture:72,fiab:88,coul:'#e8590c'},
+    {id:'sf5',nom:'Midori Racing',       prestige:35,voiture:66,fiab:86,coul:'#2f9e44'},
+  ],
+};
+
 function ecuriesPour(catId){
   const c=CAT[catId];
+  if(!c) return ECURIES.f4;
+  if(c.alt) return ECURIES_ALT[catId] || ECURIES_ALT.fe;
   if(c.format==='kart') return ECURIES.kart;
   return ECURIES[catId] || ECURIES.f4;
 }
@@ -1393,7 +1477,9 @@ function risqueBlessure(catId, abandon){
   // Calibré pour qu'une carrière de quinze saisons croise la mécanique trois ou
   // quatre fois : assez pour qu'elle existe, assez peu pour ne pas frustrer.
   const base = abandon==='Accrochage' ? 0.30 : 0.20;
-  return base * (0.45 + c.niv*0.11);
+  // Les voies alternatives ne s'équivalent pas : les ovales de l'IndyCar sont
+  // bien plus exposés que l'endurance (GDD §8.4).
+  return base * (0.45 + c.niv*0.11) * (c.risque || 1);
 }
 function tirerBlessure(catId){
   const c = CAT[catId];
@@ -3317,6 +3403,10 @@ function genererOffres(){
     const possibles = CATS.filter(c=>p.age>=c.ageMin-1 && p.age<=c.ageMax);
     if(possibles.length) cibles.push(possibles.sort((a,b)=>a.niv-b.niv)[0].id);
   }
+  // Voies alternatives (GDD §8.4) : elles s'ouvrent quand la F1 cesse d'être un
+  // horizon réaliste. Un pilote « raté » en F1 peut devenir une légende en
+  // endurance — c'est ce qui évite le sentiment de partie perdue.
+  for(const alt of voiesOuvertes()) cibles.push(alt.id);
 
   for(const catId of [...new Set(cibles)]){
     const c=CAT[catId];
@@ -3345,18 +3435,26 @@ function genererOffres(){
       const junior = c.niv<8 && Math.random() < clamp(0.10 + ecart/45 + (posChamp&&posChamp<=3?0.25:0), 0, 0.55);
       // Part du budget prise en charge par l'écurie
       let partEcurie = 0;
-      if(c.niv===8) partEcurie = 1;
+      if(c.niv===8 || c.alt) partEcurie = 1;
       else if(junior) partEcurie = clamp(0.45 + ecart/60 + rnd(0.2), 0.4, 1);
       else partEcurie = clamp(ecart/55 + rnd(0.18) - 0.05, 0, 0.65);
       const apport = Math.max(0, Math.round(c.cout*(1-partEcurie)/1000)*1000);
 
-      // Salaire (uniquement en F1)
+      // Salaire : en F1, et dans les voies alternatives où le pilote est payé
+      // au lieu de payer (GDD §8.4). C'est le basculement économique du jeu.
       let salaire=0, primeVictoire=0, primePoint=0;
       if(c.niv===8){
         const base = e.prestige>85 ? 6e6 : e.prestige>65 ? 2.4e6 : 0.8e6;
         salaire = Math.round(base * clamp(0.6+ (note-70)/40, 0.5, 3.2) / 1e4)*1e4;
         primeVictoire = Math.round(salaire*0.06/1e3)*1e3;
         primePoint    = Math.round(salaire*0.002/100)*100;
+      }else if(c.alt){
+        const [bas, haut] = c.salaire;
+        const rang = clamp((e.prestige-35)/55, 0, 1);
+        const niveau = clamp((note-62)/28, 0, 1);
+        salaire = Math.round((bas + (haut-bas)*(rang*0.6+niveau*0.4)) / 1e4)*1e4;
+        primeVictoire = Math.round(salaire*0.05/1e3)*1e3;
+        primePoint    = Math.round(salaire*0.0015/100)*100;
       }
       const objectifPos = Math.max(1, Math.round(clamp(c.grille*0.5 - (e.prestige-45)*0.16 - ecart*0.30, 1, c.grille-2)));
       offres.push({
@@ -5155,6 +5253,35 @@ function panneauMontee(){
     ${ligne(k.budgetOk, 'Budget sécurisé', budTxt)}
     <div class="note txt-muted mt">Une dernière condition ne se coche pas ici — qu’une écurie veuille du pilote :
       elle se lit dans les offres. Un champion sans budget ne monte pas : c’est l’argent le vrai filtre.</div>
+  </div>` + panneauVoies();
+}
+
+/* Panneau des voies alternatives (GDD §8.4). Il n'apparaît que lorsqu'elles
+   s'ouvrent : avant, l'horizon reste la F1 et l'afficher serait un contresens. */
+function panneauVoies(){
+  const voies = voiesOuvertes();
+  if(!voies.length) return '';
+  const p = S.pilote;
+  const dejaAlt = estAlternative(p.catId);
+  return `<div class="card"><h2>${dejaAlt?'Votre championnat':'Une autre carrière est possible'}
+      <span class="hint">GDD §8.4</span></h2>
+    <div class="note mb">${dejaAlt
+      ? `${escapeHtml(p.nom)} court en ${CAT[p.catId].nom}. Le pilote y est payé, et peut y courir longtemps.`
+      : `La F1 n’est plus l’horizon le plus réaliste pour ${escapeHtml(p.nom)}. Ces championnats
+         recrutent des pilotes de monoplace confirmés — et surtout, <b>ils paient le pilote</b>
+         au lieu de lui faire payer sa saison.`}</div>
+    ${voies.map(v=>`<div class="slider-box">
+      <div class="top"><b>${v.nom}</b><span>${v.courses} manches</span></div>
+      <div class="note">${v.d}</div>
+      <div class="row tight mt">
+        ${tag('Salaire '+fmtEur(v.salaire[0])+' à '+fmtEur(v.salaire[1]),'t-green')}
+        ${tag('Jusqu’à '+v.ageMax+' ans','t-blue')}
+        ${v.risque>1.2?tag('Exposé','t-red') : v.risque<0.85?tag('Plus sûr','t-green') : tag('Risque courant','t-grey')}
+        ${p.catId===v.id?tag('En cours','t-red'):''}
+      </div>
+    </div>`).join('')}
+    <div class="note txt-muted mt">Ces championnats apparaissent dans vos offres.
+      Ils ne mènent pas à la F1 : c’est une carrière différente, pas un détour.</div>
   </div>`;
 }
 

@@ -35,7 +35,7 @@ ne les fixait pas.
 | 8.1 | Échelle karting → F1 | ✅ | Les 9 échelons |
 | 8.2 | Conditions de changement de catégorie | ✅ | Les 3 conditions cumulatives, la voie du pilote payant, la descente |
 | 8.3 | Superlicence, 40 pts / 3 ans | ✅ | Barème du §8.3 repris tel quel, âge minimum 18 ans |
-| 8.4 | Voies alternatives (FE, WEC…) | ⛔ | V2 |
+| 8.4 | Voies alternatives | ✅ | Formule E, Endurance, IndyCar, Super Formula — le pilote y est payé |
 | 9.1 | Écuries fictives | ✅ | Les 4 nommées + 6 autres en F1, écuries propres par catégorie |
 | 9.2 | Offres concurrentes, comparaison | ✅ | Colonnes Salaire / Progression / Risque / Prestige |
 | 9.3 | Durée, clause de libération, bonus de fidélité | ✅ | Droits à l'image : V2 |
@@ -893,10 +893,66 @@ contre le départ d'un blessé par tous les chemins) et `unit13.js` le §7.4
 et nul hors karting, usure et reconstitution de la patience, différenciation par
 exigence, ton du message, retrait du pilote).
 
+## §8.4 — les voies alternatives
+
+Le GDD le dit clairement : « un pilote raté en F1 peut devenir une légende en
+endurance — cela évite un sentiment de game over frustrant ». C'est exactement
+ce que le prototype n'avait pas : une carrière qui n'atteignait pas la F1
+s'arrêtait dans une impasse.
+
+### Quatre championnats
+
+Ils ne font **pas partie de l'échelle** du §8.1 : on n'y monte pas, on y
+bifurque. `catByNiv()` ne les renvoie jamais, et l'échelle reste à neuf échelons.
+
+| Championnat | Manches | Salaire | Jusqu'à | Risque de blessure* |
+|---|---|---|---|---|
+| Formule E | 16 | 300 k€ – 1,4 M€ | 40 ans | 31 % |
+| Endurance (WEC) | 8 | 250 k€ – 1,8 M€ | 45 ans | 27 % |
+| IndyCar | 17 | 350 k€ – 2 M€ | 44 ans | 59 % |
+| Super Formula | 9 | 200 k€ – 900 k€ | 38 ans | 37 % |
+
+\* après un accrochage, à comparer aux 40 % de la F1.
+
+Le compromis est réel et lisible : l'IndyCar paie le mieux **et** expose le plus,
+l'endurance est la plus sûre et offre la plus longue carrière. Sans cette
+différenciation, un bot choisissait l'endurance dans 53 saisons sur 64 — quatre
+championnats interchangeables ne font pas un choix.
+
+### Le basculement économique
+
+C'est la vraie raison d'être de ces voies. Dans toute l'échelle junior, le pilote
+**paie** pour rouler et le manager comble le manque. Ici l'écurie prend la saison
+entière en charge et **verse un salaire** — donc une commission. Un pilote qui
+plafonne en F2 n'est plus un gouffre : il devient une rente.
+
+### Quand elles s'ouvrent
+
+Jamais depuis le karting : ces championnats recrutent des pilotes de monoplace
+confirmés. Trois portes, dont une seule suffit :
+
+- le pilote a passé l'âge où la catégorie du dessus recrute encore ;
+- il stagne depuis au moins deux saisons dans la même catégorie et a 22 ans ou plus ;
+- il a déjà couru en F1 et en est sorti (ou il a 25 ans révolus).
+
+Un panneau apparaît alors sur la fiche du pilote — pas avant, car afficher une
+porte de sortie à un espoir de 17 ans serait un contresens.
+
+Mesuré sur 12 carrières de 18 saisons : 8 atteignent la F1, 6 passent par une
+voie alternative. Les deux ne s'excluent pas — un ancien de F1 finit souvent en
+endurance.
+
+### Test
+
+`unit14.js` couvre le §8.4 : 34 assertions sur la séparation d'avec l'échelle
+principale, les écuries et leurs couleurs, les conditions d'ouverture (trop tôt,
+trop tard, après la F1), le salaire et l'absence d'apport dans les offres, la
+fourchette de salaire, l'apparition du panneau, et la différenciation des quatre
+championnats par le risque et la rémunération.
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - La réglementation évolutive d'une saison à l'autre (§11), marquée V2.
 - La gestion tour par tour de la course (§12) : il n'y a qu'un seul arbitrage
   à mi-course, pas un suivi continu.
-- Le reste du périmètre V2 : voies alternatives (§8.4), locaux (§22.1) et
-  académie (§22.2).
+- Le reste du périmètre V2 : locaux (§22.1) et académie (§22.2).
