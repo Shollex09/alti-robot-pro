@@ -1164,6 +1164,56 @@ function retourPilote(course, setup, pilote){
   return {lignes, commentaireIng};
 }
 
+/* Événements de mi-course. Le §12 demande que la stratégie se décide aussi
+   *pendant* la course : sans cela, une course détaillée se résume à un bouton.
+   Chaque choix modifie la performance de la seconde moitié et le risque pris.
+   Certains dépendent du pilote : tenter un dépassement paie si son Racecraft suit. */
+const EVENEMENTS_COURSE = [
+  {id:'safety', mono:true,
+   cond:c=>c.safetyCar,
+   titre:'Voiture de sécurité',
+   texte:c=>`Neutralisation à mi-course, ${c.nom} est ${ordinal(c.pos)}. La fenêtre d’arrêt est ouverte : `+
+            `s’arrêter maintenant coûte bien moins de temps que d’habitude.`,
+   choix:[
+     {lab:'Rentrer au stand',  d:'Pneus neufs, mais on ressort derrière.',        perf:+3.4, risque:0.85},
+     {lab:'Rester en piste',   d:'On garde la position, avec des pneus usés.',    perf:-1.6, risque:1.20},
+   ]},
+  {id:'pluie',
+   cond:c=>c.meteo.pluie>0 && c.meteo.id!=='pluie',
+   titre:'La pluie arrive',
+   texte:c=>`Des gouttes tombent sur le tracé. ${c.nom} est ${ordinal(c.pos)} et demande quoi faire.`,
+   choix:[
+     {lab:'Changer de pneus maintenant', d:'On perd du temps tout de suite, on sécurise la suite.', perf:+1.2, risque:0.75},
+     {lab:'Attendre un tour de plus',    d:'Pari sur une averse passagère.',
+      perf:+3.6, risque:1.55, stat:'adaptabilite'},
+   ]},
+  {id:'seche', 
+   cond:c=>c.meteo.id==='pluie',
+   titre:'La piste sèche',
+   texte:c=>`La trajectoire s’assèche. ${c.nom}, ${ordinal(c.pos)}, glisse sur ses pneus pluie usés.`,
+   choix:[
+     {lab:'Repasser en slicks',   d:'Le bon moment, si on ne se trompe pas.',   perf:+3.2, risque:1.25},
+     {lab:'Finir sur ces pneus',  d:'Prudent, mais on va perdre du rythme.',    perf:-1.4, risque:0.8},
+   ]},
+  {id:'usure',
+   cond:c=>true,
+   titre:'Usure des pneus',
+   texte:c=>`« Je commence à glisser sérieusement à l’arrière. » ${c.nom} est ${ordinal(c.pos)} à mi-course.`,
+   choix:[
+     {lab:'Lui dire de gérer',    d:'On lève le pied, on assure l’arrivée.',    perf:-2.0, risque:0.6},
+     {lab:'Lui dire de pousser',  d:'On garde le rythme, quitte à tout casser.',perf:+2.6, risque:1.6},
+   ]},
+  {id:'bagarre',
+   cond:c=>c.pos>1 && c.pos<=Math.max(6, Math.round(c.grilleN*0.4)),
+   titre:'Bagarre pour la position',
+   texte:c=>`${c.nom} est collé au pare-chocs de l’adversaire devant, en ${ordinal(c.pos)} position.`,
+   choix:[
+     {lab:'Tenter le dépassement', d:'Une seule occasion, il faut la prendre.', perf:+3.0, risque:1.7, stat:'depassement'},
+     {lab:'Rester dans son sillage',d:'On attend une meilleure occasion.',      perf:+0.4, risque:0.95},
+     {lab:'Assurer la position',   d:'On protège ce qu’on a.',                  perf:-1.2, risque:0.55},
+   ]},
+];
+
 /* --------------------------------- 10. SIMULATION DE COURSE (GDD §17.3) */
 
 /* Note pondérée du pilote selon le profil du circuit et la météo */
@@ -1216,46 +1266,85 @@ function simulerQualif(course, meteo, reglagesJoueur){
 }
 
 /* Course complète : grille de départ + incidents + fiabilité + récit */
-function simulerCourse(course, meteo, reglagesJoueur, grilleDepart, strat){
+/* La course se joue en deux temps : on prépare la grille et les performances,
+   on laisse le manager arbitrer un événement à mi-course, puis on résout.
+   En simulation rapide, les deux temps s'enchaînent sans interruption. */
+function preparerCourse(course, meteo, reglagesJoueur, grilleDepart, strat){
   const p = S.pilote;
-  const log = [];
   const st = STRATS.find(s=>s.id===strat) || STRATS[1];
   const field = [];
 
-  // --- performance de course
   const perfJoueur = perfTotale(notePondere(p,course,meteo), S.saison.voiture, reglagesJoueur, 1)
                    + st.perf
                    + (p.traits.includes('regulier')?1.0:0);
   field.push({id:p.id, nom:p.nom, moi:true, ecurie:S.saison.ecurieNom, perf:perfJoueur,
-    fiab:S.saison.fiab, agr:p.agressivite, note:notePilote(p), racecraft:noteGroupe(p,'racecraft')});
+    fiab:S.saison.fiab, agr:p.agressivite, racecraft:noteGroupe(p,'racecraft')});
   for(const g of S.saison.grille){
     field.push({id:g.id, nom:g.nom, moi:false, ecurie:g.ecurie,
       perf: perfTotale(notePondereIA(g,course,meteo), g.voiture, reglagesIA(g), 1),
-      fiab:g.fiab, agr:g.agressivite, note:g.note, racecraft:noteGroupe(g.p,'racecraft'), ref:g});
+      fiab:g.fiab, agr:g.agressivite, racecraft:noteGroupe(g.p,'racecraft')});
   }
   // position de départ : la grille compte, mais la course peut tout changer
   const gridPos = Object.fromEntries(grilleDepart.map(r=>[r.id, r.pos]));
   for(const f of field){
     const gp = gridPos[f.id] || field.length;
-    f.perf += (field.length - gp) * 0.28;         // avantage réel de la grille
+    f.perf += (field.length - gp) * 0.28;
   }
-
-  // --- voiture de sécurité
   const scChance = 0.16*meteo.incident + (CAT[S.saison.catId].format==='kart'?-0.05:0.04);
   const safetyCar = Math.random() < scChance;
+
+  // classement provisoire à mi-course, avant incidents
+  const provisoire = [...field].sort((a,b)=>b.perf-a.perf);
+  const posMi = provisoire.findIndex(f=>f.moi)+1;
+
+  return {field, gridPos, safetyCar, posMi, strat};
+}
+
+/* Choisit l'événement de mi-course à soumettre au manager, ou null. */
+function choisirEvenement(etat, course, meteo){
+  const kart = CAT[S.saison.catId].format==='kart';
+  const ctx = {nom:S.pilote.nom, pos:etat.posMi, safetyCar:etat.safetyCar, meteo,
+               grilleN:etat.field.length, kart};
+  const possibles = EVENEMENTS_COURSE.filter(e=>(!e.mono || !kart) && e.cond(ctx));
+  if(!possibles.length) return null;
+  // la voiture de sécurité et la météo priment sur les événements de routine
+  const prioritaires = possibles.filter(e=>e.id==='safety'||e.id==='pluie'||e.id==='seche');
+  const e = pick(prioritaires.length?prioritaires:possibles);
+  return {
+    id:e.id, titre:e.titre, texte:e.texte(ctx),
+    choix: e.choix.map((c,i)=>({i, lab:c.lab, d:c.d})),
+    _choix: e.choix,
+  };
+}
+
+/* Résout la course. `choix` est l'option retenue à mi-course, ou null. */
+function resoudreCourse(etat, course, meteo, choix){
+  const p = S.pilote;
+  const log = [];
+  const st = STRATS.find(s=>s.id===etat.strat) || STRATS[1];
+  const {field, gridPos, safetyCar} = etat;
+  let risqueChoix = 1;
+
+  if(choix){
+    const moi0 = field.find(f=>f.moi);
+    // un choix qui repose sur une qualité du pilote paie selon cette qualité
+    const coef = choix.stat ? (0.45 + p.stats[choix.stat]/100) : 1;
+    moi0.perf += choix.perf * coef;
+    risqueChoix = choix.risque;
+    log.push({t:'Mi-course', s:choix.recit || (choix.lab+' — '+choix.d), c:'big'});
+  }
   if(safetyCar) log.push({t:'Course', s:'Voiture de sécurité en piste, le peloton se regroupe.', c:'big'});
 
-  // --- incidents & fiabilité
   for(const f of field){
     f.abandon = null;
     const risqueMeca = (100-f.fiab)/100 * 0.55 * st.usure;
     if(Math.random() < risqueMeca){ f.abandon='Panne mécanique'; continue; }
-    const risqueCrash = (0.035 + (f.agr/100)*0.055) * meteo.incident * (f.moi?st.risque:1)
+    const risqueCrash = (0.035 + (f.agr/100)*0.055) * meteo.incident
+                      * (f.moi ? st.risque*risqueChoix : 1)
                       * (1 - (f.racecraft-50)/280);
     if(Math.random() < risqueCrash){ f.abandon = Math.random()<0.5?'Accrochage':'Sortie de piste'; }
   }
   if(safetyCar){
-    // la neutralisation resserre les écarts
     const m = avg(field.filter(f=>!f.abandon), f=>f.perf);
     for(const f of field) f.perf = f.perf*0.82 + m*0.18;
   }
@@ -1266,7 +1355,6 @@ function simulerCourse(course, meteo, reglagesJoueur, grilleDepart, strat){
   dnf.forEach((f,i)=>f.pos=finishers.length+i+1);
   const classement = [...finishers, ...dnf];
 
-  // --- récit de course
   const moi = field.find(f=>f.moi);
   const gp  = gridPos[p.id] || field.length;
   log.unshift({t:'Départ', s:`${p.nom} s’élance de la ${ordinal(gp)} place. Météo : ${meteo.nom.toLowerCase()}.`, c:''});
@@ -1316,6 +1404,7 @@ function ouvrirWeekend(){
     etapes: etapesWeekend(S.saison.catId), etape:0,
     setup, runs:[], runsRestants: runsDisponibles(),
     grille:null, resultat:null, strat:'equi', debrief:null, presse:null,
+    courseEtat:null, evenement:null,
   };
   S.phase='weekend';
   saveGame();
@@ -1381,12 +1470,37 @@ function simulationRapide(){
 function lancerCourse(rapide){
   const w=S.weekend, course=S.saison.calendrier[w.courseIdx], meteo=METEOS.find(m=>m.id===w.meteoId);
   const reg = rapide ? w.setupAuto : reglagesActuels();
-  const r = simulerCourse(course, meteo, reg, w.grille, w.strat);
+  const etat = preparerCourse(course, meteo, reg, w.grille, w.strat);
+  // En course détaillée, le manager arbitre un événement à mi-course (GDD §12).
+  const ev = rapide ? null : choisirEvenement(etat, course, meteo);
+  if(ev){
+    w.courseEtat = {...etat, reg, rapide:!!rapide};
+    w.evenement = ev;
+    saveGame();
+    return;                          // la course reprend après le choix du manager
+  }
+  finaliserCourse(null);
+}
+
+/* Reprend et termine la course, une fois l'événement de mi-course arbitré. */
+function finaliserCourse(indexChoix){
+  const w=S.weekend, course=S.saison.calendrier[w.courseIdx], meteo=METEOS.find(m=>m.id===w.meteoId);
+  const etat = w.courseEtat || preparerCourse(course, meteo, reglagesActuels(), w.grille, w.strat);
+  const reg = etat.reg ?? reglagesActuels();
+  let choix = null;
+  if(w.evenement && indexChoix!=null){
+    const c = w.evenement._choix[indexChoix];
+    if(c) choix = {...c, recit:'« '+c.lab+' » — '+c.d};
+  }
+  const r = resoudreCourse(etat, course, meteo, choix);
   w.resultat = {
     classement: r.classement.map(f=>({id:f.id,nom:f.nom,ecurie:f.ecurie,pos:f.pos,moi:!!f.moi,abandon:f.abandon||null})),
-    log:r.log, reglages:round(reg,1), rapide:!!rapide,
+    log:r.log, reglages:round(reg,1), rapide:!!etat.rapide,
     grillePos: (w.grille.find(g=>g.id===S.pilote.id)||{}).pos || null,
+    choixMiCourse: choix ? choix.lab : null,
+    evenement: w.evenement ? w.evenement.titre : null,
   };
+  w.courseEtat = null; w.evenement = null;
   w.etape = w.etapes.length;         // on passe au débrief
   traiterResultat(course, meteo, r, reg);
   saveGame();
@@ -3346,6 +3460,18 @@ function vueCourse(course, meteo){
   const w=S.weekend;
   const moi = w.grille ? w.grille.find(g=>g.id===S.pilote.id) : null;
   const kart = CAT[S.saison.catId].format==='kart';
+
+  // Course en cours, arrêtée sur un choix de mi-course (GDD §12)
+  if(w.evenement){
+    return `<div class="card accent">
+      <h2>${escapeHtml(w.evenement.titre)}<span class="hint">à mi-course</span></h2>
+      <div class="quote"><span class="who">Muret des stands</span>${escapeHtml(w.evenement.texte)}</div>
+      ${w.evenement.choix.map(c=>`<button class="choice" data-act="choixCourse" data-i="${c.i}">
+        <b>${escapeHtml(c.lab)}</b><small>${escapeHtml(c.d)}</small></button>`).join('')}
+      <div class="note txt-muted">Il faut trancher maintenant : la seconde moitié de course en dépend.</div>
+    </div>`;
+  }
+
   let h = rappelMeilleurReglage(course);
   h += `<div class="card"><h2>Stratégie de course</h2>
     <div class="note mb">Départ ${moi?`en ${ordinal(moi.pos)} position`:''} · ${meteo.nom.toLowerCase()}.
@@ -3367,6 +3493,7 @@ function vueDebrief(course){
         <div class="small txt-muted">${moi.abandon?escapeHtml(moi.abandon):'à l’arrivée'}</div></div>
       <div style="flex:1">
         <div class="note">Parti ${r.grillePos?ordinal(r.grillePos):'—'} · réglages ${Math.round(r.reglages)}/100${r.rapide?' (simulation rapide)':''}</div>
+        ${r.evenement?`<div class="note txt-2">${escapeHtml(r.evenement)} : vous avez choisi « ${escapeHtml(r.choixMiCourse||'—')} »</div>`:''}
         <div class="note mt">Points marqués : <b>${moi.abandon?0:pointsPour(sa.catId,moi.pos)}</b> · total saison <b>${sa.pts}</b> (${ordinal(positionChampionnat())} au général)</div>
       </div>
     </div>
@@ -3417,6 +3544,7 @@ ACTIONS.reprendreReglage = d=>{
 ACTIONS.etapeSuivante = ()=>{ etapeSuivante(); render(); };
 ACTIONS.setStrat = d=>{ S.weekend.strat=d.id; saveGame(); render(); };
 ACTIONS.lancerCourse = ()=>{ lancerCourse(false); render(); };
+ACTIONS.choixCourse = d=>{ finaliserCourse(+d.i); render(); };
 ACTIONS.repPresse = d=>{ repondrePresse(d.id); render(); };
 ACTIONS.finirWeekend = ()=>{
   finirWeekend();
