@@ -996,8 +996,69 @@ function loadGame(){
     const raw = localStorage.getItem(SAVE_KEY);
     if(!raw) return null;
     const o = JSON.parse(raw);
-    return (o && o.v===1) ? o : null;
+    if(!o || (o.v!==1 && o.v!==2)) return null;
+    return migrerPartie(o);
   }catch(e){ return null; }
+}
+
+/* Migration des sauvegardes antérieures au V2.
+   Une partie enregistrée avant le §15 n'a ni dossiers, ni locaux, ni académie :
+   la charger telle quelle faisait planter le vivier, et signer un second pilote
+   aurait écrasé le premier. On complète ici tout ce qui manque, sans jamais
+   toucher à ce qui existe déjà. */
+function migrerPartie(o){
+  if(!o) return o;
+
+  // §15 — le pilote en cours devient le dossier 0
+  if(!Array.isArray(o.dossiers)){
+    o.dossiers = [{
+      pilote:   o.pilote   || null,
+      contrat:  o.contrat  || null,
+      saison:   o.saison   || null,
+      weekend:  o.weekend  || null,
+      sponsors: o.sponsors || {actifs:[],prospects:[],vus:[]},
+      offres:   o.offres   || null,
+    }];
+    o.actif = 0;
+    // L'ancien modèle jouait une course par tour : on reproduit exactement
+    // l'avancement en cours pour ne pas décaler la saison.
+    if(o.saison && !o.saison.finie){
+      o.manche  = o.saison.courseIndex || 0;
+      o.manches = o.saison.calendrier ? o.saison.calendrier.length : 0;
+    }else{
+      o.manche = 0; o.manches = 0;
+    }
+  }
+  if(o.actif===undefined || !o.dossiers[o.actif]) o.actif = 0;
+  if(o.manche===undefined)  o.manche = 0;
+  if(o.manches===undefined) o.manches = 0;
+
+  // §5.2, §22.1, §22.2 — structures ajoutées après coup
+  if(!Array.isArray(o.scoutsRegion)) o.scoutsRegion = [];
+  if(!o.locaux || typeof o.locaux!=='object') o.locaux = {};
+  if(!o.academie || typeof o.academie!=='object') o.academie = {ouverte:false, eleves:[], candidats:null};
+  if(!Array.isArray(o.academie.eleves)) o.academie.eleves = [];
+
+  // §5.3 — les managers rivaux naissent à la reprise si la partie est antérieure
+  if(!o.monde) o.monde = {rivaux:[], managers:[], scoutPool:[], poolAnnee:0};
+  if(!Array.isArray(o.monde.managers)) o.monde.managers = [];
+  if(!Array.isArray(o.monde.scoutPool)) o.monde.scoutPool = [];
+
+  // §7.3 et §7.4 — champs de pilote ajoutés après coup, sur tous les dossiers
+  // et sur le vivier, sinon l'entourage et l'infirmerie lisent du vide.
+  const completer = pi => {
+    if(!pi) return;
+    if(pi.blessure===undefined) pi.blessure = null;
+    if(!pi.entourage) pi.entourage = 'discret';
+    if(pi.patienceFamille===undefined) pi.patienceFamille = 100;
+  };
+  for(const d of o.dossiers){ completer(d.pilote); }
+  completer(o.pilote);
+  for(const c of o.monde.scoutPool) completer(c);
+  for(const r of (o.monde.rivaux||[])) completer(r);
+
+  o.v = 2;
+  return o;
 }
 function wipeGame(){ localStorage.removeItem(SAVE_KEY); S=null; }
 
@@ -1036,7 +1097,13 @@ function resteDeLaPlace(){
 /* Emplacement où loger un nouveau pilote : un dossier vide, sinon un nouveau
    si la réputation le permet. Renvoie -1 s'il n'y a plus de place. */
 function ouvrirPlace(){
-  if(!S.dossiers){ S.dossiers=[dossierVide()]; S.actif=0; return 0; }
+  // Sécurité : sur une sauvegarde non migrée, créer un tableau vide écraserait
+  // le pilote en cours. On le range d'abord dans son dossier.
+  if(!S.dossiers){
+    S.dossiers = [dossierVide()];
+    S.actif = 0;
+    syncDossier();
+  }
   for(let i=0;i<S.dossiers.length;i++){
     const pi = i===S.actif ? S.pilote : S.dossiers[i].pilote;
     if(!pi) return i;
@@ -1171,7 +1238,7 @@ function nouvellePartie(budgetId, repPalierId, nomManager){
   const bud = BUDGETS.find(b=>b.id===budgetId);
   const rep = REP_PALIERS.find(r=>r.p===repPalierId);
   S = {
-    v:1,
+    v:2,
     annee: 2026,
     phase: 'scouting',
     manager:{
@@ -4050,8 +4117,9 @@ function go(tab){ UI.tab=tab; render(); }
    qu'un : elle n'apporte rien et mange de la hauteur d'écran. */
 function renderBarrePilotes(){
   const bar = $('#barrePilotes');
+  if(!S){ bar.hidden=true; bar.innerHTML=''; return; }
   const plusieurs = nbDossiers()>1 || (nbPilotes()>=1 && placesPilotes()>1);
-  if(!S || !S.dossiers || !plusieurs){ bar.hidden=true; bar.innerHTML=''; return; }
+  if(!S.dossiers || !plusieurs){ bar.hidden=true; bar.innerHTML=''; return; }
   bar.hidden=false;
   const aCourir = new Set(coursesDuTour().map(x=>x.i));
   let h='';
@@ -4195,7 +4263,19 @@ function renderSplash(){
   $('#rgBudget').oninput = e=>{ creaBudget=+e.target.value; renderSplash(); };
   $('#rgRep').oninput    = e=>{ creaRep=+e.target.value; renderSplash(); };
 }
-ACTIONS.reprendre = ()=>{ S=loadGame(); if(S){ UI.tab='bureau'; render(); } else showToast('Sauvegarde illisible'); };
+ACTIONS.reprendre = ()=>{
+  S=loadGame();
+  if(!S){ showToast('Sauvegarde illisible'); return; }
+  completerMonde();
+  saveGame();
+  UI.tab='bureau'; render();
+};
+/* Ce que la migration ne peut pas fabriquer sans le contexte de la partie :
+   les managers rivaux ont besoin de la réputation courante pour être générés. */
+function completerMonde(){
+  if(!S) return;
+  if(!S.monde.managers || !S.monde.managers.length) creerManagersRivaux();
+}
 ACTIONS.lancerPartie = ()=>{
   const nom = ($('#nomManager')?.value||'').trim();
   nouvellePartie(creaBudget, creaRep, nom);
@@ -4684,8 +4764,8 @@ function renderScouting(){
       ? `Vous suivez déjà ${pris===1?'un pilote':pris+' pilotes'}, le maximum à votre réputation.
          ${places<5?`Le palier suivant en débloquera un de plus.`:''}`
       : `Il vous reste <b class="txt-amber">${places-pris} place${places-pris>1?'s':''}</b> : vous pouvez signer un pilote de plus.`}</div>
-    ${pris && pris<places && S.dossiers.every((d,i)=>{
-        const v=vueDossier(i); return !v.pilote || CAT[v.pilote.catId].format==='kart'; })
+    ${pris && pris<places && (S.dossiers||[]).every((d,i)=>{
+        const v=vueDossier(i); return !v || !v.pilote || CAT[v.pilote.catId].format==='kart'; })
       ? `<div class="note warn mt">Un pilote de karting ne rapporte presque aucune commission : sa saison se
           finance sur ses seuls sponsors, et c’est vous qui comblez le manque. Un second pilote en karting est
           un <b>investissement</b>, pas un revenu — il ne paiera qu’en atteignant la monoplace.</div>`
@@ -5834,7 +5914,7 @@ ACTIONS.importSave = ()=>{
   inp.onchange=e=>{
     const f=e.target.files[0]; if(!f) return;
     const rd=new FileReader();
-    rd.onload=()=>{ try{ const o=JSON.parse(rd.result); if(o&&o.v===1){S=o;saveGame();UI.tab='bureau';render();showToast('Partie importée');} else showToast('Fichier invalide'); }catch(err){ showToast('Fichier illisible'); } };
+    rd.onload=()=>{ try{ const o=JSON.parse(rd.result); if(o&&(o.v===1||o.v===2)){S=migrerPartie(o);completerMonde();saveGame();UI.tab='bureau';render();showToast('Partie importée');} else showToast('Fichier invalide'); }catch(err){ showToast('Fichier illisible'); } };
     rd.readAsText(f);
   };
   inp.click();

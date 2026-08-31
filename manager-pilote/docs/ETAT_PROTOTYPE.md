@@ -1070,6 +1070,52 @@ pas une décision à prendre à votre place : la discipline demandée par le GDD
 une seule couleur d'accent pour les actions — est respectée avec le rouge. Si
 vous voulez le turquoise, c'est une variable CSS à changer.
 
+## Migration des sauvegardes
+
+Signalé en jouant : impossible de recruter un second pilote sur une partie
+lancée avant le V2. C'était une régression de ma part — j'avais ajouté
+`dossiers`, `locaux`, `scoutsRegion`, `academie` et les managers rivaux à l'état
+d'une **nouvelle** partie, sans jamais écrire de migration pour les parties
+existantes.
+
+Deux conséquences, dont une grave :
+
+- **le vivier plantait.** `renderScouting()` appelait `S.dossiers.every(...)` sur
+  un tableau inexistant, ce qui interrompait le rendu de tout l'écran ;
+- **signer un second pilote aurait écrasé le premier.** `ouvrirPlace()` créait
+  un tableau de dossiers vide et le chargeait à plat, effaçant pilote, contrat,
+  saison et sponsors en cours.
+
+`migrerPartie()` complète maintenant toute sauvegarde ancienne au chargement et
+à l'import : le pilote en cours devient le dossier 0 avec son contrat, sa saison
+et ses sponsors ; les structures du V2 sont créées vides ; les champs de pilote
+ajoutés après coup (blessure, entourage, patience) sont initialisés sur le
+dossier, le vivier et les rivaux. Les managers rivaux, qui ont besoin de la
+réputation courante, naissent à la reprise.
+
+L'avancement de la saison est préservé exactement : l'ancien modèle jouait une
+course par tour, donc `manche` reprend la valeur de `courseIndex` et `manches`
+la longueur du calendrier. Une partie reprise en manche 3 avec 48 points repart
+en manche 3 avec 48 points.
+
+Les trois chemins qui supposaient l'existence des dossiers sont aussi durcis, de
+sorte qu'une sauvegarde non migrée ne puisse plus jamais ni planter ni perdre de
+données : le rendu du vivier, la barre de sélection, et `ouvrirPlace()` qui range
+d'abord le pilote en cours avant de créer le tableau.
+
+La sauvegarde passe en version 2. Les versions 1 et 2 sont acceptées, toute
+autre est refusée.
+
+### Test
+
+`unit17.js` : 29 assertions sur le rangement du pilote en dossier 0, la
+préservation de l'avancement (saison en cours et saison finie), la création des
+structures manquantes, l'initialisation des champs de pilote, l'idempotence
+(migrer deux fois ne duplique rien), et le parcours complet reprise → signature
+d'un second pilote avec vérification que le premier et sa saison sont intacts.
+`browser5.js` rejoue ce parcours dans le navigateur, par le vrai bouton
+« Reprendre » et de vrais clics.
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - La réglementation évolutive d'une saison à l'autre (§11), marquée V2.
