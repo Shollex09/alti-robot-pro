@@ -945,6 +945,34 @@ Mesuré sur 12 carrières de 18 saisons : 8 atteignent la F1, 6 passent par une
 voie alternative. Les deux ne s'excluent pas — un ancien de F1 finit souvent en
 endurance.
 
+**Une porte qui s'ouvrait trop tôt.** Le balayage d'équilibrage a montré
+l'effet : l'accès à la F1 s'effondrait (0 sur 8 pour le profil « budget faible /
+inconnu », contre 4 avant le §8.4). La porte de la stagnation s'ouvrait à 22 ans,
+or la fenêtre de recrutement F1 du §8.2 court jusqu'à 24 : ces championnats,
+gratuits et payants, détournaient des carrières encore viables. Elle s'aligne
+maintenant sur cette fenêtre.
+
+## Ce que le §8.4 a changé à l'équilibrage général
+
+Le balayage final, 8 profils × 8 carrières × 15 saisons :
+
+| | avant le §8.4 | après |
+|---|---|---|
+| Faillites | 0 à 4 sur 8 | **0 partout** |
+| Accès à la monoplace | 8 sur 8 | 7 à 8 sur 8 |
+| Accès à la F1 | 4 à 8 sur 8 | 1 à 8 sur 8 |
+| Titres moyens | 6,1 à 11,1 | 8,9 à 13,6 |
+
+Les faillites disparaissent, et c'est l'effet voulu : un pilote qui plafonne
+part en endurance où il est payé, ce qui arrête l'hémorragie. C'est exactement
+le « sentiment de game over » que le §8.4 veut éviter.
+
+**Mais un jeu sans échec possible perd sa tension**, et c'est un arbitrage qui
+vous revient, pas au simulateur. Deux choses à savoir avant de trancher : le bot
+qui produit ces chiffres optimise l'argent et prend donc systématiquement le
+baquet payé, là où un joueur qui vise la F1 peut refuser ; et la baisse d'accès
+à la F1 vient de ce même biais, pas d'un blocage. À juger en jouant.
+
 ### Test
 
 `unit14.js` couvre le §8.4 : 34 assertions sur la séparation d'avec l'échelle

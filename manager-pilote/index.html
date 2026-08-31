@@ -512,7 +512,12 @@ function voiesOuvertes(){
   const dejaF1 = p.palmares.some(x=>x.catId==='f1');
   const sup = catByNiv(c.niv+1);
   const tropVieuxPourMonter = !!sup && p.age > (MONTEE[sup.id] ? MONTEE[sup.id].age[1] : sup.ageMax);
-  const ouvert = dejaAlt || dejaF1 || tropVieuxPourMonter || (p.age>=22 && saisonsIci>=2) || p.age>=25;
+  // La porte ne s'ouvre qu'une fois la fenêtre de recrutement F1 refermée
+  // (le §8.2 la fixe à 24 ans) : plus tôt, ces championnats détournaient des
+  // carrières encore viables — mesuré, l'accès à la F1 s'effondrait.
+  const finFenetreF1 = (MONTEE.f1 ? MONTEE.f1.age[1] : 24);
+  const ouvert = dejaAlt || dejaF1 || tropVieuxPourMonter
+              || (p.age>=finFenetreF1 && saisonsIci>=2) || p.age>=finFenetreF1+2;
   if(!ouvert) return [];
   return CATS_ALT.filter(a => p.age>=a.ageMin && p.age<=a.ageMax);
 }
