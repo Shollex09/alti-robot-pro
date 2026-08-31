@@ -60,7 +60,8 @@ ne les fixait pas.
 | 22.1 | Locaux et bureaux | ✅ | Quatre locaux à trois niveaux ; ils conditionnent la capacité de gestion |
 | 22.2 | Académie de pilotes | ✅ | Formation d'enfants de 8 à 12 ans, potentiel réel connu, revente |
 | 22.3 | Devenir Team Principal en F1 | ⛔ | V3 — le GDD l'écarte lui-même du périmètre |
-| 23 | Direction artistique et interface | ⛔ | V2 — le §23.1 demande explicitement de ne pas y toucher avant validation du gameplay |
+| 23.1 | Interface après validation du gameplay | ✅ | Condition remplie : la boucle a été jouée et validée avant d'y toucher |
+| 23.2 | Référence visuelle Motorsport Manager | ✅ | Découpes en diagonale, vignettes, densité réduite sur l'accueil |
 
 ## §8.2 — comment les trois conditions sont codées
 
@@ -1012,6 +1013,34 @@ d'antennes, effets mesurés du marketing et du juridique) et `unit16.js` le §22
 places, progression bornée par le plafond, sortie à 15 ans vers le vivier avec
 marge d'estimation nulle, et valeur de revente croissante avec le potentiel,
 décroissante avec l'âge).
+
+## §23 — la direction artistique
+
+Le §23.1 pose une condition : « l'interface est travaillée après validation du
+gameplay, jamais avant ». Elle est remplie — la boucle a été jouée sur plusieurs
+sessions et validée avant qu'on y touche.
+
+Le §23.2 prend Motorsport Manager comme référence et liste cinq traits. Trois
+étaient déjà là depuis le début : le fond bleu-gris foncé, la typographie
+condensée en majuscules pour les titres, et le système de cartes à coins
+arrondis. Deux manquaient.
+
+**Les découpes en diagonale**, que le GDD désigne explicitement comme « ce qui
+donne l'identité sport automobile et évite l'aspect application
+administrative ». Chaque titre de carte porte maintenant une barre oblique, et
+les vignettes de section sont des tuiles inclinées avec leur contenu redressé.
+
+**La densité faible sur l'accueil.** La carte de progression de réputation
+occupait quatre paragraphes pour une information secondaire ; elle tient
+maintenant en une jauge, le détail se dépliant à la demande.
+
+Une chose n'a délibérément pas été suivie : le §23.2 cite le turquoise comme
+couleur d'accent unique, en référence à Motorsport Manager. Le jeu a construit
+son identité autour du rouge depuis le premier prototype, et vous avez joué
+plusieurs sessions avec. Changer la couleur d'identité d'un jeu qui tourne n'est
+pas une décision à prendre à votre place : la discipline demandée par le GDD —
+une seule couleur d'accent pour les actions — est respectée avec le rouge. Si
+vous voulez le turquoise, c'est une variable CSS à changer.
 
 ## Ce qui reste à faire avant de parler de « jeu »
 

@@ -102,6 +102,26 @@ main{max-width:1080px;margin:0 auto;padding:14px 12px calc(40px + env(safe-area-
 .card>h2{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);
   margin-bottom:11px;display:flex;align-items:center;gap:7px}
 .card>h2 .hint{margin-left:auto;font-size:11px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:500;font-family:'Barlow',sans-serif}
+/* ---- identité sport automobile (GDD §23.2) ----
+   Découpes en diagonale et vignettes de section : c'est ce que le GDD retient
+   de Motorsport Manager pour éviter l'aspect application administrative. */
+.card>h2::before{content:'';flex:0 0 3px;align-self:stretch;min-height:15px;
+  background:var(--red);transform:skewX(-18deg);border-radius:1px}
+.card.accent>h2::before{background:var(--amber)}
+.card>h2 .vig{flex:0 0 22px;width:22px;height:22px;display:grid;place-items:center;
+  font-size:13px;line-height:1;background:var(--card2);border-radius:6px;
+  transform:skewX(-10deg);margin-right:1px}
+.card>h2 .vig>span{transform:skewX(10deg)}
+.repli{margin-top:8px}
+.repli>summary{cursor:pointer;list-style:none;font-size:12px;color:var(--text2);
+  display:flex;align-items:center;gap:6px}
+.repli>summary::-webkit-details-marker{display:none}
+.repli>summary::before{content:'▸';color:var(--red);font-size:11px;transition:transform .15s}
+.repli[open]>summary::before{transform:rotate(90deg)}
+.hero-diag{position:relative;overflow:hidden}
+.hero-diag::after{content:'';position:absolute;right:-40px;top:-20px;width:120px;bottom:-20px;
+  background:linear-gradient(120deg,transparent 45%,var(--red) 45%,var(--red) 52%,transparent 52%);
+  opacity:.10;pointer-events:none}
 .card.accent{border-color:var(--red-d);background:linear-gradient(180deg,#1d1418,var(--card))}
 .card.flat{background:var(--card2)}
 .sect-title{font-family:var(--cond);font-size:19px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:16px 0 9px}
@@ -4203,10 +4223,13 @@ function renderBureau(){
 
   if(suiv){
     const prev = rp.seuil, span = suiv.seuil-prev, fait = S.manager.repPoints-prev;
-    h += `<div class="card"><h2>Progression de réputation<span class="hint">palier ${suiv.p} : ${suiv.nom}</span></h2>
-      ${gline('Vers '+suiv.nom, fait/span*100, 'blue','%')}
-      <div class="note mt">${suiv.acces}</div>
-      <div class="note txt-muted mt">Chaque palier est plus long que le précédent : ${Math.round(span)} points à couvrir ici.</div>
+    // Densité faible sur l'accueil (GDD §23.2) : le détail du palier se déplie.
+    h += `<div class="card"><h2><span class="vig"><span>★</span></span>Réputation<span class="hint">vers ${suiv.nom}</span></h2>
+      ${gline('Palier '+suiv.p, fait/span*100, 'blue','%')}
+      <details class="repli"><summary>Ce que ce palier ouvre</summary>
+        <div class="note mt">${suiv.acces}</div>
+        <div class="note txt-muted mt">Chaque palier est plus long que le précédent : ${Math.round(span)} points à couvrir ici.</div>
+      </details>
     </div>`;
   }
 
@@ -4216,7 +4239,7 @@ function renderBureau(){
   // ---- pilote
   if(p){
     const n=notePilote(p);
-    h += `<div class="card"><h2>Votre pilote</h2>
+    h += `<div class="card"><h2><span class="vig"><span>🏎</span></span>Votre pilote</h2>
       <div class="ovr">
         <div class="portrait-box">${portraitPilote(p,{coul:coulPilote()})}</div>
         ${noteBadge(n)}
@@ -4254,7 +4277,7 @@ function renderBureau(){
 
   // ---- écurie de management (GDD §15) : l'état de chaque pilote d'un coup d'œil
   if(nbPilotes()>1){
-    h += `<div class="card"><h2>Écurie de management<span class="hint">${nbPilotes()} / ${placesPilotes()} places</span></h2>
+    h += `<div class="card"><h2><span class="vig"><span>👥</span></span>Écurie de management<span class="hint">${nbPilotes()} / ${placesPilotes()} places</span></h2>
       <div class="tw"><table><thead><tr><th>Pilote</th><th>Catégorie</th><th>Écurie</th>
         <th class="num">Pts</th><th class="num">Class.</th><th></th></tr></thead><tbody>
       ${S.dossiers.map((d,i)=>{
@@ -4280,7 +4303,7 @@ function renderBureau(){
   // ---- derniers messages
   const derniers = S.inbox.slice(0,3);
   if(derniers.length){
-    h += `<div class="card"><h2>Messagerie<span class="hint">${nbNonLus()} non lu(s)</span></h2>
+    h += `<div class="card"><h2><span class="vig"><span>✉</span></span>Messagerie<span class="hint">${nbNonLus()} non lu(s)</span></h2>
       ${derniers.map(m=>`<div class="msg ${m.lu?'':'unread'}" data-act="ouvrirMsg" data-id="${m.id}">
         <div class="top"><span class="fr">${escapeHtml(m.from)}</span><span>${escapeHtml(m.date)}</span></div>
         <div class="sj">${escapeHtml(m.sujet)}</div></div>`).join('')}
@@ -4560,7 +4583,7 @@ function renderPilote(){
     const e = ENTOURAGE[p.entourage||'discret'];
     const pat = p.patienceFamille===undefined ? 100 : p.patienceFamille;
     const apport = apportFamilial(p.catId, p);
-    h += `<div class="card"><h2>Entourage<span class="hint">${escapeHtml(e.nom)}</span></h2>
+    h += `<div class="card"><h2><span class="vig"><span>👨‍👩‍👦</span></span>Entourage<span class="hint">${escapeHtml(e.nom)}</span></h2>
       <div class="note mb">${escapeHtml(e.d)}</div>
       ${e.part>0.05 ? `<div class="note mb">Apport à la saison : environ
         <b class="txt-green">${fmtEur(apport)}</b> (${Math.round(e.part*100)} % du budget de la catégorie).</div>` : ''}
@@ -4572,7 +4595,7 @@ function renderPilote(){
     </div>`;
   }
   if(blesse(p)){
-    h += `<div class="card accent"><h2>Infirmerie</h2>
+    h += `<div class="card accent"><h2><span class="vig"><span>🩹</span></span>Infirmerie</h2>
       <div class="note"><b class="txt-red">${escapeHtml(p.blessure.nom)}</b> — ${escapeHtml(p.blessure.txt)}</div>
       <div class="note mt">Indisponible pour <b>${p.blessure.manches}</b> manche(s)
         sur les ${p.blessure.total} d’arrêt initial.</div></div>`;
@@ -4651,7 +4674,7 @@ function renderScouting(){
 
   // Places disponibles (GDD §15) : le nombre de pilotes suivis dépend de la réputation.
   const places = placesPilotes(), pris = nbPilotes();
-  h += `<div class="card"><h2>Votre écurie de management<span class="hint">${pris} / ${places} place(s)</span></h2>
+  h += `<div class="card"><h2><span class="vig"><span>👥</span></span>Votre écurie de management<span class="hint">${pris} / ${places} place(s)</span></h2>
     <div class="note">${pris>=places
       ? `Vous suivez déjà ${pris===1?'un pilote':pris+' pilotes'}, le maximum à votre réputation.
          ${places<5?`Le palier suivant en débloquera un de plus.`:''}`
@@ -5518,7 +5541,7 @@ function renderStaff(){
   h += `<div class="card flat"><div class="note txt-muted">Coach mental et négociateur/avocat sont prévus en V2 (GDD §13).
     Niveaux disponibles limités par votre réputation : ${clamp(1+Math.floor(rp/2),1,5)}/5.</div></div>`;
   // ---- locaux du manager (GDD §22.1)
-  h += `<div class="card"><h2>Vos locaux<span class="hint">${fmtEur(coutLocauxMensuel())}/mois</span></h2>
+  h += `<div class="card"><h2><span class="vig"><span>🏢</span></span>Vos locaux<span class="hint">${fmtEur(coutLocauxMensuel())}/mois</span></h2>
     <div class="note mb">Le contenu de fin de partie du §22.1 : une fois les revenus assurés, vous
       réinvestissez dans votre propre structure. La réputation vous donne le <b>droit</b> de suivre
       plusieurs pilotes, les locaux vous en donnent les <b>moyens</b>.</div>
@@ -5555,7 +5578,7 @@ function renderStaff(){
 
   // ---- académie de pilotes (GDD §22.2)
   if(!academieOuverte()){
-    h += `<div class="card"><h2>Académie de pilotes<span class="hint">non ouverte</span></h2>
+    h += `<div class="card"><h2><span class="vig"><span>🎓</span></span>Académie de pilotes<span class="hint">non ouverte</span></h2>
       <div class="note mb">Au lieu de chercher des talents, vous les formez. Des enfants de
         ${ACADEMIE.ageMin} à ${ACADEMIE.ageMax} ans, plusieurs saisons de formation, et surtout :
         vous connaîtrez leur <b>potentiel réel</b>, sans estimation floue.</div>
@@ -5572,7 +5595,7 @@ function renderStaff(){
     </div>`;
   } else {
     const el = elevesAcademie();
-    h += `<div class="card"><h2>Académie de pilotes<span class="hint">${el.length} / ${placesAcademie()} élèves</span></h2>
+    h += `<div class="card"><h2><span class="vig"><span>🎓</span></span>Académie de pilotes<span class="hint">${el.length} / ${placesAcademie()} élèves</span></h2>
       <div class="note mb">Charges : <b>${fmtEur(coutAcademieMensuel())}/mois</b>, formation comprise.
         Les élèves sortent à ${ACADEMIE.sortie} ans et rejoignent votre vivier — avec leur vraie valeur connue.</div>
       ${el.length ? el.map(e=>`<div class="slider-box">
@@ -5611,7 +5634,7 @@ function renderStaff(){
   }
 
   // ---- réseau de scouts par région (GDD §5.2)
-  h += `<div class="card"><h2>Réseau de repérage<span class="hint">${fmtEur(coutScoutsRegion())}/mois</span></h2>
+  h += `<div class="card"><h2><span class="vig"><span>🌍</span></span>Réseau de repérage<span class="hint">${fmtEur(coutScoutsRegion())}/mois</span></h2>
     <div class="note mb">Vous ne voyez que les jeunes des régions où vous avez une antenne.
       Chaque antenne élargit le vivier et donne accès à une école de pilotage différente.</div>
     ${REGIONS.map(r=>{
@@ -5660,7 +5683,7 @@ function blocManagers(){
   const l = classementManagers();
   if(l.length<2) return '';
   const moi = l.find(x=>x.moi);
-  return `<div class="card"><h2>Managers<span class="hint">${ordinal(moi.pos)} sur ${l.length}</span></h2>
+  return `<div class="card"><h2><span class="vig"><span>🏁</span></span>Managers<span class="hint">${ordinal(moi.pos)} sur ${l.length}</span></h2>
     <div class="note mb">Vous n’êtes pas seul à chercher des talents. Ces managers signent dans le même vivier.</div>
     <div class="tw"><table><thead><tr><th>Pos</th><th>Manager</th><th class="num">Rép.</th>
       <th class="num">Pilotes</th><th>Meilleur</th><th class="num">Titres</th></tr></thead><tbody>
