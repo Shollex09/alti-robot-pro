@@ -990,7 +990,11 @@ function wipeGame(){ localStorage.removeItem(SAVE_KEY); S=null; }
 const CHAMPS_DOSSIER = ['pilote','contrat','saison','weekend','sponsors','offres'];
 
 /* Places disponibles selon la réputation du manager (GDD §15). */
-function placesPilotes(){ return pilotesMax(repPalier(S.manager.repPoints).p); }
+/* La réputation donne le droit de suivre plusieurs pilotes, les locaux en
+   donnent les moyens (GDD §15 × §22.1). Le plus contraignant des deux gagne. */
+function placesPilotes(){
+  return Math.min(pilotesMax(repPalier(S.manager.repPoints).p), capaciteLocaux());
+}
 function nbDossiers(){ return S.dossiers ? S.dossiers.length : (S.pilote?1:0); }
 /* Dossiers réellement occupés — un pilote parti à la retraite laisse sa place vide. */
 function nbPilotes(){
@@ -1165,6 +1169,8 @@ function nouvellePartie(budgetId, repPalierId, nomManager){
     manches: 0,                       // nombre de tours de la saison en cours
     staff: {},                        // roleId -> {niv, salaire, nom}
     scoutsRegion: [],                 // antennes régionales ouvertes (GDD §5.2)
+    locaux: {},                       // id -> niveau (GDD §22.1)
+    academie: {ouverte:false, eleves:[], candidats:null},   // GDD §22.2
     inbox: [],
     finances: [],                     // {annee, lab, montant, type}
     historique: [],                   // saisons terminées
@@ -1212,7 +1218,8 @@ function caisse(lab, montant, type='saison'){
   S.saison.mouvements.unshift({lab, montant, type, date:dateCourante()});
   if(S.saison.mouvements.length>200) S.saison.mouvements.length=200;
 }
-const staffCoutMensuel = ()=> sum(Object.values(S.staff), s=>s.salaire) + coutScoutsRegion();
+const staffCoutMensuel = ()=> sum(Object.values(S.staff), s=>s.salaire) + coutScoutsRegion()
+  + coutLocauxMensuel() + coutAcademieMensuel();
 function staffNiv(roleId){ return S.staff[roleId] ? S.staff[roleId].niv : 0; }
 
 /* --------------------------------------- 7. SCOUTING (GDD §5, §13) */
@@ -1293,12 +1300,16 @@ function potentielSponsorsSaison(catId){
 /* Estimation floue d'une valeur — la marge dépend du scout et des observations.
    GDD §5.1 : le joueur ne voit jamais la vraie valeur exacte. */
 function marge(p){
-  const niv = staffNiv('scout');
-  const base = [16,11,8,5.5,3.5,2][niv];      // niv 0 = aucun scout
+  // Un pilote sorti de votre académie n'a plus de secret : c'est la contrepartie
+  // de cinq à sept saisons de formation (GDD §22.2).
+  if(p.formeParVous) return 0;
+  const niv = staffNiv('scout') + niveauLocal('scouting');   // la cellule vaut un niveau de scout
+  const base = [16,11,8,5.5,3.5,2][Math.min(niv,5)];         // niv 0 = aucun scout
   return Math.max(1, base - p.observe*1.6);
 }
 function estim(p, val, salt){
   const m = marge(p);
+  if(m===0) { const v=clamp(Math.round(val),1,99); return {lo:v, hi:v, c:v}; }
   // Biais stable par pilote+stat pour que l'estimation ne change pas à chaque rendu
   const biais = (hash01(p.id+salt+p.seedEst)*2-1) * m;
   const c = clamp(Math.round(val + biais), 1, 99);
@@ -1380,6 +1391,125 @@ function creerRivaux(){
     S.monde.rivaux.push(r);
   }
 }
+
+/* ================= ACADÉMIE DE PILOTES (GDD §22.2) =====================
+   Le vrai contenu de fin de partie : au lieu de chercher des talents, le manager
+   les forme. Recrutement d'enfants de 8 à 12 ans, plusieurs saisons de formation,
+   coût élevé et retour long. En contrepartie il connaît leur **potentiel réel** —
+   plus d'estimation floue — et peut revendre les pilotes en surplus. */
+const ACADEMIE = {
+  achat: 450000, charges: 6500, places: 4,
+  ageMin: 8, ageMax: 12,
+  coutFormation: 9000,            // par élève et par saison
+  sortie: 15,                     // âge auquel l'élève sort de l'académie
+};
+function academieOuverte(){ return !!(S.academie && S.academie.ouverte); }
+function elevesAcademie(){ return (S.academie && S.academie.eleves) || []; }
+function placesAcademie(){ return ACADEMIE.places + niveauLocal('scouting'); }
+function coutAcademieMensuel(){
+  if(!academieOuverte()) return 0;
+  return ACADEMIE.charges + Math.round(elevesAcademie().length*ACADEMIE.coutFormation/12);
+}
+
+/* Les enfants repérés pour l'académie viennent des régions couvertes, comme le
+   reste du repérage. Ils sont plus jeunes et bien moins formés que le vivier. */
+function candidatsAcademie(){
+  const pays = paysCouverts();
+  const n = 3 + niveauLocal('scouting');
+  const l = [];
+  for(let i=0;i<n;i++){
+    const age = rint(ACADEMIE.ageMin, ACADEMIE.ageMax);
+    const r = Math.random() + repPalier(S.manager.repPoints).p*0.03;
+    const potId = r>1.05?4 : r>0.80?3 : r>0.40?2 : 1;
+    const p = creerPilote({age, potId, role:'eleve', catId:'kmini', pays:pick(pays), part:0.12});
+    ecoleRegionale(p);
+    p.observe = 99;                 // formé par vous : plus aucune incertitude
+    l.push(p);
+  }
+  return l;
+}
+
+/* Une saison de formation. La progression est plus forte qu'en course parce
+   qu'elle est encadrée, mais elle n'apporte ni résultat ni réputation : c'est
+   l'investissement long que décrit le GDD. */
+function formerEleves(){
+  if(!academieOuverte()) return;
+  const sortis = [];
+  for(const e of elevesAcademie()){
+    e.age++;
+    const cA = coeffAge(e.age);
+    for(const k of ALL_STATS){
+      const marge = 1 - e.stats[k]/e.plafonds[k];
+      if(marge>0) e.stats[k] = clamp(e.stats[k] + GAIN_SAISON*1.35*cA*marge*rnd(1.15,0.85), 1, e.plafonds[k]);
+    }
+    e.anneesFormation = (e.anneesFormation||0)+1;
+    if(e.age>=ACADEMIE.sortie) sortis.push(e);
+  }
+  for(const e of sortis) diplomer(e);
+}
+
+/* Un élève sort de l'académie : il rejoint le vivier avec son potentiel connu. */
+function diplomer(e){
+  S.academie.eleves = elevesAcademie().filter(x=>x.id!==e.id);
+  e.role = 'candidat';
+  e.catId = e.age<=13 ? 'kcadet' : 'kjunior';
+  e.observe = 99;                 // vous l'avez formé : vous savez ce qu'il vaut
+  e.formeParVous = true;
+  S.monde.scoutPool.unshift(e);
+  msg('scout','Votre académie','Fin de formation — '+e.nom,
+    `${e.nom} sort de l’académie à ${e.age} ans après ${e.anneesFormation} saison(s) de formation.\n\n`+
+    `Note actuelle <em>${Math.round(notePilote(e))}</em>, plafond réel <em>${Math.round(notePlafond(e))}</em> — `+
+    `vous l’avez formé, vous connaissez sa vraie valeur.\n\n`+
+    `Il vous attend dans le vivier. Vous pouvez le signer, ou le vendre à une autre écurie.`);
+}
+
+/* Valeur de revente d'un élève ou d'un diplômé (GDD §22.2). */
+function valeurEleve(e){
+  const plaf = notePlafond(e), note = notePilote(e);
+  const jeunesse = clamp((18-e.age)/8, 0, 1);
+  return Math.round((plaf*plaf*22 + note*400) * (0.55 + jeunesse*0.75) / 1000)*1000;
+}
+
+/* ================= LOCAUX DU MANAGER (GDD §22.1) =======================
+   Contenu de fin de partie : une fois la F1 atteinte et les revenus assurés, le
+   manager réinvestit dans sa propre structure. Le GDD lie explicitement les
+   locaux à la capacité de gestion — « sans structure adaptée, le manager ne peut
+   pas suivre correctement plusieurs pilotes ». La réputation donne le droit de
+   suivre plusieurs pilotes, les locaux en donnent les moyens. */
+const LOCAUX = [
+  {id:'bureau', nom:'Bureau de management', achat:180000, charges:3500, niveaux:3,
+   d:'Des locaux, du personnel administratif, de quoi suivre plusieurs carrières de front.',
+   effet:'+1 pilote suivi par niveau, au-delà des deux que vous pouvez gérer depuis chez vous.'},
+  {id:'scouting', nom:'Cellule de recrutement', achat:140000, charges:2800, niveaux:3,
+   d:'Une équipe qui centralise les rapports et fait tourner les antennes régionales.',
+   effet:'Estimations resserrées comme un scout d’un niveau de plus, et deux antennes régionales de plus par niveau.'},
+  {id:'marketing', nom:'Département marketing', achat:220000, charges:4200, niveaux:3,
+   d:'Des gens dont le métier est de vendre votre pilote à des marques.',
+   effet:'+8 % sur les montants de sponsoring et sur les chances d’aboutir, par niveau.'},
+  {id:'juridique', nom:'Cabinet juridique', achat:200000, charges:3800, niveaux:3,
+   d:'Des avocats qui lisent les contrats à votre place, et savent où pousser.',
+   effet:'Négociations plus solides : plus de chances d’obtenir, moins de risque de retrait.'},
+];
+const LOCAL = Object.fromEntries(LOCAUX.map(l=>[l.id,l]));
+
+function niveauLocal(id){ return (S.locaux && S.locaux[id]) ? S.locaux[id] : 0; }
+function coutLocauxMensuel(){
+  return sum(LOCAUX, l => niveauLocal(l.id) * l.charges);
+}
+/* Prix du niveau suivant : chaque palier coûte plus cher que le précédent. */
+function coutAchatLocal(id){
+  const l = LOCAL[id], n = niveauLocal(id);
+  if(!l || n>=l.niveaux) return null;
+  return Math.round(l.achat * Math.pow(1.7, n) / 1000)*1000;
+}
+/* Capacité de gestion : deux pilotes depuis chez soi, plus un par niveau de
+   bureau. C'est le plafond qui s'applique en plus de celui de la réputation. */
+function capaciteLocaux(){ return 2 + niveauLocal('bureau'); }
+/* Antennes régionales que la structure peut faire tourner. */
+function antennesMax(){ return 2 + niveauLocal('scouting')*2; }
+/* Multiplicateurs appliqués ailleurs dans le jeu. */
+function bonusMarketing(){ return 1 + niveauLocal('marketing')*0.08; }
+function bonusJuridique(){ return niveauLocal('juridique'); }
 
 /* ================= ENTOURAGE DU PILOTE (GDD §7.4) ======================
    « Parents envahissants en karting, qui financent une partie de la saison mais
@@ -2559,7 +2689,8 @@ function genererSponsor(niv){
   if(!dispo.length) return null;
   const [nom,secteur] = pick(dispo);
   const spread = N.max-N.min;
-  const montant = Math.round((N.min + spread*Math.pow(Math.random(),1.6))/100)*100;
+  // Le département marketing (GDD §22.1) fait monter les montants proposés.
+  const montant = Math.round((N.min + spread*Math.pow(Math.random(),1.6)) * bonusMarketing()/100)*100;
   const obl = [];
   if(Math.random()<0.45) obl.push('presse');
   if(Math.random()<0.30) obl.push('objectif');
@@ -2615,7 +2746,10 @@ function interetSponsor(s){
   sc += s.approches*4;                                // relancer paie un peu
   return sc;
 }
-function probaSponsor(s){ return clamp(0.5 + interetSponsor(s)/120, 0.03, 0.94); }
+function probaSponsor(s){
+  // Le département marketing (GDD §22.1) améliore les chances d'aboutir.
+  return clamp((0.5 + interetSponsor(s)/120) * bonusMarketing(), 0.03, 0.94);
+}
 
 function demarcher(sponsorId){
   const s = S.sponsors.prospects.find(x=>x.id===sponsorId); if(!s) return null;
@@ -3257,6 +3391,7 @@ function passerAnneeSuivante(){
   });
   S.flags.renvoye=false;
   for(const k of Object.keys(S.flags)) if(k.startsWith('retrait_')) delete S.flags[k];
+  formerEleves();                                    // GDD §22.2
   progresserManagers();
   if(!S.monde.managers || !S.monde.managers.length) creerManagersRivaux();
   tourDeMarche(1.2);      // un mouvement avant que le joueur ouvre le vivier
@@ -3494,9 +3629,10 @@ const LEVIERS = [
 function negocier(offre, levierId){
   offre.tours++;
   const rp=repPalier(S.manager.repPoints).p;
-  const base = 0.62 + rp*0.028 + (S.pilote.reputation/100)*0.18;
-  const proba = clamp(base - offre.tours*0.16, 0.06, 0.9);
-  const risqueRetrait = clamp(0.05 + offre.tours*0.13 - rp*0.012, 0.02, 0.6);
+  const jur = bonusJuridique();                 // GDD §22.1
+  const base = 0.62 + rp*0.028 + (S.pilote.reputation/100)*0.18 + jur*0.05;
+  const proba = clamp(base - offre.tours*0.16, 0.06, 0.94);
+  const risqueRetrait = clamp(0.05 + offre.tours*0.13 - rp*0.012 - jur*0.025, 0.02, 0.6);
 
   if(Math.random() < risqueRetrait){
     offre.retiree = true;
@@ -4321,9 +4457,66 @@ ACTIONS.mettreEnRetrait = ()=>{
 };
 /* Antennes régionales (GDD §5.2). Ouvrir coûte trois mois d'avance, comme un
    dépôt : sans cela on ouvrirait et fermerait au gré des intersaisons. */
+/* Académie (GDD §22.2) */
+ACTIONS.ouvrirAcademie = ()=>{
+  if(academieOuverte()) return;
+  if(S.manager.budget < ACADEMIE.achat){ showToast('Trésorerie insuffisante'); return; }
+  argent('Ouverture de l’académie', -ACADEMIE.achat, 'structure');
+  S.academie = {ouverte:true, eleves:[], candidats:null};
+  msg('scout','Votre académie','L’académie est ouverte',
+    `Vous pouvez désormais former vos propres pilotes, à partir de ${ACADEMIE.ageMin} ans.\n\n`+
+    `C’est un investissement long : cinq à sept saisons avant qu’un élève ne sorte. `+
+    `En échange, vous connaîtrez leur potentiel réel, sans estimation.`);
+  saveGame(); render();
+};
+ACTIONS.recruterEleves = ()=>{
+  if(!academieOuverte()) return;
+  S.academie.candidats = candidatsAcademie();
+  saveGame(); render();
+};
+ACTIONS.fermerCandidats = ()=>{ if(S.academie) S.academie.candidats=null; saveGame(); render(); };
+ACTIONS.prendreEleve = d=>{
+  if(!academieOuverte()) return;
+  if(elevesAcademie().length >= placesAcademie()){ showToast('Académie complète'); return; }
+  const c = (S.academie.candidats||[]).find(x=>x.id===d.id); if(!c) return;
+  c.anneesFormation = 0;
+  S.academie.eleves = elevesAcademie().concat([c]);
+  S.academie.candidats = S.academie.candidats.filter(x=>x.id!==c.id);
+  saveGame(); render();
+  showToast(c.nom+' entre à l’académie');
+};
+ACTIONS.vendreEleve = d=>{
+  const e = elevesAcademie().find(x=>x.id===d.id); if(!e) return;
+  const prix = valeurEleve(e);
+  argent('Vente d’un élève — '+e.nom, prix, 'commission');
+  S.academie.eleves = elevesAcademie().filter(x=>x.id!==e.id);
+  gagnerRep(Math.round(6 + notePlafond(e)/12), 'formation revendue');
+  msg('finance','Votre académie','Transfert — '+e.nom,
+    `${e.nom} rejoint une autre structure pour ${fmtEurFull(prix)}.\n\n`+
+    `Former des pilotes en surplus et les revendre est une source de revenus à part entière.`);
+  saveGame(); render();
+  showToast(e.nom+' vendu — '+fmtEur(prix));
+};
+ACTIONS.acheterLocal = d=>{
+  const l = LOCAL[d.l]; if(!l) return;
+  const cout = coutAchatLocal(l.id);
+  if(cout===null){ showToast('Déjà au niveau maximal'); return; }
+  if(S.manager.budget < cout){ showToast('Trésorerie insuffisante'); return; }
+  argent((niveauLocal(l.id)?'Agrandissement — ':'Acquisition — ')+l.nom, -cout, 'structure');
+  if(!S.locaux) S.locaux = {};
+  S.locaux[l.id] = niveauLocal(l.id)+1;
+  msg('finance','Votre structure', l.nom+' — niveau '+S.locaux[l.id],
+    `${l.effet}\n\nCharges mensuelles : ${fmtEurFull(S.locaux[l.id]*l.charges)}.`);
+  saveGame(); render();
+  showToast(l.nom+' — niveau '+S.locaux[l.id]);
+};
 ACTIONS.ouvrirAntenne = d=>{
   const r = REGION[d.r];
   if(!r || regionCouverte(r.id)) return;
+  if(regionsCouvertes().length-1 >= antennesMax()){
+    showToast('Votre structure ne peut pas suivre plus de '+antennesMax()+' antennes');
+    return;
+  }
   const avance = r.cout*3;
   if(S.manager.budget < avance){ showToast('Il faut '+fmtEur(avance)+' d’avance'); return; }
   argent('Ouverture d’une antenne — '+r.nom, -avance, 'scouting');
@@ -4518,7 +4711,10 @@ function renderScouting(){
     Vous n’êtes pas seul à le regarder : les managers concurrents signent aussi, et un jeune observé trop longtemps finit par partir.</div></div>`;
   $('#v-pilote').innerHTML = h;
 }
+/* Un élève formé par vous n'a plus de secret : le §22.2 supprime l'estimation
+   floue pour eux, c'est la contrepartie de dix saisons d'investissement. */
 function traitsRevele(c){
+  if(c.formeParVous) return c.traits;
   const niv=staffNiv('scout');
   if(niv>=4 || c.observe>=3) return c.traits;
   if(niv>=2 || c.observe>=2) return c.traits.slice(0,2);
@@ -5321,6 +5517,99 @@ function renderStaff(){
   }
   h += `<div class="card flat"><div class="note txt-muted">Coach mental et négociateur/avocat sont prévus en V2 (GDD §13).
     Niveaux disponibles limités par votre réputation : ${clamp(1+Math.floor(rp/2),1,5)}/5.</div></div>`;
+  // ---- locaux du manager (GDD §22.1)
+  h += `<div class="card"><h2>Vos locaux<span class="hint">${fmtEur(coutLocauxMensuel())}/mois</span></h2>
+    <div class="note mb">Le contenu de fin de partie du §22.1 : une fois les revenus assurés, vous
+      réinvestissez dans votre propre structure. La réputation vous donne le <b>droit</b> de suivre
+      plusieurs pilotes, les locaux vous en donnent les <b>moyens</b>.</div>
+    ${(()=>{
+      const parRep = pilotesMax(repPalier(S.manager.repPoints).p), parLoc = capaciteLocaux();
+      const frein = parRep<=parLoc ? 'réputation' : 'locaux';
+      return `<div class="note mb">Vous pouvez suivre <b class="txt-amber">${placesPilotes()}</b> pilote(s).
+        ${frein==='réputation'
+          ? `Ce sont vos <b>${parRep>1?'':''}locaux qui ont de l’avance</b> (capacité ${parLoc}) :
+             c’est votre réputation qui limite, elle en autorise ${parRep}.`
+          : `Votre réputation en autorise ${parRep}, mais vos locaux ne peuvent en suivre que ${parLoc} :
+             c’est la <b>structure</b> qui limite.`}</div>`;
+    })()}
+    ${LOCAUX.map(l=>{
+      const niv = niveauLocal(l.id), cout = coutAchatLocal(l.id);
+      return `<div class="slider-box">
+        <div class="top"><b>${l.nom}</b>
+          <span>${niv?`niveau ${niv}/${l.niveaux}`:'non acquis'}</span></div>
+        <div class="note">${l.d}</div>
+        <div class="note txt-2 mt">${l.effet}</div>
+        <div class="row tight mt">
+          ${niv?tag(fmtEur(niv*l.charges)+'/mois','t-amber'):''}
+          <div class="spacer"></div>
+          ${cout===null
+            ? tag('Niveau maximal','t-green')
+            : `<button class="btn btn-sm" data-act="acheterLocal" data-l="${l.id}"
+                 ${S.manager.budget<cout?'disabled':''}>${niv?'Agrandir':'Acquérir'} — ${fmtEur(cout)}</button>`}
+        </div>
+      </div>`;
+    }).join('')}
+    <div class="note txt-muted mt">Les charges s’ajoutent à votre masse salariale, tous les mois,
+      qu’il y ait un pilote en piste ou non.</div>
+  </div>`;
+
+  // ---- académie de pilotes (GDD §22.2)
+  if(!academieOuverte()){
+    h += `<div class="card"><h2>Académie de pilotes<span class="hint">non ouverte</span></h2>
+      <div class="note mb">Au lieu de chercher des talents, vous les formez. Des enfants de
+        ${ACADEMIE.ageMin} à ${ACADEMIE.ageMax} ans, plusieurs saisons de formation, et surtout :
+        vous connaîtrez leur <b>potentiel réel</b>, sans estimation floue.</div>
+      <div class="note mb">C’est un investissement long — cinq à sept saisons avant qu’un élève
+        ne sorte. Les diplômés en surplus se revendent.</div>
+      <div class="row tight mb">
+        ${tag('Ouverture '+fmtEur(ACADEMIE.achat),'t-amber')}
+        ${tag(fmtEur(ACADEMIE.charges)+'/mois','t-amber')}
+        ${tag(fmtEur(ACADEMIE.coutFormation)+'/élève/an','t-amber')}
+      </div>
+      <button class="btn btn-cta btn-block" data-act="ouvrirAcademie"
+        ${S.manager.budget<ACADEMIE.achat?'disabled':''}>Ouvrir l’académie — ${fmtEur(ACADEMIE.achat)}</button>
+      ${S.manager.budget<ACADEMIE.achat?`<div class="note txt-muted mt">Il vous manque ${fmtEur(ACADEMIE.achat-S.manager.budget)}.</div>`:''}
+    </div>`;
+  } else {
+    const el = elevesAcademie();
+    h += `<div class="card"><h2>Académie de pilotes<span class="hint">${el.length} / ${placesAcademie()} élèves</span></h2>
+      <div class="note mb">Charges : <b>${fmtEur(coutAcademieMensuel())}/mois</b>, formation comprise.
+        Les élèves sortent à ${ACADEMIE.sortie} ans et rejoignent votre vivier — avec leur vraie valeur connue.</div>
+      ${el.length ? el.map(e=>`<div class="slider-box">
+        <div class="top"><b>${escapeHtml(e.nom)}</b><span>${e.age} ans</span></div>
+        <div class="note">${e.pays} · ${e.anneesFormation||0} saison(s) de formation · sortie à ${ACADEMIE.sortie} ans</div>
+        <div class="row tight mt">
+          ${tag('Note '+Math.round(notePilote(e)),'t-blue')}
+          ${tag('Plafond réel '+Math.round(notePlafond(e)),'t-green')}
+          ${e.traits.map(x=>tag(TRAITS[x].nom,TRAITS[x].coul)).join('')}
+          <div class="spacer"></div>
+          <button class="btn-ghost btn-sm" data-act="vendreEleve" data-id="${e.id}">Vendre — ${fmtEur(valeurEleve(e))}</button>
+        </div>
+      </div>`).join('') : `<div class="empty">Aucun élève. Ouvrez une session de recrutement.</div>`}
+      ${el.length<placesAcademie()
+        ? `<button class="btn btn-block mt" data-act="recruterEleves">Repérer des enfants à former</button>`
+        : `<div class="note txt-muted mt">Académie complète. Une cellule de recrutement ajoute une place par niveau.</div>`}
+    </div>`;
+    if(S.academie.candidats && S.academie.candidats.length){
+      h += `<div class="card accent"><h2>Enfants repérés<span class="hint">à recruter</span></h2>
+        <div class="note mb">Vous voyez leur vraie valeur : c’est vous qui les formerez.</div>
+        ${S.academie.candidats.map(c=>`<div class="slider-box">
+          <div class="top"><b>${escapeHtml(c.nom)}</b><span>${c.age} ans</span></div>
+          <div class="note">${c.pays}</div>
+          <div class="row tight mt">
+            ${tag('Note '+Math.round(notePilote(c)),'t-blue')}
+            ${tag('Plafond réel '+Math.round(notePlafond(c)),'t-green')}
+            ${c.traits.map(x=>tag(TRAITS[x].nom,TRAITS[x].coul)).join('')}
+            <div class="spacer"></div>
+            <button class="btn btn-sm" data-act="prendreEleve" data-id="${c.id}"
+              ${elevesAcademie().length>=placesAcademie()?'disabled':''}>Le former</button>
+          </div>
+        </div>`).join('')}
+        <button class="btn-ghost btn-sm btn-block mt" data-act="fermerCandidats">Laisser passer cette session</button>
+      </div>`;
+    }
+  }
+
   // ---- réseau de scouts par région (GDD §5.2)
   h += `<div class="card"><h2>Réseau de repérage<span class="hint">${fmtEur(coutScoutsRegion())}/mois</span></h2>
     <div class="note mb">Vous ne voyez que les jeunes des régions où vous avez une antenne.
@@ -5343,7 +5632,9 @@ function renderStaff(){
         </div>
       </div>`;
     }).join('')}
-    <div class="note txt-muted mt">Le vivier ne se recompose qu’à la saison suivante : ouvrir une antenne
+    <div class="note txt-muted mt">Votre structure peut faire tourner <b>${antennesMax()}</b> antennes
+      (${regionsCouvertes().length-1} ouverte(s)) — une cellule de recrutement en autorise deux de plus par niveau.
+      Le vivier ne se recompose qu’à la saison suivante : ouvrir une antenne
       aujourd’hui vous fera voir ces pilotes à la prochaine intersaison.</div>
   </div>`;
 

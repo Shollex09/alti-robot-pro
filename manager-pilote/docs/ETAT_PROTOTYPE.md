@@ -57,7 +57,9 @@ ne les fixait pas.
 | 21.1 | Course détaillée ou simulation rapide | ✅ | Choix manche par manche |
 | 21.2 | 3 formats de week-end | ✅ | Karting / monoplace / F1 |
 | 21.3 | Modèle économique | — | Décision reportée, rien à coder |
-| 22 | Structure du manager (locaux, académie, Team Principal) | ⛔ | V2 / V3 |
+| 22.1 | Locaux et bureaux | ✅ | Quatre locaux à trois niveaux ; ils conditionnent la capacité de gestion |
+| 22.2 | Académie de pilotes | ✅ | Formation d'enfants de 8 à 12 ans, potentiel réel connu, revente |
+| 22.3 | Devenir Team Principal en F1 | ⛔ | V3 — le GDD l'écarte lui-même du périmètre |
 | 23 | Direction artistique et interface | ⛔ | V2 — le §23.1 demande explicitement de ne pas y toucher avant validation du gameplay |
 
 ## §8.2 — comment les trois conditions sont codées
@@ -950,9 +952,71 @@ trop tard, après la F1), le salaire et l'absence d'apport dans les offres, la
 fourchette de salaire, l'apparition du panneau, et la différenciation des quatre
 championnats par le risque et la rémunération.
 
+## §22.1 et §22.2 — la structure du manager
+
+Le contenu de fin de partie : une fois la F1 atteinte et les revenus assurés, le
+manager réinvestit dans sa propre structure.
+
+### Les locaux
+
+Quatre locaux, trois niveaux chacun, chaque palier plus cher que le précédent.
+Les charges s'ajoutent à la masse salariale tous les mois, qu'il y ait un pilote
+en piste ou non.
+
+| Local | Effet |
+|---|---|
+| Bureau de management | +1 pilote suivi par niveau |
+| Cellule de recrutement | Vaut un niveau de scout, et +2 antennes régionales par niveau |
+| Département marketing | +8 % sur les montants et les chances de sponsoring, par niveau |
+| Cabinet juridique | Négociations plus solides, moins de retraits d'offre |
+
+Le point important est celui que le GDD souligne : « sans structure adaptée, le
+manager ne peut pas suivre correctement plusieurs pilotes ». **La réputation
+donne le droit de suivre plusieurs pilotes, les locaux en donnent les moyens** —
+le plus contraignant des deux gagne. Sans bureau, on gère deux pilotes depuis
+chez soi, quelle que soit la réputation. C'est ce qui empêche le §15 d'être une
+récompense passive.
+
+La cellule de recrutement plafonne aussi le §5.2 : deux antennes régionales sans
+elle, deux de plus par niveau. Ouvrir le monde entier demande donc une structure,
+pas seulement de la trésorerie.
+
+### L'académie
+
+Le vrai endgame. Au lieu de chercher des talents, le manager les forme :
+recrutement d'enfants de 8 à 12 ans, une saison de formation par an, sortie à
+15 ans vers le vivier.
+
+L'investissement est lourd — 450 k€ d'ouverture, 6 500 €/mois de charges,
+9 000 € par élève et par an — et le retour est long : trois saisons pour un
+enfant recruté à 12 ans, sept pour un enfant de 8 ans. En échange, deux choses
+que le scouting classique ne donne jamais :
+
+- **le potentiel réel**, sans estimation floue. `marge()` renvoie zéro pour un
+  pilote formé par vous, tous ses traits sont visibles, et son estimation vaut
+  exactement sa note. C'est la contrepartie explicite du §22.2 face au §5.1 ;
+- **la revente**. Un élève en surplus se vend, à un prix qui suit son plafond et
+  sa jeunesse. Former plus d'élèves qu'on ne peut en gérer devient une source de
+  revenus à part entière.
+
+La formation progresse 35 % plus vite qu'une saison de course, parce qu'elle est
+encadrée — mais elle n'apporte ni résultat, ni réputation, ni points de
+superlicence. C'est du temps acheté contre de l'argent.
+
+### Test
+
+`unit15.js` couvre le §22.1 (24 assertions : forme des locaux, prix croissant,
+achat et charges, capacité de gestion croisée avec la réputation, plafond
+d'antennes, effets mesurés du marketing et du juridique) et `unit16.js` le §22.2
+(31 assertions : ouverture, recrutement dans les régions couvertes, respect des
+places, progression bornée par le plafond, sortie à 15 ans vers le vivier avec
+marge d'estimation nulle, et valeur de revente croissante avec le potentiel,
+décroissante avec l'âge).
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - La réglementation évolutive d'une saison à l'autre (§11), marquée V2.
 - La gestion tour par tour de la course (§12) : il n'y a qu'un seul arbitrage
   à mi-course, pas un suivi continu.
-- Le reste du périmètre V2 : locaux (§22.1) et académie (§22.2).
+- Le §22.3 (devenir Team Principal en F1), que le GDD écarte lui-même : « cette
+  extension représente pratiquement un second jeu greffé sur le premier ».
