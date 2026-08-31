@@ -292,6 +292,21 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
 .slider-box .top{display:flex;align-items:baseline;gap:8px;margin-bottom:2px}
 .slider-box .top b{font-family:var(--cond);font-size:17px;text-transform:uppercase;letter-spacing:.04em}
 .slider-box .top span{margin-left:auto;font-family:var(--cond);font-size:20px;font-weight:700;color:var(--amber)}
+/* ---- barre multi-pilotes (GDD §15) ---- */
+#barrePilotes{display:flex;gap:6px;padding:7px 10px;background:var(--bg2);
+  border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+#barrePilotes::-webkit-scrollbar{display:none}
+.chip-pil{display:flex;align-items:center;gap:7px;flex:0 0 auto;cursor:pointer;
+  background:var(--card);border:1.5px solid var(--border);border-radius:999px;
+  padding:4px 12px 4px 4px;transition:border-color .15s,background .15s}
+.chip-pil:hover{border-color:var(--border2)}
+.chip-pil.actif{border-color:var(--red);background:var(--red-bg)}
+.chip-pil .av{width:28px;height:28px;border-radius:50%;overflow:hidden;flex:0 0 28px;background:var(--card2)}
+.chip-pil .tx{line-height:1.15}
+.chip-pil .nm{font-weight:600;font-size:13px;white-space:nowrap}
+.chip-pil .ct{font-size:11px;color:var(--text2);white-space:nowrap}
+.chip-pil .pastille{width:7px;height:7px;border-radius:50%;background:var(--amber);flex:0 0 7px}
+.chip-pil.vide{border-style:dashed;color:var(--text2);padding:4px 12px}
 /* ---- portraits et podium (GDD §16) ---- */
 .portrait{width:100%;height:100%;display:block;border-radius:12px}
 .portrait-box{width:76px;height:91px;flex:0 0 76px;border-radius:12px;overflow:hidden;
@@ -349,6 +364,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
   <button class="tab-btn" data-tab="finances">Finances</button>
   <button class="tab-btn" data-tab="save">Sauvegarde</button>
 </nav>
+<div id="barrePilotes" hidden></div>
 
 <main>
   <!-- ===== SPLASH / NOUVELLE PARTIE ===== -->
@@ -608,7 +624,8 @@ const REP_PALIERS = [
 ];
 const repPalier = pts => { let r=REP_PALIERS[0]; for(const x of REP_PALIERS) if(pts>=x.seuil) r=x; return r; };
 const repProchain = pts => REP_PALIERS.find(x=>x.seuil>pts) || null;
-// GDD §15 — nombre de pilotes gérables. V1 : 1 seul pilote, le reste est affiché comme verrouillé.
+// GDD §15 — nombre de pilotes gérables selon le palier de réputation.
+// placesPilotes() l'applique au manager courant.
 const pilotesMax = p => p<=3?1 : p<=6?2 : p<=8?3 : 5;
 
 /* --- 1.6 Sponsors (GDD §4, §19.5) --- */
@@ -792,7 +809,10 @@ const SAVE_KEY = 'manager_pilote_v1';
 let S = null;              // état de la partie
 let UI = {tab:'bureau', setupDraft:null, negoc:null};
 
-function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){ showToast('Sauvegarde impossible'); } }
+function saveGame(){
+  try{ syncDossier(); localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }
+  catch(e){ showToast('Sauvegarde impossible'); }
+}
 function loadGame(){
   try{
     const raw = localStorage.getItem(SAVE_KEY);
@@ -802,6 +822,83 @@ function loadGame(){
   }catch(e){ return null; }
 }
 function wipeGame(){ localStorage.removeItem(SAVE_KEY); S=null; }
+
+/* ============ DOSSIERS DE PILOTES (GDD §15) ============================
+   Un « dossier » réunit tout ce qui appartient à un pilote géré : le pilote,
+   son contrat, sa saison, son week-end en cours, ses sponsors et les offres
+   qu'il reçoit. Le reste de S — argent, réputation, staff, messagerie,
+   calendrier — appartient au manager et reste commun à tous les pilotes.
+
+   Le dossier actif est recopié à plat sur S (S.pilote, S.saison…), ce qui
+   permet à tout le code écrit pour un pilote unique de continuer à
+   fonctionner sans indirection. `syncDossier()` renvoie l'état à plat dans le
+   tableau, `activerDossier()` fait le mouvement inverse. Toute opération qui
+   parcourt les dossiers doit donc appeler `syncDossier()` d'abord. */
+const CHAMPS_DOSSIER = ['pilote','contrat','saison','weekend','sponsors','offres'];
+
+/* Places disponibles selon la réputation du manager (GDD §15). */
+function placesPilotes(){ return pilotesMax(repPalier(S.manager.repPoints).p); }
+function nbDossiers(){ return S.dossiers ? S.dossiers.length : (S.pilote?1:0); }
+/* Dossiers réellement occupés — un pilote parti à la retraite laisse sa place vide. */
+function nbPilotes(){
+  if(!S.dossiers) return S.pilote?1:0;
+  let n=0;
+  for(let i=0;i<S.dossiers.length;i++) if(i===S.actif ? S.pilote : S.dossiers[i].pilote) n++;
+  return n;
+}
+function resteDeLaPlace(){
+  if(!S.dossiers) return true;
+  if(S.dossiers.length < placesPilotes()) return true;
+  return nbPilotes() < S.dossiers.length;
+}
+/* Emplacement où loger un nouveau pilote : un dossier vide, sinon un nouveau
+   si la réputation le permet. Renvoie -1 s'il n'y a plus de place. */
+function ouvrirPlace(){
+  if(!S.dossiers){ S.dossiers=[dossierVide()]; S.actif=0; return 0; }
+  for(let i=0;i<S.dossiers.length;i++){
+    const pi = i===S.actif ? S.pilote : S.dossiers[i].pilote;
+    if(!pi) return i;
+  }
+  if(S.dossiers.length < placesPilotes()){ S.dossiers.push(dossierVide()); return S.dossiers.length-1; }
+  return -1;
+}
+function dossierVide(){
+  return {pilote:null, contrat:null, saison:null, weekend:null,
+          sponsors:{actifs:[],prospects:[],vus:[]}, offres:null};
+}
+function syncDossier(){
+  if(!S.dossiers || !S.dossiers[S.actif]) return;
+  const d = S.dossiers[S.actif];
+  for(const k of CHAMPS_DOSSIER) d[k] = S[k];
+}
+function activerDossier(i){
+  if(!S.dossiers || !S.dossiers[i] || i===S.actif) return false;
+  syncDossier();
+  S.actif = i;
+  for(const k of CHAMPS_DOSSIER) S[k] = S.dossiers[i][k];
+  return true;
+}
+/* Exécute fn() dans le contexte de chaque dossier, puis rétablit l'actif. */
+function pourChaqueDossier(fn){
+  if(!S.dossiers) return;
+  const retour = S.actif;
+  syncDossier();
+  for(let i=0;i<S.dossiers.length;i++){
+    S.actif = i;
+    for(const k of CHAMPS_DOSSIER) S[k] = S.dossiers[i][k];
+    fn(S.dossiers[i], i);
+    syncDossier();
+  }
+  S.actif = retour;
+  for(const k of CHAMPS_DOSSIER) S[k] = S.dossiers[retour][k];
+}
+/* Lecture seule d'un dossier sans changer l'actif. */
+function dossier(i){ return S.dossiers ? (i===S.actif ? null : S.dossiers[i]) : null; }
+function vueDossier(i){
+  if(!S.dossiers) return null;
+  if(i===S.actif){ const o={}; for(const k of CHAMPS_DOSSIER) o[k]=S[k]; return o; }
+  return S.dossiers[i];
+}
 
 /* ------------------------------------------- 3. GÉNÉRATION DES PILOTES */
 
@@ -900,12 +997,17 @@ function nouvellePartie(budgetId, repPalierId, nomManager){
       image: 25 + repPalierId*4,     // image médiatique 0-100
       profil:{budgetId, repDepart:repPalierId},
     },
+    // dossier actif, recopié à plat (voir CHAMPS_DOSSIER)
     pilote: null,
     contrat: null,
-    staff: {},                        // roleId -> {niv, salaire, nom}
     sponsors: {actifs:[], prospects:[], vus:[]},
     saison: null,
     weekend: null,
+    dossiers: [dossierVide()],        // GDD §15 — un seul au départ
+    actif: 0,
+    manche: 0,                        // tour du calendrier commun
+    manches: 0,                       // nombre de tours de la saison en cours
+    staff: {},                        // roleId -> {niv, salaire, nom}
     inbox: [],
     finances: [],                     // {annee, lab, montant, type}
     historique: [],                   // saisons terminées
@@ -1132,6 +1234,17 @@ function demarrerSaison(catId, ecurieId){
     const fam = Math.round(c.cout * rnd(0.22,0.10));
     caisse('Apport de la famille du pilote', fam, 'famille');
   }
+  // Le tour du calendrier commun ne repart à zéro que pour la première saison
+  // engagée dans l'année : engager un second pilote ne rembobine pas l'année.
+  let premiere = true;
+  if(S.dossiers) for(let i=0;i<S.dossiers.length;i++){
+    if(i===S.actif) continue;
+    const sa2 = S.dossiers[i].saison;
+    if(sa2 && sa2.annee===S.annee && !sa2.finie) premiere = false;
+  }
+  if(premiere){ S.manche = 0; S.manches = 0; }
+  syncDossier();
+  recalcManches();
   S.phase = 'semaine';
   S.actions = actionsParSemaine();
   S.stats.saisonsJouees++;
@@ -1145,7 +1258,89 @@ function demarrerSaison(catId, ecurieId){
   saveGame();
 }
 
-const actionsParSemaine = ()=> 3;
+/* Trois actions par semaine, plus une par pilote supplémentaire. La hausse est
+   volontairement sous-linéaire : gérer trois pilotes doit peser (GDD §15 —
+   « plus de revenus, mais aussi plus de charge de gestion »). */
+const actionsParSemaine = ()=> 3 + Math.max(0, nbPilotes()-1);
+
+/* ---- Calendrier commun (GDD §15) ----------------------------------------
+   Les pilotes gérés n'ont pas le même nombre de manches : 6 en karting, 24 en
+   F2. La saison du manager compte donc autant de tours que le plus long des
+   calendriers engagés, et chaque pilote y répartit ses courses régulièrement.
+   Avec un seul pilote, un tour vaut une course — le déroulé est identique à
+   celui de la V1. */
+/* Le nombre de manches est arrêté au moment où les saisons sont engagées et ne
+   bouge plus de l'année. Le recalculer en cours de route serait un piège : si le
+   pilote au calendrier le plus long se fait renvoyer, le total s'effondrerait
+   sous la manche en cours et clôturerait la saison de tout le monde d'un coup. */
+function manchesTotales(){
+  if(!S.dossiers) return S.saison ? S.saison.calendrier.length : 0;
+  return S.manches || 0;
+}
+function recalcManches(){
+  let n = S.manches || 0;
+  if(S.dossiers) for(let i=0;i<S.dossiers.length;i++){
+    const sa = i===S.actif ? S.saison : S.dossiers[i].saison;
+    if(sa && !sa.finie && sa.annee===S.annee) n = Math.max(n, sa.calendrier.length);
+  }
+  S.manches = n;
+  return n;
+}
+/* Courses encore à disputer, tous pilotes confondus. */
+function coursesRestantes(){
+  if(!S.dossiers) return S.saison && !S.saison.finie ? S.saison.calendrier.length-S.saison.courseIndex : 0;
+  let n=0;
+  for(let i=0;i<S.dossiers.length;i++){
+    const sa = i===S.actif ? S.saison : S.dossiers[i].saison;
+    if(sa && !sa.finie) n += Math.max(0, sa.calendrier.length - sa.courseIndex);
+  }
+  return n;
+}
+/* Index de course que ce calendrier dispute au tour donné, ou -1. */
+function courseDuTour(sa, tour){
+  if(!sa || sa.finie) return -1;
+  const C = sa.calendrier.length, N = manchesTotales() || C;
+  if(C>=N) return tour<C ? tour : -1;
+  const idx = Math.floor(tour*C/N), prec = tour===0 ? -1 : Math.floor((tour-1)*C/N);
+  return (idx>prec && idx<C) ? idx : -1;
+}
+/* Pilotes qui doivent encore courir au tour en cours. */
+function coursesDuTour(){
+  const l=[];
+  if(!S.dossiers) return l;
+  for(let i=0;i<S.dossiers.length;i++){
+    const sa = i===S.actif ? S.saison : S.dossiers[i].saison;
+    const pi = i===S.actif ? S.pilote : S.dossiers[i].pilote;
+    if(!pi || !sa || sa.finie) continue;
+    const idx = courseDuTour(sa, S.manche||0);
+    if(idx>=0 && sa.courseIndex<=idx) l.push({i, idx, sa, pilote:pi});
+  }
+  return l;
+}
+/* Passe au tour suivant une fois que tous les engagés ont couru. */
+function avancerCalendrier(){
+  syncDossier();
+  if(coursesDuTour().length){ S.phase='semaine'; return; }   // un autre pilote attend
+  const N = manchesTotales();
+  if(N===0 || coursesRestantes()===0 || (S.manche||0)+1 >= N){
+    pourChaqueDossier(d=>{ if(d.pilote && d.saison && !d.saison.finie) terminerSaison(false); });
+    S.phase='finSaison';
+    return;
+  }
+  S.manche = (S.manche||0)+1;
+  S.phase='semaine';
+  S.actions=actionsParSemaine();
+  S.flags.bonusReglages = 0;
+  // Plusieurs semaines séparent deux manches : les pilotes récupèrent seuls.
+  // Sans cela, un manager qui utilise tout son temps de piste finirait la
+  // saison avec des pilotes épuisés, ce qui n'a aucun sens.
+  pourChaqueDossier(d=>{
+    if(!d.pilote || !d.saison || d.saison.finie) return;
+    d.pilote.fatigue = clamp(d.pilote.fatigue - (9 + staffNiv('prepa')*2.5), 0, 100);
+    majForme();
+    majSponsorsProspects();
+  });
+}
 
 /* Temps de piste disponible sur un week-end. Trois runs de base : c'est court,
    et c'est voulu — quand c'est trop juste, la réponse est de recruter un
@@ -1475,6 +1670,7 @@ const ETAPE_NOM = {libres:'Essais libres', essais:'Essais', qualifs:'Qualificati
 
 function ouvrirWeekend(){
   const course = S.saison.calendrier[S.saison.courseIndex];
+  if(!course) return;
   const meteo  = meteoPour(course);
   course.meteo = meteo.id;
   const params = setupParams(S.saison.catId);
@@ -1775,7 +1971,10 @@ function gagnerRep(pts, motif){
     const r = REP_PALIERS[apres-1];
     msg('systeme','Paddock','Votre réputation grandit — palier '+apres+' : '+r.nom,
       `Vous êtes désormais reconnu comme « <em>${r.nom}</em> » (${apres}/10).\n\n${r.acces}\n\n`+
-      (pilotesMax(apres)>1 ? `À ce palier, un manager peut suivre jusqu’à ${pilotesMax(apres)} pilotes. Cette extension est prévue après la V1.` : ''));
+      (pilotesMax(apres)>pilotesMax(avant)
+        ? `À ce palier, vous pouvez suivre jusqu’à <em>${pilotesMax(apres)} pilotes</em> en parallèle. `
+          + `Une place vient de s’ouvrir : le vivier vous attend.`
+        : ''));
     majSponsorsProspects();
   }else if(apres<avant){
     msg('systeme','Paddock','Votre réputation recule — palier '+apres,
@@ -2377,9 +2576,12 @@ function perdrePilote(){
   gagnerRep(-120,'départ du pilote');
   S.historique.push({annee:S.annee, type:'depart', pilote:S.pilote.nom});
   S.pilote=null; S.contrat=null; S.saison=null; S.weekend=null;
-  S.sponsors.actifs=[]; S.sponsors.prospects=[];
-  S.phase='scouting';
-  genererScoutPool();
+  S.sponsors.actifs=[]; S.sponsors.prospects=[]; S.sponsors.vus=[];
+  S.offres=null;
+  syncDossier();
+  // Les autres pilotes gérés continuent : on ne retombe au repérage que si la
+  // structure se retrouve vide (GDD §15).
+  if(!nbPilotes()){ S.phase='scouting'; genererScoutPool(); }
   saveGame();
 }
 
@@ -2471,27 +2673,34 @@ function terminerSaison(interrompue){
 
 /* Vieillissement, retraite et progression du monde */
 function passerAnneeSuivante(){
-  const p=S.pilote;
   S.annee++;
-  p.age++;
+  S.manche = 0;
+  S.manches = 0;
   for(const r of S.monde.rivaux){ r.age++; progresserPiloteAbstrait(r); }
-  // Retraite (GDD §7.2)
-  const proba = p.age<33?0 : clamp((p.age-32)*0.13 + (notePilote(p)<55?0.15:0), 0, 1);
-  if(p.age>=34 && Math.random()<proba){ partirRetraite(); return; }
-  // Nettoyage de saison
-  S.saison=null; S.weekend=null;
+  // Chaque dossier vieillit pour son compte : un pilote peut raccrocher pendant
+  // que les autres continuent (GDD §7.2 et §15).
+  pourChaqueDossier(d=>{
+    const p=S.pilote;
+    if(!p) return;
+    p.age++;
+    const proba = p.age<33?0 : clamp((p.age-32)*0.13 + (notePilote(p)<55?0.15:0), 0, 1);
+    if(p.age>=34 && Math.random()<proba){ partirRetraite(); return; }
+    S.saison=null; S.weekend=null;
+    // sponsors : ceux dont le contrat pluriannuel court restent, les autres partent
+    const gardes=[];
+    for(const sp of S.sponsors.actifs){
+      sp.duree--;
+      if(sp.duree>0){ sp.verseSaison=0; gardes.push(sp); }
+      else msg('sponsor', sp.nom, 'Fin de contrat', `Le partenariat avec ${sp.nom} pour ${p.nom} arrive à son terme. Il faudra le renégocier ou trouver mieux.`);
+    }
+    S.sponsors.actifs=gardes;
+    majSponsorsProspects();
+  });
   S.flags.renvoye=false;
-  // sponsors : ceux dont le contrat pluriannuel court restent, les autres partent
-  const gardes=[];
-  for(const s of S.sponsors.actifs){
-    s.duree--;
-    if(s.duree>0){ s.verseSaison=0; gardes.push(s); }
-    else msg('sponsor', s.nom, 'Fin de contrat', `Le partenariat avec ${s.nom} arrive à son terme. Il faudra le renégocier ou trouver mieux.`);
-  }
-  S.sponsors.actifs=gardes;
-  S.phase='intersaison';
+  for(const k of Object.keys(S.flags)) if(k.startsWith('retrait_')) delete S.flags[k];
+  S.phase = nbPilotes() ? 'intersaison' : 'scouting';
   S.actions=6;
-  majSponsorsProspects();
+  if(!nbPilotes()) genererScoutPool();
   saveGame();
 }
 function progresserPiloteAbstrait(r){
@@ -2612,10 +2821,23 @@ function genererOffres(){
   if(sup && ageAutoriseMontee(sup.id, p.age)){
     if(montePossibleSportivement(sup.id) && (sup.id!=='f1' || p.age>=18)) cibles.push(sup.id);
   }
-  cibles.push(catAct.id);                                     // rester
-  // Redescendre est toujours possible : c'est la porte de sortie quand la saison
-  // n'est pas finançable, et la seule option après un renvoi.
-  if(catAct.niv>0) cibles.push(catByNiv(catAct.niv-1).id);
+  // Rester, tant que la catégorie accepte encore son âge. Les catégories de
+  // karting sont bornées : passé la limite, le pilote doit bouger, comme dans
+  // la réalité — c'est l'âge qui pousse vers le haut de l'échelle.
+  if(p.age <= catAct.ageMax) cibles.push(catAct.id);
+  // Redescendre est la porte de sortie quand la saison n'est pas finançable, et
+  // la seule option après un renvoi — mais pas dans une catégorie que l'âge du
+  // pilote interdit : un pilote de 22 ans n'a rien à faire en Karting Mini.
+  if(catAct.niv>0){
+    const inf = catByNiv(catAct.niv-1);
+    if(p.age <= inf.ageMax) cibles.push(inf.id);
+  }
+  // Trop vieux pour sa catégorie et pour celle du dessous : on lui ouvre la plus
+  // basse qui l'accepte encore, sans quoi il n'aurait aucune offre du tout.
+  if(!cibles.length){
+    const possibles = CATS.filter(c=>p.age>=c.ageMin-1 && p.age<=c.ageMax);
+    if(possibles.length) cibles.push(possibles.sort((a,b)=>a.niv-b.niv)[0].id);
+  }
 
   for(const catId of [...new Set(cibles)]){
     const c=CAT[catId];
@@ -2859,23 +3081,14 @@ function finirWeekend(){
   if(S.flags.ruptureEnCours){
     S.flags.ruptureEnCours=false;
     terminerSaison(true);
+    syncDossier(); avancerCalendrier();
     saveGame();
     return;
   }
   if(faillite()){ S.phase='faillite'; saveGame(); return; }
-  if(S.saison.courseIndex >= S.saison.calendrier.length){
-    terminerSaison(false);
-  }else{
-    S.phase='semaine';
-    S.actions=actionsParSemaine();
-    S.flags.bonusReglages = 0;
-    // Plusieurs semaines séparent deux manches : le pilote récupère seul.
-    // Sans cela, un manager qui utilise tout son temps de piste finirait
-    // la saison avec un pilote épuisé, ce qui n'a aucun sens.
-    S.pilote.fatigue = clamp(S.pilote.fatigue - (9 + staffNiv('prepa')*2.5), 0, 100);
-    majForme();
-    majSponsorsProspects();
-  }
+  if(S.saison.courseIndex >= S.saison.calendrier.length) terminerSaison(false);
+  syncDossier();
+  avancerCalendrier();
   saveGame();
 }
 
@@ -3094,6 +3307,36 @@ const RENDERERS = {
   champ:renderChamp, finances:renderFinances, save:renderSave,
 };
 function go(tab){ UI.tab=tab; render(); }
+
+/* Barre de sélection des pilotes gérés (GDD §15). Masquée tant qu'il n'y en a
+   qu'un : elle n'apporte rien et mange de la hauteur d'écran. */
+function renderBarrePilotes(){
+  const bar = $('#barrePilotes');
+  const plusieurs = nbDossiers()>1 || (nbPilotes()>=1 && placesPilotes()>1);
+  if(!S || !S.dossiers || !plusieurs){ bar.hidden=true; bar.innerHTML=''; return; }
+  bar.hidden=false;
+  const aCourir = new Set(coursesDuTour().map(x=>x.i));
+  let h='';
+  S.dossiers.forEach((d,i)=>{
+    const v = vueDossier(i);
+    if(!v.pilote){
+      h += `<div class="chip-pil vide" data-act="choisirDossier" data-i="${i}">Place libre</div>`;
+      return;
+    }
+    const cat = CAT[v.pilote.catId];
+    const coul = v.saison ? coulEcurie(v.saison.ecurieId, v.saison.catId)
+               : v.contrat ? coulEcurie(v.contrat.ecurieId, v.contrat.catId) : '#3a4552';
+    h += `<div class="chip-pil ${i===S.actif?'actif':''}" data-act="choisirDossier" data-i="${i}">
+      <span class="av">${portraitPilote(v.pilote,{coul})}</span>
+      <span class="tx"><span class="nm">${escapeHtml(v.pilote.nom)}</span><br>
+        <span class="ct">${cat.court}${v.saison&&!v.saison.finie?` · ${v.saison.pts} pts`:''}</span></span>
+      ${aCourir.has(i)?'<span class="pastille" title="Court cette manche"></span>':''}
+    </div>`;
+  });
+  if(resteDeLaPlace() && nbPilotes()<placesPilotes())
+    h += `<div class="chip-pil vide" data-act="recruterEnPlus">+ Recruter</div>`;
+  bar.innerHTML = h;
+}
 function render(){
   const enJeu = !!S;
   $('#nav').hidden = !enJeu;
@@ -3115,11 +3358,12 @@ function render(){
 
   const u = nbNonLus();
   $('#navUnread').hidden = u===0; $('#navUnread').textContent = u;
+  renderBarrePilotes();
 
   $$('.tab-btn').forEach(b=>{
     const t=b.dataset.tab;
     b.classList.toggle('active', t===UI.tab);
-    b.classList.toggle('locked', (t==='weekend' && S.phase!=='weekend'));
+    b.classList.toggle('locked', (t==='weekend' && !S.weekend));
   });
 
   $('#v-'+UI.tab).classList.add('active');
@@ -3135,6 +3379,30 @@ document.addEventListener('click', e=>{
   if(ACTIONS[act]){ e.preventDefault(); ACTIONS[act](el.dataset, el); }
 });
 const ACTIONS = {};
+
+ACTIONS.choisirDossier = d=>{
+  const i = +d.i;
+  const v = vueDossier(i);
+  if(!v) return;
+  if(!v.pilote){ ACTIONS.recruterEnPlus(); return; }
+  if(activerDossier(i)){ saveGame(); showToast('Dossier : '+v.pilote.nom); }
+  render();
+};
+/* Aucun pilote engagé cette manche : on avance le calendrier commun. */
+ACTIONS.passerManche = ()=>{
+  if(coursesDuTour().length){ showToast('Un pilote court encore cette manche'); return; }
+  avancerCalendrier();
+  saveGame(); render();
+};
+ACTIONS.recruterEnPlus = ()=>{
+  if(nbPilotes()>=placesPilotes()){
+    showToast('Réputation insuffisante pour un pilote de plus');
+    return;
+  }
+  UI.viserVivier = true;
+  go('pilote');
+};
+
 
 /* ------------------------------------------ ÉCRAN : NOUVELLE PARTIE */
 let creaBudget=1, creaRep=1;
@@ -3269,6 +3537,31 @@ function renderBureau(){
     </div>`;
   }
 
+  // ---- écurie de management (GDD §15) : l'état de chaque pilote d'un coup d'œil
+  if(nbPilotes()>1){
+    h += `<div class="card"><h2>Écurie de management<span class="hint">${nbPilotes()} / ${placesPilotes()} places</span></h2>
+      <div class="tw"><table><thead><tr><th>Pilote</th><th>Catégorie</th><th>Écurie</th>
+        <th class="num">Pts</th><th class="num">Class.</th><th></th></tr></thead><tbody>
+      ${S.dossiers.map((d,i)=>{
+        const v = vueDossier(i);
+        if(!v.pilote) return '';
+        const sa = v.saison;
+        const enCours = sa && !sa.finie;
+        const court = coursesDuTour().some(x=>x.i===i);
+        return `<tr class="${i===S.actif?'me':''}" data-act="choisirDossier" data-i="${i}" style="cursor:pointer">
+          <td><b>${escapeHtml(v.pilote.nom)}</b><div class="small txt-muted">${v.pilote.age} ans</div></td>
+          <td>${CAT[v.pilote.catId].court}</td>
+          <td class="txt-2">${sa?escapeHtml(sa.ecurieNom):(v.contrat?escapeHtml(v.contrat.ecurieNom):'—')}</td>
+          <td class="num">${sa?sa.pts:'—'}</td>
+          <td class="num">${sa&&sa.posChamp?ordinal(sa.posChamp):(enCours?'en cours':'—')}</td>
+          <td>${court?tag('Court','t-amber'):(sa?'':tag('Sans baquet','t-red'))}</td>
+        </tr>`;
+      }).join('')}
+      </tbody></table></div>
+      ${nbPilotes()<placesPilotes()?`<button class="btn-ghost btn-sm mt" data-act="recruterEnPlus">Recruter un pilote de plus</button>`:''}
+    </div>`;
+  }
+
   // ---- derniers messages
   const derniers = S.inbox.slice(0,3);
   if(derniers.length){
@@ -3283,14 +3576,24 @@ function renderBureau(){
   $('#v-bureau').innerHTML = h;
 }
 
+/* Phase vue depuis le dossier actif. La phase globale mène le calendrier, mais
+   chaque pilote peut en être à un point différent : l'un court, l'autre cherche
+   encore un baquet (GDD §15). */
+function phaseDossier(){
+  if(S.phase==='faillite') return 'faillite';
+  if(!S.pilote) return 'scouting';
+  if(!S.saison || S.saison.finie) return S.phase==='finSaison' ? 'finSaison' : 'intersaison';
+  if(S.weekend) return 'weekend';
+  return 'semaine';
+}
 function ctaBureau(){
-  const p=S.pilote, sa=S.saison;
-  if(S.phase==='scouting'){
+  const p=S.pilote, sa=S.saison, ph=phaseDossier();
+  if(ph==='scouting'){
     return `<div class="card accent"><h2>À faire maintenant</h2>
       <div class="note mb">Vous n’avez pas de pilote. Sans pilote, pas de commission, et le staff continue de coûter.</div>
       <button class="btn btn-cta btn-block" data-act="tab" data-tab="pilote">Consulter le vivier de jeunes pilotes</button></div>`;
   }
-  if(S.phase==='intersaison' && S.contrat && S.contrat.anneeDebut===S.annee && S.flags.signatureRecente){
+  if(ph==='intersaison' && S.contrat && S.contrat.anneeDebut===S.annee && S.flags.signatureRecente){
     const sg = S.flags.signatureRecente;
     const coul = coulEcurie(S.contrat.ecurieId, S.contrat.catId);
     return `<div class="card accent anim-entree">
@@ -3311,11 +3614,30 @@ function ctaBureau(){
       </div>
     </div>`;
   }
-  if(S.phase==='intersaison'){
+  if(ph==='intersaison'){
     if(!S.contrat || S.contrat.anneeDebut!==S.annee){
+      const enRetrait = S.flags['retrait_'+p.id]===S.annee;
+      if(enRetrait){
+        // Si plus personne n'est engagé, il faut pouvoir passer l'année.
+        const aucunEngage = !S.dossiers || !S.dossiers.some((d,i)=>{
+          const v=vueDossier(i);
+          return v.pilote && v.contrat && v.contrat.anneeDebut===S.annee;
+        });
+        return `<div class="card"><h2>Saison blanche ${S.annee}</h2>
+          <div class="note mb">${escapeHtml(p.nom)} ne court pas cette année. Il ne coûte rien,
+            mais il ne progresse pas non plus et prend un an de plus.</div>
+          <button class="btn-ghost btn-block" data-act="annulerRetrait">Finalement, lui chercher un baquet</button>
+          ${aucunEngage?`<button class="btn btn-cta btn-block mt" data-act="passerSaisonBlanche">Passer la saison ${S.annee}</button>
+            <div class="note txt-muted mt">Aucun de vos pilotes n’est engagé : l’année passera sans course.</div>`:''}
+        </div>`;
+      }
       return `<div class="card accent"><h2>Intersaison ${S.annee}</h2>
         <div class="note mb">Aucun engagement pour cette saison. Il faut trouver un baquet à ${escapeHtml(p.nom)}.</div>
-        <button class="btn btn-cta btn-block" data-act="ouvrirOffres">Étudier les offres d’écuries</button></div>`;
+        <button class="btn btn-cta btn-block" data-act="ouvrirOffres">Étudier les offres d’écuries</button>
+        ${nbPilotes()>1?`<button class="btn-ghost btn-sm btn-block mt" data-act="mettreEnRetrait">Ne pas l’engager cette saison</button>
+          <div class="note txt-muted mt">Une saison sans baquet ne coûte rien, mais elle est perdue :
+            pas de progression, pas de points de superlicence, et le pilote le prend mal.</div>`:''}
+      </div>`;
     }
     const c=CAT[S.contrat.catId];
     const apport = S.contrat.apport;
@@ -3329,8 +3651,33 @@ function ctaBureau(){
         <button class="btn btn-cta" style="flex:1" data-act="lancerSaison">Lancer la saison</button>
       </div></div>`;
   }
-  if(S.phase==='semaine'){
+  if(ph==='semaine'){
     const prochaine=sa.calendrier[sa.courseIndex];
+    // Avec plusieurs pilotes, tous ne courent pas à chaque manche : la
+    // préparation ne mène au week-end que pour ceux qui sont engagés (GDD §15).
+    const tour = coursesDuTour();
+    const moiCeTour = tour.some(x=>x.i===S.actif);
+    const autres = tour.filter(x=>x.i!==S.actif);
+    const listeAutres = autres.length
+      ? `<div class="note txt-muted mt">Aussi engagés cette manche : `
+        + autres.map(x=>`<b>${escapeHtml(x.pilote.nom)}</b> (${CAT[x.sa.catId].court})`).join(' · ')
+        + ` — passez à leur dossier depuis la barre du haut.</div>`
+      : '';
+    if(!moiCeTour){
+      return `<div class="card"><h2>Manche ${(S.manche||0)+1}<span class="hint">${S.actions} action(s) restante(s)</span></h2>
+        <div class="note mb">${escapeHtml(S.pilote.nom)} ne court pas cette manche — son championnat compte
+          ${sa.calendrier.length} courses, réparties sur les ${manchesTotales()} manches de votre saison.
+          Prochaine sortie : <b>${prochaine?escapeHtml(prochaine.nom):'—'}</b>.</div>
+        <div class="row tight mb">
+          <button class="btn-ghost btn-sm" data-act="modalEntrainement" ${S.actions<=0?'disabled':''}>Entraînement</button>
+          <button class="btn-ghost btn-sm" data-act="actionRepos" ${S.actions<=0?'disabled':''}>Repos</button>
+          <button class="btn-ghost btn-sm" data-act="modalDiscussion" ${S.actions<=0?'disabled':''}>Parler au pilote</button>
+          <button class="btn-ghost btn-sm" data-act="modalDev" ${S.actions<=0?'disabled':''}>Développement</button>
+          <button class="btn-ghost btn-sm" data-act="tab" data-tab="sponsors" ${S.actions<=0?'disabled':''}>Démarcher un sponsor</button>
+        </div>${listeAutres}
+        ${autres.length?'':`<button class="btn btn-cta btn-block" data-act="passerManche">Passer à la manche suivante</button>`}
+      </div>`;
+    }
     return `<div class="card accent"><h2>Préparation — manche ${sa.courseIndex+1}<span class="hint">${S.actions} action(s) restante(s)</span></h2>
       <div class="note mb">Prochaine manche : <b>${prochaine.nom}</b> (${prochaine.pays}) — circuit ${prochaine.type.toLowerCase()}.</div>
       <div class="row tight mb">
@@ -3345,15 +3692,16 @@ function ctaBureau(){
         <button class="btn btn-cta" style="flex:2" data-act="allerWeekend">Aller au week-end de course</button>
       </div>
       <div class="note txt-muted mt">La simulation rapide règle la voiture toute seule (selon votre ingénieur) et donne le résultat immédiatement.</div>
+      ${listeAutres}
     </div>`;
   }
-  if(S.phase==='weekend'){
+  if(ph==='weekend'){
     const w=S.weekend, et=w.etapes[Math.min(w.etape,w.etapes.length-1)];
     return `<div class="card accent"><h2>Week-end en cours</h2>
       <div class="note mb">${sa.calendrier[w.courseIdx].nom} — étape : <b>${w.etape>=w.etapes.length?'Débrief':ETAPE_NOM[et]}</b></div>
       <button class="btn btn-cta btn-block" data-act="tab" data-tab="weekend">Reprendre le week-end</button></div>`;
   }
-  if(S.phase==='finSaison'){
+  if(ph==='finSaison'){
     return `<div class="card accent"><h2>Saison ${S.annee} terminée</h2>
       <button class="btn btn-cta btn-block" data-act="bilanSaison">Voir le bilan de saison</button></div>`;
   }
@@ -3362,6 +3710,28 @@ function ctaBureau(){
 
 ACTIONS.tab = d=>go(d.tab);
 ACTIONS.nouvellePartieDepuisFin = ()=>{ wipeGame(); UI.tab='bureau'; render(); };
+/* GDD §15 — avec plusieurs pilotes, engager tout le monde chaque année ruine :
+   en karting un pilote ne rapporte aucune commission et sa saison se finance sur
+   ses seuls sponsors. Mettre un pilote en retrait est donc une vraie décision. */
+ACTIONS.mettreEnRetrait = ()=>{
+  const p=S.pilote; if(!p) return;
+  S.flags['retrait_'+p.id] = S.annee;
+  p.moral = clamp(p.moral - 14, 5, 100);
+  p.relation = clamp(p.relation - 10, 0, 100);
+  msg('pilote', p.nom, 'Une année sans rouler',
+    `« Tu me mets sur la touche pour ${S.annee} ? Je comprends que l’argent manque, `+
+    `mais une saison blanche à mon âge, ça se rattrape mal. »`);
+  saveGame(); render();
+  showToast(p.nom+' ne courra pas cette saison');
+};
+ACTIONS.passerSaisonBlanche = ()=>{
+  passerAnneeSuivante();
+  render(); showToast('Saison passée');
+};
+ACTIONS.annulerRetrait = ()=>{
+  if(S.pilote) delete S.flags['retrait_'+S.pilote.id];
+  saveGame(); render();
+};
 ACTIONS.lancerSaison = ()=>{
   demarrerSaison(S.contrat.catId, S.contrat.ecurieId);
   render(); showToast('Saison lancée');
@@ -3371,7 +3741,7 @@ ACTIONS.simRapide = ()=>{ simulationRapide(); go('weekend'); };
 
 /* ------------------------------------------------- ÉCRAN : PILOTE */
 function renderPilote(){
-  if(!S.pilote){ renderScouting(); return; }
+  if(!S.pilote || UI.viserVivier){ UI.viserVivier=false; renderScouting(); return; }
   const p=S.pilote, n=notePilote(p), plaf=notePlafond(p);
   const ePlaf = estimTexte(p, plaf, 'plafGlobal');
   let h='';
@@ -3446,6 +3816,22 @@ function renderScouting(){
     ${sc? `Votre scout ${NIV_LABEL[sc].toLowerCase()} affine les estimations.` : `<b class="txt-amber">Vous n’avez aucun scout :</b> les estimations sont très larges.`}</div>
     <div class="note txt-muted">Vous ne verrez <b>jamais</b> la valeur exacte d’un jeune. Une observation supplémentaire (payante) resserre la fourchette.</div>
     ${!sc?`<button class="btn-ghost btn-sm mt" data-act="tab" data-tab="staff">Recruter un scout</button>`:''}
+  </div>`;
+
+  // Places disponibles (GDD §15) : le nombre de pilotes suivis dépend de la réputation.
+  const places = placesPilotes(), pris = nbPilotes();
+  h += `<div class="card"><h2>Votre écurie de management<span class="hint">${pris} / ${places} place(s)</span></h2>
+    <div class="note">${pris>=places
+      ? `Vous suivez déjà ${pris===1?'un pilote':pris+' pilotes'}, le maximum à votre réputation.
+         ${places<5?`Le palier suivant en débloquera un de plus.`:''}`
+      : `Il vous reste <b class="txt-amber">${places-pris} place${places-pris>1?'s':''}</b> : vous pouvez signer un pilote de plus.`}</div>
+    ${pris && pris<places && S.dossiers.every((d,i)=>{
+        const v=vueDossier(i); return !v.pilote || CAT[v.pilote.catId].format==='kart'; })
+      ? `<div class="note warn mt">Un pilote de karting ne rapporte presque aucune commission : sa saison se
+          finance sur ses seuls sponsors, et c’est vous qui comblez le manque. Un second pilote en karting est
+          un <b>investissement</b>, pas un revenu — il ne paiera qu’en atteignant la monoplace.</div>`
+      : ''}
+    <div class="note txt-muted mt">Réputation 1-3 : un pilote · 4-6 : deux · 7-8 : trois · 9-10 : cinq.</div>
   </div>`;
 
   for(const c of S.monde.scoutPool){
@@ -3523,13 +3909,23 @@ ACTIONS.confirmSignerPilote = d=>{
     showToast(c.nom+' décline votre proposition');
     return;
   }
+  // Le nouveau pilote prend un dossier libre — celui d'un retraité, ou un
+  // dossier neuf si la réputation ouvre une place de plus (GDD §15).
+  const place = ouvrirPlace();
+  if(place<0){ closeModal(); showToast('Plus de place : votre réputation n’en autorise pas davantage'); return; }
   c.role='joueur'; c.relation=58; c.moral=Math.max(c.moral,62);
+  syncDossier();
+  S.actif = place;
+  for(const k of CHAMPS_DOSSIER) S[k] = S.dossiers[place][k];
   S.pilote=c;
-  S.monde.scoutPool = S.monde.scoutPool.filter(x=>x.id!==c.id);
-  creerRivaux();
-  S.phase='intersaison';
-  S.actions=6;
   S.contrat=null;
+  S.sponsors={actifs:[],prospects:[],vus:[]};
+  S.offres=null;
+  syncDossier();
+  S.monde.scoutPool = S.monde.scoutPool.filter(x=>x.id!==c.id);
+  if(!S.monde.rivaux.length) creerRivaux();
+  // Un pilote signé en pleine saison ne rembobine pas l'année en cours.
+  if(S.phase==='scouting'){ S.phase='intersaison'; S.actions=6; }
   majSponsorsProspects();
   msg('pilote', c.nom, 'Ravi de travailler avec vous',
     `« Merci de croire en moi. Maintenant il faut trouver de quoi rouler. »\n\n`+
@@ -4136,9 +4532,12 @@ function categorieDeSecours(){
   const age = S.pilote.age;
   // On ne redescend pas plus bas que ce que l'âge du pilote autorise : un pilote
   // de 17 ans n'a rien à faire en Karting Mini, dont la limite est 13 ans.
-  const nivPlancher = Math.max(0, ...CATS.filter(c=>age<=c.ageMax).map(c=>c.niv).length
-    ? [Math.min(...CATS.filter(c=>age<=c.ageMax).map(c=>c.niv))] : [0]);
-  let niv = CAT[S.pilote.catId].niv;
+  const acceptent = CATS.filter(c=>age<=c.ageMax).map(c=>c.niv);
+  const nivPlancher = acceptent.length ? Math.min(...acceptent) : 0;
+  // Le plancher joue aussi vers le haut : un pilote qui a passé la limite d'âge
+  // de sa catégorie ne peut pas y rester, il est poussé vers la première qui
+  // l'accepte encore. Sans cela il vieillissait indéfiniment en Karting Senior.
+  let niv = Math.max(CAT[S.pilote.catId].niv, nivPlancher);
   while(niv>nivPlancher){
     const c = catByNiv(niv);
     if(c.cout*0.65 <= dispo) break;      // l'écurie modeste prend 35 % à sa charge
@@ -4371,8 +4770,9 @@ function renderSave(){
       <div class="note txt-muted mt">L’export produit un fichier JSON : utile pour changer d’appareil ou garder une trace avant une décision risquée.</div>
     </div>
     <div class="card flat"><h2>À propos</h2>
-      <div class="note">Prototype jouable du GDD « Manager de Pilote » v0.5, limité au périmètre <b>[V1]</b> :
-      un seul pilote, 2D, boucle complète karting → F1.<br><br>
+      <div class="note">Prototype jouable du GDD « Manager de Pilote » v0.7 : périmètre <b>[V1]</b> complet
+      — boucle karting → F1, réglages, R&D, sponsors, presse, podium illustré — et le multi-pilotes du <b>[V2]</b>,
+      jusqu’à cinq pilotes suivis selon votre réputation.<br><br>
       Circuits réels cités par leur nom, sans logo ni marque officielle. Écuries fictives.</div>
     </div>`;
 }

@@ -46,7 +46,7 @@ ne les fixait pas.
 | 12 | Météo, stratégie, qualifs, incidents, circuits réels | ✅ | Stratégie avant le départ **et** un arbitrage à mi-course |
 | 13 | Staff | ✅ | Les 4 rôles V1, 5 niveaux ; coach mental et avocat en V2 |
 | 14 | Boîte de réception, comparaison coéquipier | ✅ | Récompenses de fin de saison et historique complet : V2 |
-| 15 | Un seul pilote en V1 | ✅ | Le multi-pilotes est affiché comme verrouillé |
+| 15 | Nombre de pilotes gérés (déblocage par réputation) | ✅ | Table complète : 1 / 2 / 3 / 5 pilotes selon le palier, calendrier commun |
 | 16 | 2D, pas de 3D | ✅ | Portrait de pilote généré et vieillissant, podium illustré, scène de signature, animations sobres |
 | 17.1 | Formule de progression | ✅ | Formule du GDD à l'identique |
 | 17.2 | Note globale | ✅ | Pace ×0,40 + Consistency ×0,30 + Racecraft ×0,30 |
@@ -507,10 +507,159 @@ Le harnais de test lisait un `game.js` extrait à la main, qui pouvait être
 périmé — les tests passaient alors sur du code ancien. Il lit maintenant
 `index.html` directement.
 
+## §15 — plusieurs pilotes gérés
+
+Premier morceau du V2, et le plus structurant : tout le reste du V2 (académie,
+locaux, managers rivaux) suppose qu'un manager suit plusieurs pilotes.
+
+### Le nombre de places vient de la réputation
+
+Table du GDD appliquée telle quelle :
+
+| Réputation | Pilotes suivis |
+|---|---|
+| 1 – 3 | 1 |
+| 4 – 6 | 2 |
+| 7 – 8 | 3 |
+| 9 – 10 | 5 |
+
+Une place se libère aussi quand un pilote prend sa retraite : le dossier reste
+vide et attend un successeur, la partie ne retombe au repérage que si la
+structure se vide entièrement.
+
+### Les dossiers
+
+Un « dossier » réunit ce qui appartient à un pilote : le pilote, son contrat, sa
+saison, son week-end, ses sponsors et ses offres. Le reste — argent, réputation,
+staff, messagerie, calendrier — appartient au manager et reste commun.
+
+Le dossier actif est recopié à plat sur l'état (`S.pilote`, `S.saison`…), si bien
+que les 300 références écrites pour un pilote unique continuent de fonctionner
+sans indirection. `syncDossier()` renvoie l'état à plat dans le tableau,
+`activerDossier()` fait le mouvement inverse, `pourChaqueDossier()` exécute un
+traitement dans le contexte de chacun. Toute opération qui parcourt les dossiers
+commence donc par une synchronisation ; `saveGame()` le fait systématiquement.
+
+### Le calendrier commun
+
+Les pilotes gérés n'ont pas le même nombre de manches : 6 en Karting Mini, 24 en
+F2. La saison du manager compte donc autant de **tours** que le plus long des
+calendriers engagés, et chaque pilote y répartit ses courses régulièrement — un
+pilote de karting court 7 fois sur 24 tours, aux tours 0, 4, 7, 10, 14, 17, 21.
+Avec un seul pilote, un tour vaut une course : le déroulé est identique à la V1.
+
+Le tour n'avance que lorsque tous les pilotes engagés dessus ont couru. Le
+bureau indique qui court encore, et la barre du haut porte une pastille sur les
+dossiers concernés.
+
+**Un piège rencontré et corrigé.** Le nombre de tours était d'abord recalculé à
+la volée à partir des saisons en cours. Quand le pilote au calendrier le plus
+long se faisait renvoyer en milieu d'année, ce total s'effondrait *sous* le tour
+courant et clôturait d'un coup la saison de tous les autres. Mesuré : une saison
+karting + F2 s'arrêtait au tour 11 sur 24, le pilote de karting bloqué à 4
+courses sur 7. Le nombre de tours est maintenant arrêté au moment où les saisons
+sont engagées et ne bouge plus de l'année ; la saison se clôture soit au dernier
+tour, soit dès qu'il ne reste plus une seule course à disputer.
+
+### La charge de gestion
+
+Le GDD demande que gérer plus de pilotes rapporte plus, mais coûte plus. Les
+commissions s'additionnent naturellement, et chaque pilote a sa propre saison à
+financer avec ses propres sponsors. En face, les actions hebdomadaires passent de
+3 à `3 + (pilotes − 1)` : la hausse est volontairement sous-linéaire, si bien que
+chaque pilote reçoit moins d'attention qu'un pilote unique. Le staff, lui, reste
+commun et sert tout le monde.
+
+### Mettre un pilote en retrait
+
+En karting, un pilote ne rapporte quasiment aucune commission : les primes sont
+minuscules et le salaire est nul, c'est le pilote qui paie pour rouler. Sa saison
+se finance sur ses seuls sponsors et le manager comble le manque. Un second
+pilote de karting est donc une **dépense**, pas un revenu — il ne paiera qu'en
+atteignant la monoplace. Mesuré : engager systématiquement un second pilote
+faisait passer la trésorerie de +62 k€ à −17 k€ en quatre saisons.
+
+Le joueur peut maintenant refuser de l'engager pour l'année. Une saison blanche
+ne coûte rien, mais elle est perdue : pas de progression, pas de points de
+superlicence, et le pilote le prend mal (moral −14, relation −10). Si personne
+n'est engagé, l'année se passe d'un bouton. Le vivier prévient explicitement de
+l'économie du karting avant de signer un second pilote.
+
+### La phase, vue du dossier
+
+La phase globale mène le calendrier, mais deux pilotes peuvent en être à des
+points différents : l'un court, l'autre cherche encore un baquet. `phaseDossier()`
+donne la phase du dossier actif, et c'est elle qui décide de l'écran de bureau.
+Sans cela, signer un second pilote en pleine saison plantait le bureau — il
+cherchait le calendrier d'une saison qui n'existait pas encore.
+
+### Deux limites d'âge qui ne s'appliquaient pas
+
+Le bot multi-pilotes a fait remonter deux trous dans les règles d'âge du §8.1,
+tous deux invisibles avec un pilote unique bien géré.
+
+**La descente d'offre ne vérifiait pas l'âge.** `genererOffres()` proposait
+systématiquement la catégorie du dessous comme porte de sortie, sans regarder si
+le pilote y était encore admissible. Un pilote de 22 ans recevait donc des offres
+en Karting Mini, dont la limite est 13 ans. Le baquet de secours, lui, avait bien
+son plancher — la règle existait à un endroit et manquait à l'autre.
+
+**Le plancher d'âge du baquet de secours ne jouait que vers le bas.** Sa boucle
+`while(niv > plancher)` ne s'exécutait pas quand le pilote était *déjà* sous le
+plancher, et renvoyait alors sa catégorie actuelle. Un pilote qui avait dépassé
+la limite d'âge de sa catégorie y restait donc indéfiniment : mesuré, un pilote
+courait en Karting Senior jusqu'à 30 ans, pour une limite à 22.
+
+Rester dans sa catégorie est maintenant conditionné à l'âge, la descente aussi,
+et le plancher pousse vers le haut quand il le faut — c'est l'âge qui fait monter
+l'échelle du karting, comme dans la réalité. Mesuré après correction : sur 180
+saisons simulées, plus une seule course hors limite d'âge (16 avant).
+
+L'effet sur l'équilibrage est net et va dans le bon sens. Sur les 8 profils de
+départ × 8 carrières × 15 saisons :
+
+| | avant | après |
+|---|---|---|
+| Accès à la monoplace | 7 à 8 sur 8 | **8 sur 8 partout** |
+| Accès à la F1 | 3 à 8 sur 8 | 4 à 8 sur 8 |
+| Faillites | 0 à 2 sur 8 | 0 à 4 sur 8 |
+
+Plus aucune carrière ne s'enlise en karting : la limite d'âge supprime cette
+impasse. En contrepartie les faillites augmentent un peu, ce qui est logique —
+un pilote poussé vers le haut coûte plus cher qu'un pilote qui stagne dans une
+catégorie bon marché. C'est exactement la tension décrite au §19.8.
+
+### Ce que la mesure dit, et ne dit pas
+
+Le bot mono-pilote joue le nouveau code aussi bien qu'avant : 8 profils × 8
+carrières × 15 saisons donnent les mêmes ordres de grandeur qu'avant le §15
+(0 à 2 faillites sur 8, accès à la monoplace 7-8/8, F1 3-8/8). Le refactor n'a
+donc rien cassé du jeu à un pilote.
+
+L'équilibrage **à plusieurs pilotes n'est pas validé**. Un bot multi-pilotes a
+été écrit pour le mesurer, mais un mauvais joueur simulé ne prouve rien : sa
+première version s'est révélée très inférieure au bot mono-pilote simplement
+parce qu'elle démarchait les sponsors au montant brut au lieu de l'espérance, et
+n'épuisait pas ses actions. Une fois branchée sur les heuristiques éprouvées du
+bot mono-pilote, la progression redevient saine (Karting Mini → KZ en dix ans),
+mais la trésorerie s'effondre quand deux pilotes atteignent des catégories
+coûteuses en même temps. C'est peut-être la tension voulue par le §19.8, c'est
+peut-être un déséquilibre : il faudra une partie humaine pour trancher.
+
+### Test
+
+`unit9.js` couvre le §15 : 59 assertions sur la table des places, le refus de
+signer au-delà, l'isolement des sponsors et contrats entre dossiers, la
+répartition des courses sur le calendrier commun, le fait que le tour n'avance
+qu'une fois tous les engagés passés, la sauvegarde des deux dossiers, le passage
+d'année, la régression du renvoi décrite plus haut et les deux limites d'âge.
+`browser4.js` déroule une saison complète à deux pilotes dans le navigateur.
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - La réglementation évolutive d'une saison à l'autre (§11), marquée V2.
 - La gestion tour par tour de la course (§12) : il n'y a qu'un seul arbitrage
   à mi-course, pas un suivi continu.
-- Tout le périmètre V2, à commencer par le multi-pilotes (§15) qui est la
-  suite logique une fois la boucle validée.
+- Le reste du périmètre V2 : réseau de scouts par région (§5.2), managers
+  rivaux (§5.3), blessures (§7.3), entourage du pilote (§7.4), voies
+  alternatives (§8.4), locaux (§22.1) et académie (§22.2).
