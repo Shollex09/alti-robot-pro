@@ -43,7 +43,7 @@ ne les fixait pas.
 | 9.5 | Renvoi | ✅ | Bilan toutes les 4 manches, 3 avertissements |
 | 10 | Revenus et dépenses du manager | ✅ | |
 | 11 | Développement technique, fiabilité | 🟡 | R&D en un seul curseur, pas réparti châssis/aéro/moteur |
-| 12 | Météo, stratégie, qualifs, incidents, circuits réels | 🟡 | Stratégie choisie avant le départ, pas d'arrêts au stand tour par tour |
+| 12 | Météo, stratégie, qualifs, incidents, circuits réels | ✅ | Stratégie avant le départ **et** un arbitrage à mi-course |
 | 13 | Staff | ✅ | Les 4 rôles V1, 5 niveaux ; coach mental et avocat en V2 |
 | 14 | Boîte de réception, comparaison coéquipier | ✅ | Récompenses de fin de saison et historique complet : V2 |
 | 15 | Un seul pilote en V1 | ✅ | Le multi-pilotes est affiché comme verrouillé |
@@ -258,6 +258,36 @@ nouveaux runs, la fatigue saturait à 100 dès la 6e course et la forme tombait
 fonctionnalité qu'il venait de demander. Corrigé par une récupération passive
 entre les manches, avec un test de non-régression dédié.
 
+## §12 — la décision de mi-course
+
+Le §12 demande que la stratégie se décide « avant **et pendant** la course ».
+Seul l'avant existait : une course détaillée se résumait à un bouton Départ,
+ce qui lui ôtait tout intérêt face à la simulation rapide du §21.1.
+
+La course se joue désormais en deux temps. On prépare la grille et les
+performances, le manager arbitre un événement à mi-course, puis on résout. Cinq
+événements, tirés selon la situation réelle de la course :
+
+| Événement | Se déclenche | Options |
+|---|---|---|
+| Voiture de sécurité | neutralisation, hors karting | rentrer au stand / rester en piste |
+| La pluie arrive | piste évolutive | changer maintenant / attendre un tour |
+| La piste sèche | course sous la pluie | repasser en slicks / finir sur ces pneus |
+| Usure des pneus | toujours disponible | gérer / pousser |
+| Bagarre pour la position | dans les premiers | tenter / suivre / assurer |
+
+Chaque option modifie la performance de la seconde moitié et le risque
+d'abandon. Deux d'entre elles dépendent du pilote : tenter un dépassement paie
+selon son Dépassement, attendre sous la pluie selon son Adaptabilité — de quoi
+rendre les statistiques du §6 lisibles au moment où elles comptent.
+
+Mesuré sur 120 courses, en forçant l'une puis l'autre option : 18,9e de moyenne
+avec 54 arrivées sur 60 d'un côté, 16,1e avec 47 arrivées sur 60 de l'autre.
+Le compromis position / risque est donc réel sans qu'une option domine.
+
+Le karting ne se voit jamais proposer d'arrêt au stand, et la simulation rapide
+n'est jamais interrompue — c'est ce qui distingue les deux modes du §21.1.
+
 ## Deuxième passage de jeu, retours et suites
 
 1. **« L'ingénieur ne me sert à rien. »** Exact, et c'était structurel : le score
@@ -341,6 +371,7 @@ dur, comme le §2.2 l'annonce pour cette combinaison, mais jouable.
 
 - Le podium illustré, le portrait de pilote évolutif et les animations du §16.
 - Le développement technique réparti sur trois axes (§11).
-- Les arrêts aux stands décidés en course (§12).
+- La gestion tour par tour de la course (§12) : il n'y a qu'un seul arbitrage
+  à mi-course, pas un suivi continu.
 - Tout le périmètre V2, à commencer par le multi-pilotes (§15) qui est la
   suite logique une fois la boucle validée.
