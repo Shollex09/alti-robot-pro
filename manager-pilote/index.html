@@ -2611,18 +2611,18 @@ function scoreReglages(course, setup, pilote){
    qui se trompe. C'est ce qui justifie d'investir dans le staff (GDD §18.3) —
    sinon il suffirait d'optimiser un chiffre affiché sans jamais écouter personne. */
 const BRUIT_MESURE = [12, 9, 7, 5, 2.5, 0];
-function scorePercu(scoreReel, seed){
+function scorePercu(scoreReel, seed, attenuation){
   const niv = staffNiv('ingenieur');
-  const bruit = BRUIT_MESURE[niv];
+  const bruit = BRUIT_MESURE[niv] * (attenuation ?? 1);
   if(bruit<=0) return scoreReel;
   return clamp(scoreReel + (hash01(String(seed))*2-1)*bruit, 0, 100);
 }
 /* Rendu du score selon ce que l'ingénieur permet de savoir. */
-function afficheScore(percu, nivForce){
+function afficheScore(percu, nivForce, att){
   const niv = nivForce ?? staffNiv('ingenieur');
   if(niv>=5) return {txt:Math.round(percu)+'/100', cls: percu>78?'t-green':percu>55?'t-amber':'t-red'};
   if(niv>=3){
-    const m = BRUIT_MESURE[niv];
+    const m = BRUIT_MESURE[niv] * (att ?? 1);
     return {txt:Math.max(0,Math.round(percu-m))+'–'+Math.min(100,Math.round(percu+m))+'/100',
             cls: percu>78?'t-green':percu>55?'t-amber':'t-red'};
   }
@@ -2789,8 +2789,11 @@ function preparerCourse(course, meteo, reglagesJoueur, grilleDepart, strat){
   const st = STRATS.find(s=>s.id===strat) || STRATS[1];
   const field = [];
 
+  // Les longs relais des essais libres se paient en rythme de course (GDD §12).
+  const prog = S.weekend ? S.weekend.programme : null;
   const perfJoueur = perfTotale(notePondere(p,course,meteo), voitureEffective(course), reglagesJoueur, 1)
                    + st.perf
+                   + (prog==='relais' ? 1.2 : 0)
                    + (p.traits.includes('regulier')?1.0:0);
   field.push({id:p.id, nom:p.nom, moi:true, ecurie:S.saison.ecurieNom, perf:perfJoueur,
     fiab:S.saison.fiab, agr:p.agressivite, racecraft:noteGroupe(p,'racecraft')});
@@ -2851,12 +2854,17 @@ function resoudreCourse(etat, course, meteo, choix){
   if(safetyCar) log.push({t:'Course', s:'Voiture de sécurité en piste, le peloton se regroupe.', c:'big'});
 
   const regl = reglSaison();
+  // Ce qu'on a fait de la séance d'essais libres ne vaut que pour notre voiture.
+  const progEssais = S.weekend ? S.weekend.programme : null;
+  const usureEL  = progEssais==='relais'   ? 0.82 : 1;
+  const risqueELs = progEssais==='economie' ? 0.78 : 1;
   for(const f of field){
     f.abandon = null;
-    const risqueMeca = (100-f.fiab)/100 * 0.55 * st.usure * (regl.mUsure||1);
+    const risqueMeca = (100-f.fiab)/100 * 0.55 * st.usure * (regl.mUsure||1)
+                     * (f.moi ? usureEL : 1);
     if(Math.random() < risqueMeca){ f.abandon='Panne mécanique'; continue; }
     const risqueCrash = (0.035 + (f.agr/100)*0.055) * meteo.incident * (regl.mRisque||1)
-                      * (f.moi ? st.risque*risqueChoix : 1)
+                      * (f.moi ? st.risque*risqueChoix*risqueELs : 1)
                       * (1 - (f.racecraft-50)/280);
     if(Math.random() < risqueCrash){ f.abandon = Math.random()<0.5?'Accrochage':'Sortie de piste'; }
   }
@@ -2900,11 +2908,54 @@ function pointsPour(catId, pos){
 }
 
 /* ------------------------------------ 11. WEEK-END DE COURSE (GDD §21.2) */
+
+/* --- 11.1 Essais libres (GDD §12) ---
+   Le §12 veut un « week-end complet en trois temps : EL / Qualifs / Course ».
+   La séance existait de nom, en F1 seulement, et se contentait de dupliquer les
+   essais de réglages — un clic pour rien. Elle porte maintenant une décision et
+   une seule : on ne peut pas tout travailler en une séance.
+   Chaque programme ferme une porte en en ouvrant une autre, et ses effets
+   courent sur tout le reste du week-end. */
+const PROGRAMMES_EL = [
+  {id:'reglages', nom:'Travail des réglages', ico:'🔧',
+   desc:'Le stand consacre la séance à la voiture, tour après tour.',
+   effet:'Un run d’essais supplémentaire.',
+   pour:'Un circuit que vous ne réglez jamais bien.'},
+  {id:'tracage', nom:'Repérage du tracé', ico:'🗺️',
+   desc:'Le pilote enchaîne les tours pour apprendre la piste et sentir la voiture.',
+   effet:'Le retour du stand devient bien plus fiable sur tout le week-end.',
+   pour:'Quand vous n’avez pas d’ingénieur — ou pas confiance en lui.'},
+  {id:'relais', nom:'Simulation de course', ico:'⏱️',
+   desc:'Longs relais, plein d’essence : on apprend à gérer les pneus.',
+   effet:'Moins de casse en course, et un peu plus de rythme.',
+   pour:'Une longue épreuve, ou une stratégie agressive.'},
+  {id:'economie', nom:'Séance au ralenti', ico:'🛑',
+   desc:'On ne roule presque pas : matériel et pilote préservés.',
+   effet:'Le pilote arrive frais et prend nettement moins de risques.',
+   pour:'Un pilote fatigué, ou un circuit dangereux.'},
+];
+const PROG_EL = Object.fromEntries(PROGRAMMES_EL.map(x=>[x.id,x]));
+const progEL = ()=> (S.weekend && PROG_EL[S.weekend.programme]) || null;
+/* Un seul programme conseillé, et pour une raison lisible : un badge posé sur
+   trois cartes sur quatre ne conseille plus rien. */
+function conseilEL(){
+  const p = S.pilote;
+  if(!p) return null;
+  if(p.fatigue>55)
+    return {id:'economie', raison:'votre pilote est déjà entamé ('+Math.round(p.fatigue)+' de fatigue)'};
+  if(staffNiv('ingenieur')<=1)
+    return {id:'tracage', raison:'sans ingénieur, vous ne savez pas ce que valent vos réglages'};
+  if(S.saison && CAT[S.saison.catId].niv>=4)
+    return {id:'relais', raison:'à ce niveau les courses sont longues et la mécanique souffre'};
+  return {id:'reglages', raison:'rien d’urgent ailleurs : autant chercher la voiture'};
+}
+/* Atténuation du bruit de mesure obtenue en repérant le tracé. */
+const attenuationEL = ()=> (S.weekend && S.weekend.programme==='tracage') ? 0.4 : 1;
+
 function etapesWeekend(catId){
   const f = CAT[catId].format;
-  if(f==='kart') return ['essais','course'];
-  if(f==='f1')   return ['libres','essais','qualifs','course'];
-  return ['essais','qualifs','course'];
+  if(f==='kart') return ['libres','essais','course'];
+  return ['libres','essais','qualifs','course'];
 }
 const ETAPE_NOM = {libres:'Essais libres', essais:'Essais', qualifs:'Qualifications', course:'Course'};
 
@@ -2923,11 +2974,30 @@ function ouvrirWeekend(){
     courseIdx:S.saison.courseIndex, meteoId:meteo.id,
     etapes: etapesWeekend(S.saison.catId), etape:0,
     setup, runs:[], runsRestants: runsDisponibles(),
+    programme:null,                  // programme d'essais libres (GDD §12)
     grille:null, resultat:null, strat:'equi', debrief:null, presse:null,
     courseEtat:null, evenement:null,
   };
   S.phase='weekend';
   saveGame();
+}
+
+/* Choix du programme d'essais libres : il s'applique tout de suite et vaut pour
+   le reste du week-end. Une fois posé, on ne revient pas dessus. */
+function choisirProgrammeEL(id){
+  const w=S.weekend;
+  if(!w || w.etapes[w.etape]!=='libres') return null;
+  const prog = PROG_EL[id];
+  if(!prog) return null;
+  w.programme = id;
+  if(id==='reglages') w.runsRestants++;
+  // Rouler use le pilote ; ne pas rouler le repose.
+  const cout = id==='economie' ? -6 : id==='relais' ? 4 : 2;
+  S.pilote.fatigue = clamp(S.pilote.fatigue + cout - staffNiv('prepa'), 0, 100);
+  majForme();
+  w.etape++;
+  saveGame();
+  return prog;
 }
 
 function faireRun(){
@@ -2937,9 +3007,10 @@ function faireRun(){
   const sc = scoreReglages(course, w.setup, S.pilote);
   const ret= retourPilote(course, w.setup, S.pilote);
   const n = w.runs.length+1;
+  const att = attenuationEL();
   w.runs.unshift({setup:{...w.setup}, score:sc.score,
-    percu: scorePercu(sc.score, course.seed+'|run'+n+'|'+Math.round(sc.score)),
-    nivIng: staffNiv('ingenieur'),
+    percu: scorePercu(sc.score, course.seed+'|run'+n+'|'+Math.round(sc.score), att),
+    nivIng: staffNiv('ingenieur'), att,
     lignes:ret.lignes, ing:ret.commentaireIng, n});
   // Un run coûte quelques tours de fraîcheur, pas beaucoup plus.
   S.pilote.fatigue = clamp(S.pilote.fatigue + rint(0,2) - staffNiv('prepa'), 0, 100);
@@ -2958,7 +3029,12 @@ function etapeSuivante(){
   const meteo  = METEOS.find(m=>m.id===w.meteoId);
   const etape  = w.etapes[w.etape];
 
-  if(etape==='libres' || etape==='essais'){
+  if(etape==='libres'){
+    // On ne quitte pas les essais libres sans avoir décidé du programme :
+    // sortir sans rien faire serait un clic pour rien, ce qu'on voulait éviter.
+    if(!w.programme) return;
+    w.etape++;
+  }else if(etape==='essais'){
     w.etape++;
     // Karting : pas de qualif, la grille sort directement des essais (GDD §21.2)
     if(w.etapes[w.etape]==='course'){
@@ -5769,7 +5845,8 @@ function renderWeekend(){
     </div>
   </div>`;
 
-  if(et==='libres'||et==='essais') h += vueEssais(course, meteo);
+  if(et==='libres')                h += vueEssaisLibres(course, meteo);
+  else if(et==='essais')           h += vueEssais(course, meteo);
   else if(et==='qualifs')          h += vueQualifs(course);
   else if(et==='course')           h += vueCourse(course, meteo);
   else                             h += vueDebrief(course);
@@ -5804,8 +5881,8 @@ function rappelMeilleurReglage(course){
   const dejaDessus = memeSetup(w.setup, best.setup);
   const niv = staffNiv('ingenieur');
   const runMonte = w.runs.find(r=>memeSetup(w.setup, r.setup));
-  const aff = afficheScore(best.percu??best.score, best.nivIng);
-  const affMonte = runMonte ? afficheScore(runMonte.percu??runMonte.score, runMonte.nivIng) : null;
+  const aff = afficheScore(best.percu??best.score, best.nivIng, best.att);
+  const affMonte = runMonte ? afficheScore(runMonte.percu??runMonte.score, runMonte.nivIng, runMonte.att) : null;
   return `<div class="card ${dejaDessus?'flat':'accent'}">
     <h2>Réglage retenu<span class="hint">${w.runs.length} run(s) fait(s)</span></h2>
     <div class="row" style="align-items:center">
@@ -5824,12 +5901,40 @@ function rappelMeilleurReglage(course){
   </div>`;
 }
 
+/* Écran des essais libres : un choix, quatre programmes, aucune marche arrière.
+   On y affiche ce que la séance change concrètement pour la suite (GDD §12). */
+function vueEssaisLibres(course, meteo){
+  const w=S.weekend, p=S.pilote;
+  let h = `<div class="card"><h2><span class="vig"><span>🏁</span></span>Essais libres
+      <span class="hint">${w.runsRestants} run(s) prévus ensuite</span></h2>
+    <div class="note mb">Une seule séance, un seul programme. Ce que vous en faites vaut pour
+    tout le reste du week-end — vous ne pourrez pas revenir dessus.</div>
+    <div class="note txt-muted mb">${escapeHtml(course.nom)} · circuit ${course.type.toLowerCase()} ·
+      ${meteo.nom.toLowerCase()} · ${p.nom} : forme ${Math.round(p.forme)}, fatigue ${Math.round(p.fatigue)}.</div>`;
+
+  const conseil = conseilEL();
+  for(const prog of PROGRAMMES_EL){
+    const vise = conseil && conseil.id===prog.id;
+    h += `<div class="grp">
+      <div class="h"><b>${prog.ico} ${escapeHtml(prog.nom)}</b>${vise?tag('conseillé','t-green'):''}</div>
+      <div class="note txt-muted">${escapeHtml(prog.desc)}</div>
+      <div class="note"><b class="txt-amber">${escapeHtml(prog.effet)}</b></div>
+      <div class="note txt-muted small">${vise?'Conseillé ici : '+escapeHtml(conseil.raison)+'.':'Utile : '+escapeHtml(prog.pour)}</div>
+      <button class="${vise?'btn':'btn-ghost'} btn-block mt" data-act="programmeEL" data-id="${prog.id}">Lancer cette séance</button>
+    </div>`;
+  }
+  h += `</div>`;
+  return h;
+}
+
 function vueEssais(course, meteo){
   const w=S.weekend, params=setupParams(S.saison.catId);
   const sc = scoreReglages(course, w.setup, S.pilote).score;
   const ing = staffNiv('ingenieur');
   const best = meilleurRun();
+  const prog = progEL();
   let h = `<div class="card"><h2>Réglages<span class="hint">${w.runsRestants} run(s) restant(s)</span></h2>
+    ${prog?`<div class="note mb">Essais libres : <b>${prog.ico} ${escapeHtml(prog.nom)}</b> — ${escapeHtml(prog.effet)}</div>`:''}
     <div class="note mb">Chaque circuit a un réglage optimal <b>caché</b>, décalé par les préférences du pilote.
     Vous le cherchez par essais successifs — et vous repartez de zéro au circuit suivant.</div>
     ${params.map(p=>`<div class="setup-row">
@@ -5854,7 +5959,7 @@ function vueEssais(course, meteo){
       h += `<div class="${i?'mt2':''}">
         <div class="row tight">
           <b class="small">Run ${r.n}</b>
-          ${(()=>{const a=afficheScore(r.percu??r.score, r.nivIng);return tag(a.txt,a.cls);})()}
+          ${(()=>{const a=afficheScore(r.percu??r.score, r.nivIng, r.att);return tag(a.txt,a.cls);})()}
           ${estBest?tag(staffNiv('ingenieur')>=3?'meilleur':'le mieux ressenti','t-amber'):''}
           <div class="spacer"></div>
           ${monte
@@ -5994,6 +6099,12 @@ function vueDebrief(course){
 }
 
 ACTIONS.faireRun = ()=>{ faireRun(); render(); };
+ACTIONS.programmeEL = d=>{
+  const prog = choisirProgrammeEL(d.id);
+  if(!prog) return;
+  showToast(prog.nom+' — '+prog.effet);
+  render();
+};
 ACTIONS.reprendreReglage = d=>{
   const r = S.weekend.runs.find(x=>x.n===+d.n);
   if(!r) return;

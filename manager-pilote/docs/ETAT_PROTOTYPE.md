@@ -452,6 +452,79 @@ Le compromis position / risque est donc réel sans qu'une option domine.
 Le karting ne se voit jamais proposer d'arrêt au stand, et la simulation rapide
 n'est jamais interrompue — c'est ce qui distingue les deux modes du §21.1.
 
+## §12 — les essais libres
+
+Le §12 demandait aussi, en V2, un « week-end complet en trois temps (EL /
+Qualifs / Course) ».
+
+La séance existait de nom — et seulement en F1, où elle dupliquait purement et
+simplement l'écran des essais de réglages. Un clic pour rien.
+
+Elle porte maintenant **une décision, et une seule** : quatre programmes, un
+seul choix, aucune marche arrière, et des effets qui courent sur tout le reste
+du week-end.
+
+| Programme | Ce qu'il fait |
+|---|---|
+| 🔧 Travail des réglages | un run d'essais supplémentaire |
+| 🗺️ Repérage du tracé | le bruit de mesure sur le retour du stand tombe à 40 % |
+| ⏱️ Simulation de course | casse mécanique ×0,82 et +1,2 de rythme en course |
+| 🛑 Séance au ralenti | risque d'accrochage ×0,78, et le pilote récupère 6 de fatigue |
+
+Le week-end passe donc à trois temps en karting (EL / Essais / Course) et à
+quatre en monoplace (EL / Essais / Qualifs / Course), au lieu de deux et trois.
+
+**Trois choix de conception qui méritent d'être notés :**
+
+1. **On ne quitte pas la séance sans avoir décidé.** `etapeSuivante` refuse
+   d'avancer tant qu'aucun programme n'est retenu, et l'écran ne propose aucun
+   bouton « passer ». Sans cela, la séance redevenait exactement ce qu'on
+   voulait supprimer : un clic pour rien.
+2. **La simulation rapide ne choisit aucun programme.** Elle n'en tire donc
+   aucun bénéfice. C'est la contrepartie du §21.1 : simuler reste plus rapide,
+   jouer reste plus payant.
+3. **Un seul programme est conseillé à la fois, et il dit pourquoi.** La
+   première version en marquait trois sur quatre comme « conseillé ici », ce
+   qui ne conseillait plus rien. Le conseil regarde maintenant l'état réel :
+   fatigue au-dessus de 55 → séance au ralenti ; pas d'ingénieur → repérage ;
+   catégorie de niveau 4 ou plus → simulation de course ; sinon réglages.
+
+Les effets ne valent que pour notre voiture : la grille adverse n'en profite
+jamais.
+
+### Effet mesuré
+
+Sur le repérage du tracé, écart moyen entre le score réel d'un réglage et le
+score affiché au stand, ingénieur de niveau 2, sur 30 week-ends chacun :
+**2,96 sans repérage contre 1,28 avec** — soit une lecture deux fois plus juste.
+Vérifié aussi dans le navigateur (2,96 → 1,28 sur 40 week-ends).
+
+Sur la course, en rejouant 12 000 fois la même manche en ne changeant que le
+programme retenu :
+
+| Programme | Casse mécanique | Accrochages |
+|---|---|---|
+| Aucun | 6,6 % | 6,0 % |
+| ⏱️ Simulation de course | 5,5 % | 6,0 % (inchangé) |
+| 🛑 Séance au ralenti | 6,6 % (inchangée) | 4,4 % |
+
+(40 000 résolutions par ligne. Le tableau se lit dans les deux sens : chaque
+programme agit sur son canal et laisse l'autre intact, ce que le test vérifie.)
+
+### Test
+
+`unit21.js` : 48 assertions sur la structure du week-end dans les quatre
+formats, le catalogue, le refus d'avancer sans programme, le run supplémentaire,
+l'atténuation du bruit de mesure (y compris son affichage en fourchette et le
+cas de l'ingénieur au sommet, où il n'y a rien à atténuer), la fatigue dans les
+deux sens, les effets en course mesurés par résolution directe, l'absence
+d'effet sur la grille adverse, la neutralité de la simulation rapide, une saison
+complète jouée de bout en bout en karting, F3, F1 et endurance, et la reprise
+d'un week-end enregistré avant le §12 — ancien format d'étapes, aucun
+programme — qui doit rester jouable tel quel.
+`browser11.js` rejoue la séance par de vrais clics et vérifie le week-end
+complet.
+
 ## Deuxième passage de jeu, retours et suites
 
 1. **« L'ingénieur ne me sert à rien. »** Exact, et c'était structurel : le score
@@ -1419,9 +1492,11 @@ deux sens du transfert par de vrais clics, `browser9.js` le cycle de l'échéanc
 
 ## Ce qui reste à faire avant de parler de « jeu »
 
-- Les essais libres (§12, V2) : « week-end complet en trois temps (EL /
-  Qualifs / Course) ». La structure existe déjà — `etapesWeekend` sait rendre
-  `libres, essais, qualifs, course` — mais seul le format F1 y a droit ; le
-  karting en est à deux temps et la monoplace à trois.
-- Le §22.3 (devenir Team Principal en F1), que le GDD écarte lui-même : « cette
-  extension représente pratiquement un second jeu greffé sur le premier ».
+- Le §22.3 (devenir Team Principal en F1), le seul point du GDD encore ouvert,
+  et que le GDD écarte lui-même : « cette extension représente pratiquement un
+  second jeu greffé sur le premier ».
+
+Tout le reste du périmètre V1 et V2 du GDD est en place. Ce qui manque
+maintenant n'est plus du contenu, c'est du jeu réel : le multi-pilotes, le
+marché des transferts et la réglementation évolutive n'ont jamais été
+confrontés à une partie humaine, seulement à des simulations.
