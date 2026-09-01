@@ -4726,8 +4726,7 @@ $('#overlay').addEventListener('click', e=>{ if(e.target.id==='overlay') closeMo
    masque du premier. La liste est figée (balayée exhaustivement par
    unit23.js sur tout le domaine du style) et ne change pas d'une version de
    la bibliothèque à l'autre sans que le test s'en aperçoive. */
-const AVATAR_ID_TOKENS = ['viewboxMask','personas-a','bodySmall-a',
-  'facialHairBeardMustache-a','hairCurly-a','hairCurlyHighTop-a','hairFade-a','hairFade-b'];
+const AVATAR_ID_TOKENS = ['viewboxMask'];
 function namespaceAvatarIds(svg, suffix){
   let s = svg;
   for(const id of AVATAR_ID_TOKENS){
@@ -4744,27 +4743,33 @@ function assombrir(hex, part){
   return '#' + c.map(v=>v.toString(16).padStart(2,'0')).join('');
 }
 
-/* Buste DiceBear pour ce pilote : combinaison aux couleurs de l'écurie,
-   débarrassé de son <svg> englobant et de ses métadonnées (l'attribution
-   vit une seule fois, dans l'onglet Crédits — pas la peine de la répéter à
-   chaque portrait). */
+/* Buste DiceBear (style Micah, plus adulte que le précédent Personas) pour ce
+   pilote : combinaison aux couleurs de l'écurie, débarrassé de son <svg>
+   englobant et de ses métadonnées (l'attribution vit une seule fois, dans
+   l'onglet Crédits — pas la peine de la répéter à chaque portrait). */
 function avatarInterieur(p, coul){
   const vieux = clamp((p.age-34)/10, 0, 1);
   const opts = {
-    clothingColor: [coul.replace('#','')],
-    // « pacifier » (une tétine) fait partie du style mais ne colle à aucun
-    // pilote du jeu, même le plus jeune académicien (8 ans).
-    mouth: ['smile','frown','surprise','bigSmile','smirk','lips'],
+    shirtColor: [coul.replace('#','')],
+    // « beard » se dessine comme un aplat noir plein qui masque tout le bas
+    // du visage — bien plus proche d'une cagoule que d'une barbe dans ce
+    // style. « scruff » (repousse) reste sobre et naturel à tout âge.
+    facialHair: ['scruff'],
     // sous 19 ans, jamais de barbe — un jeune de 14 ans n'en a pas ;
     // au-delà, une chance normale par pilote, stable d'un affichage à l'autre
-    facialHairProbability: p.age>=19 ? 10 : 0,
+    facialHairProbability: p.age>=19 ? 12 : 0,
+    // les bouches grande ouverte (« surprised », « nervous », « pucker »)
+    // donnent un air alarmé à un roster entier de pilotes ; on garde les
+    // expressions posées.
+    mouth: ['smile','smirk','frown','laughing'],
   };
   // Grisonnement : plus grossier que l'ancien dégradé continu (un pas net
   // plutôt qu'un mélange), mais le principe — le portrait vieillit — tient.
-  // La teinte « dee1f5 » de la palette par défaut est si pâle qu'elle se lit
-  // comme grise sur un visage jeune : réservée aux pilotes réellement âgés.
-  if(vieux>0.4) opts.hairColor = [hash01(p.id+'|gris')<0.5 ? '9099a6' : 'c8ccd4'];
-  else opts.hairColor = ['362c47','6c4545','e15c66','e16381','f27d65','f29c65'];
+  // La palette par défaut est très pastel (menthe, lavande, cyan) : bien
+  // pour un jeune pilote, mais aucune de ces teintes ne se lit comme un
+  // cheveu naturel une fois âgé — le blanc est réservé à ce cas précis.
+  if(vieux>0.4) opts.hairColor = ['ffffff'];
+  else opts.hairColor = ['000000','f4d150','ac6651','77311d'];
   const svg = window.DicebearPersona.svgFor(p.id, opts);
   const inner = svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '')
                     .replace(/<metadata[\s\S]*?<\/metadata>/, '');
@@ -4779,11 +4784,12 @@ function portraitPilote(p, opt={}){
   const buste = avatarInterieur(p, coul);
   const fond = opt.integre ? '' : `<rect width="100" height="120" fill="#161b22"/>
       <circle cx="50" cy="44" r="40" fill="${coul}" opacity=".16"/>`;
-  // Le buste DiceBear tient dans un carré 64×64 ; on le met à l'échelle du
+  // Le buste DiceBear tient dans un carré 360×360 ; on le met à l'échelle du
   // gabarit 100×120 en le recouvrant entièrement (scale = max des deux
-  // rapports, soit 120/64) et en le recentrant horizontalement — comme un
+  // rapports, soit 120/360) et en le recentrant horizontalement — comme un
   // fond `cover` en CSS. Le débord gauche/droit est rogné par le clipPath.
-  const dessin = `${fond}<g transform="translate(-10,0) scale(1.875)">${buste}</g>`;
+  const ECH_AVATAR = 120/360, DX_AVATAR = (100 - 360*ECH_AVATAR)/2;
+  const dessin = `${fond}<g transform="translate(${round(DX_AVATAR,2)},0) scale(${ECH_AVATAR})">${buste}</g>`;
   if(opt.integre) return dessin;
   return `<svg viewBox="0 0 100 120" class="portrait" role="img" aria-label="Portrait de ${escapeHtml(p.nom)}">
     <defs><clipPath id="pc${p.id}"><rect x="0" y="0" width="100" height="120" rx="14"/></clipPath></defs>

@@ -1553,7 +1553,33 @@ avatars générés par une bibliothèque tierce (déterministes, seedés sur
 l'identifiant du pilote), et les tracés de circuits dessinés à la main par de
 vrais tracés sous licence libre, recolorés en CSS.
 
-### Portraits — DiceBear, style Personas
+### Portraits — DiceBear, style Micah (Personas au départ, remplacé)
+
+**Mise à jour après retour utilisateur** : « les visages, pas moyen d'en
+trouver de plus jolis, plus réalistes ? ». Personas donnait des visages
+jugés trop simples. Comparé côte à côte à cinq autres styles du même
+paquet (lorelei, avataaars, adventurer, micah) :
+
+- **lorelei** (CC0, correspond exactement à la licence visée au départ) :
+  rendu en fait moins abouti que Personas — traits au trait noir sur blanc,
+  sans couleur, et surtout **aucun corps/vêtement** dans son schéma :
+  impossible d'y poser la couleur d'écurie.
+- **avataaars** (le plus soigné visuellement à l'œil) : licence non
+  standard — le SVG généré la déclare lui-même « Free for personal and
+  commercial use » avec l'URL `avataaars.com` comme seule référence, pas
+  MIT/CC0/CC BY. Écarté pour rester sur une licence reconnue, comme demandé.
+- **adventurer** : rendu trop enfantin (têtes rondes, très grands yeux),
+  contraire au « plus réaliste » demandé.
+- **micah** (« Avatar Illustration System », Micah Lanier, CC BY 4.0) :
+  retenu. Rendu nettement plus adulte, `shirtColor` pour la couleur
+  d'écurie, licence de la même famille que Personas (déjà correctement
+  gérée). Un seul piège : `facialHair: 'beard'` se dessine en aplat noir
+  plein façon cagoule dans ce style — exclu, seul `scruff` (repousse) est
+  utilisé. Le vocabulaire d'ids internes est encore plus simple qu'avec
+  Personas : un seul id (`viewboxMask`) sur tout le domaine testé
+  (1440 combinaisons), contre huit précédemment — toujours vérifié par
+  balayage exhaustif plutôt que supposé (`unit23.js`).
+
 
 `@dicebear/core` + `@dicebear/collection` (MIT), version 9.4.2, bundlées en
 local avec esbuild en un seul fichier IIFE (`vendor/dicebear.bundle.js`,

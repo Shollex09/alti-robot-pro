@@ -6,16 +6,33 @@ le jeu reste jouable hors ligne.
 ## dicebear.bundle.js
 
 Bundle esbuild (IIFE, minifié) de `@dicebear/core` + `@dicebear/collection`
-(style **Personas**), exposant `window.DicebearPersona.svgFor(seed, options)`.
+(style **Micah**), exposant `window.DicebearPersona.svgFor(seed, options)`.
+Le nom de la fonction globale garde « Persona » pour l'historique, mais le
+style utilisé est Micah depuis le retour « visages plus jolis, plus
+réalistes » — voir plus bas.
 
 - `@dicebear/core` et `@dicebear/collection` : MIT, © DiceBear contributors —
   <https://www.dicebear.com/>.
-- Le style **Personas** lui-même est une œuvre distincte, par Draftbit,
-  sous licence **CC BY 4.0** (attribution requise) —
-  <https://personas.draftbit.com/> / <https://creativecommons.org/licenses/by/4.0/>.
+- Le style **Micah** (« Avatar Illustration System », par Micah Lanier) est
+  une œuvre distincte, sous licence **CC BY 4.0** (attribution requise) —
+  <https://www.figma.com/community/file/829741575478342595> /
+  <https://creativecommons.org/licenses/by/4.0/>.
   L'attribution est faite une fois dans l'application, onglet
   Sauvegarde → Crédits, plutôt que répétée dans les métadonnées de chaque
   portrait généré (celles-ci sont retirées à l'affichage).
+
+**Pourquoi Micah plutôt que Personas (premier choix) ou Notionists** :
+Personas donnait des visages jugés trop simples/enfantins par l'utilisateur.
+Notionists est CC0 (aucune attribution requise, plus proche de ce qui avait
+été demandé au départ) mais son schéma n'a **aucune option de couleur** —
+impossible d'y mettre la couleur d'écurie sur la combinaison. Micah a
+`shirtColor`, un rendu plus adulte/soigné, et reste sous une licence libre
+standard (CC BY 4.0, déjà correctement gérée pour Personas).
+
+**Piège rencontré** : l'option `facialHair: 'beard'` de Micah se dessine
+comme un aplat noir plein qui couvre tout le bas du visage — bien plus
+proche d'une cagoule que d'une barbe dans cette illustration. Exclue ;
+seule l'option `scruff` (repousse) est utilisée, sobre à tout âge.
 
 Régénérer le bundle (versions figées à 9.4.2, la dernière compatible entre
 core et collection au moment de l'écriture) :
@@ -26,9 +43,9 @@ npm init -y
 npm install @dicebear/core@9.4.2 @dicebear/collection@9.4.2 esbuild@latest --save-dev
 cat > glue.mjs <<'EOF'
 import { createAvatar } from '@dicebear/core';
-import { personas } from '@dicebear/collection';
+import { micah } from '@dicebear/collection';
 function svgFor(seed, options){
-  return createAvatar(personas, { seed, size: 64, ...options }).toString();
+  return createAvatar(micah, { seed, size: 360, ...options }).toString();
 }
 window.DicebearPersona = { svgFor };
 EOF
