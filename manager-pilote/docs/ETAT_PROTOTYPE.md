@@ -1546,6 +1546,129 @@ informatif, le renvoi depuis le vivier sans duplication, l'unicité des noms sur
 25 marchés réellement peuplés, et la troncature annoncée au-delà de douze
 pilotes. `browser12.js` parcourt l'onglet par de vrais clics.
 
+## Portraits et circuits : bibliothèques réelles plutôt que dessin maison
+
+Demandé explicitement : remplacer les portraits en SVG fait main par des
+avatars générés par une bibliothèque tierce (déterministes, seedés sur
+l'identifiant du pilote), et les tracés de circuits dessinés à la main par de
+vrais tracés sous licence libre, recolorés en CSS.
+
+### Portraits — DiceBear, style Personas
+
+`@dicebear/core` + `@dicebear/collection` (MIT), version 9.4.2, bundlées en
+local avec esbuild en un seul fichier IIFE (`vendor/dicebear.bundle.js`,
+37 Ko minifié) exposant `window.DicebearPersona.svgFor(seed, options)`.
+Aucun appel réseau à l'exécution — vérifié en coupant le réseau après le
+premier chargement de la page (`browser13.js`) : zéro requête, le bundle
+tourne entièrement en local.
+
+Le style choisi est **Personas** (par Draftbit), pas Notionists : les deux
+styles étaient proposés, mais seul Personas a une option `clothingColor`
+qui permet de forcer la couleur du vêtement à la couleur d'écurie — Notionists
+n'a aucune option de couleur (schéma vérifié directement dans le paquet), ce
+qui aurait rendu impossible la livrée aux couleurs de l'équipe.
+
+**Point de licence à corriger par rapport à la demande initiale** : la
+demande visait du MIT/CC0. Le code de DiceBear est bien MIT, mais l'illustration
+Personas elle-même est sous **CC BY 4.0** (attribution requise) — c'est écrit
+dans les métadonnées que la bibliothèque embarque dans chaque SVG généré.
+Notionists, lui, est bien CC0 (vérifié de la même façon), mais sans aucune
+option de couleur. Plutôt que de perdre la livrée aux couleurs d'écurie pour
+respecter à la lettre « CC0 », l'attribution est faite une fois, correctement,
+dans l'onglet Sauvegarde → Crédits — ce que CC BY demande, ni plus ni moins.
+
+**Deux corrections faites après un premier rendu vérifié à l'œil** (le style
+brut, non ajusté à ce cas d'usage, ne convient pas tel quel à des pilotes de
+8 à 90 ans) :
+1. Le style « pacifier » (tétine) fait partie du répertoire de bouches de
+   Personas mais ne colle à aucun pilote du jeu, pas même le plus jeune
+   académicien à 8 ans. Exclu explicitement de la liste transmise.
+2. La teinte de cheveux « dee1f5 », très pâle, se lisait comme un
+   grisonnement sur un pilote de 13 ans tiré au hasard. Réservée depuis aux
+   pilotes réellement âgés (déclenchée par le même seuil qui pose la teinte
+   grise/blanche volontaire, `vieux>0.4`, soit environ 44 ans).
+
+**Un problème d'intégration qui ne saute pas aux yeux avant de l'avoir
+cherché** : DiceBear réutilise toujours les huit mêmes identifiants internes
+d'un portrait à l'autre (des masques de découpe SVG : `viewboxMask`,
+`personas-a`, etc.). Deux portraits affichés côte à côte — le vivier, une
+grille de départ — se marchaient dessus : le second n'héritait que du masque
+du premier, silencieusement (pas d'erreur JS, juste un rendu cassé).
+Chaque portrait renomme désormais ses ids avec le suffixe de l'identifiant du
+pilote (`namespaceAvatarIds`). Le vocabulaire des huit ids est balayé de
+façon exhaustive par `unit23.js` (tout le domaine hair × facialHair du style)
+plutôt que supposé stable d'une version de la bibliothèque à l'autre.
+
+La géométrie du cadrage : le buste DiceBear tient dans un carré 64×64, le
+gabarit du jeu est un rectangle 100×120 (portrait). Mise à l'échelle en
+« cover » (comme `background-size:cover` en CSS) — `scale = max(100/64,
+120/64) = 1.875`, recentré horizontalement — plutôt que d'étirer ou de
+laisser des bandes vides.
+
+### Circuits — tracés réels, pas Wikimedia
+
+**Wikimedia Commons, la source demandée, est bloqué par la politique réseau
+de cet environnement de développement** (`commons.wikimedia.org` et
+`upload.wikimedia.org` renvoient un 403 côté proxy — vérifié directement,
+et confirmé par le journal du proxy). Ce n'est pas contournable depuis ici ;
+c'est un choix de politique réseau de l'environnement, pas une limite de
+Claude Code. D'autres CDN généralistes (unpkg, jsdelivr) sont bloqués de la
+même façon ; seuls `registry.npmjs.org` et `raw.githubusercontent.com`
+(entre autres) sont ouverts.
+
+À la place : [bacinger/f1-circuits](https://github.com/bacinger/f1-circuits)
+(MIT, © Tomislav Bacinger), un jeu de données GeoJSON des tracés F1 réels,
+cloné en lecture anonyme (dépôt public, hors du périmètre GitHub attaché à
+cette session mais lisible quand même — le proxy git de la session sert les
+lectures anonymes de dépôts publics). Le choix est en réalité meilleur que
+l'idée initiale : une géométrie réelle (coordonnées GPS du tracé) plutôt
+qu'une image SVG statique à recolorer par filtre CSS, ce qui aurait été plus
+fragile et moins fidèle à « recoloré via CSS » au sens strict.
+
+Conversion (script Node ponctuel, pas embarqué dans le jeu) : projection
+locale plate corrigée de la latitude (`x = lon·cos(lat₀)`, `y = -lat`),
+mise à l'échelle et centrage dans un viewBox commun `0 0 200 120`, arrondi à
+0,1 unité. 27 circuits sur les 28 du catalogue monoplace ont une
+correspondance réelle (seul Jarama, absent du jeu de données — plus au
+calendrier F1 actuel — n'en a pas). Aucun circuit de karting n'a de
+correspondance : aucun jeu de données ouvert équivalent trouvé pour ces
+circuits, en partie fictifs.
+
+Pour les circuits sans tracé réel (tout le karting, Jarama), un tracé
+stylisé déterministe (somme de sinusoïdes à phases et amplitudes tirées du
+nom du circuit via `hash01`) comble le vide plutôt que de le laisser béant —
+distingué du réel par la classe CSS `.stylise` et l'absence du badge
+« tracé réel », jamais présenté comme authentique.
+
+Le chemin ne porte aucune couleur : `fill="none" stroke="currentColor"`,
+recoloré entièrement par le conteneur (`style="color:${coulPilote()}"`) —
+vérifié qu'aucune couleur n'est codée en dur dans le SVG produit
+(`unit23.js`), et que changer la couleur du conteneur change bien le trait
+sans toucher au SVG (`browser14.js`, forçage direct de `style.color`).
+
+### Test
+
+`unit23.js` : 188 assertions. Portraits : bundle chargé et déterministe,
+couleur d'écurie appliquée, mode intégré (podium) sans balise `<svg>`,
+absence de collision d'ids entre deux portraits affichés ensemble, balayage
+exhaustif du vocabulaire d'ids sur tout le domaine hair × facialHair,
+options réellement transmises à DiceBear interceptées et vérifiées (barbe
+selon l'âge, palette de cheveux selon l'âge, absence de « pacifier ») plutôt
+que devinées depuis le rendu. Circuits : tout circuit résolu par tout
+calendrier généré a un tracé, les 27 circuits réels sont marqués comme tels
+et portent une longueur plausible, tout le karting et Jarama sont stylisés,
+déterminisme et unicité du tracé stylisé par circuit, absence de couleur en
+dur dans le SVG produit. `unit8.js` (portraits, existant) mis à jour : les
+assertions qui inspectaient le dessin à la main disparu (palette de cheveux
+sans gris, tracé littéral des rides) sont remplacées par l'équivalent au
+niveau de `portraitPilote()` pour la nouvelle implémentation ; les
+assertions sur le cadrage, la livrée et le podium, elles, n'avaient pas
+besoin de changer.
+`browser13.js` vérifie les portraits par de vrais rendus (déterminisme,
+absence de collision d'ids en DOM réel, couleur appliquée, réseau coupé),
+`browser14.js` les circuits (tracé réel vs stylisé, badge, recoloration CSS
+en direct).
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - Le §22.3 (devenir Team Principal en F1), le seul point du GDD encore ouvert,
