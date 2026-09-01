@@ -1511,6 +1511,42 @@ function tauxCommission(assiette){
   return clamp(base*mult, 0.02, 0.5);
 }
 function mandatActif(){ return !!(S.mandat && S.mandat.anneeFin >= S.annee); }
+/* Un mandat qui expire ne se prolonge pas tout seul : il faut le renégocier à
+   l'intersaison, sinon le pilote se retrouve libre et n'importe quel
+   concurrent peut le prendre sans rien vous verser. */
+function mandatEchu(){ return !!(S.pilote && S.mandat && S.mandat.anneeFin < S.annee); }
+function mandatDerniereAnnee(){ return !!(S.pilote && S.mandat && S.mandat.anneeFin === S.annee); }
+
+/* Ce que le pilote pense d'une proposition de renouvellement. Il compare le
+   taux, ce qu'il vaut désormais, et ce que vous lui avez fait vivre. */
+function interetRenouvellement(taux){
+  const p = S.pilote;
+  if(!p) return 0;
+  const rp = repPalier(S.manager.repPoints).p;
+  const ancien = S.mandat ? S.mandat.commission : COMMISSION_BASE;
+  // Un pilote qui a progressé sous votre houlette accepte plus facilement.
+  const progres = p.palmares.length ? clamp((p.palmares[p.palmares.length-1].pos<=5?18:-8), -12, 20) : 0;
+  return (ancien - taux)*380 + (p.relation-45)*0.9 + rp*4 + progres;
+}
+function probaRenouvellement(taux){ return clamp(0.28 + interetRenouvellement(taux)/120, 0.04, 0.96); }
+
+/* Renouveler pour trois saisons au taux proposé. */
+function renouvelerMandat(taux){
+  const p = S.pilote;
+  if(!p) return {issue:'sanspilote'};
+  if(Math.random() > probaRenouvellement(taux)){
+    p.relation = clamp(p.relation-5, 0, 100);
+    S.flags['renouRefus_'+p.id] = (S.flags['renouRefus_'+p.id]||0)+1;
+    return {issue:'refus', essais:S.flags['renouRefus_'+p.id]};
+  }
+  S.mandat = {anneeDebut:S.annee, anneeFin:S.annee+2, duree:3, commission:taux,
+              indemnite:S.mandat?S.mandat.indemnite:0};
+  delete S.flags['renouRefus_'+p.id];
+  p.relation = clamp(p.relation+10, 0, 100);
+  msg('pilote', p.nom, 'Mandat renouvelé',
+    `${p.nom} vous renouvelle sa confiance pour trois saisons, à ${Math.round(taux*100)} %.`);
+  return {issue:'accord', taux};
+}
 function anneesMandatRestantes(){ return S.mandat ? Math.max(0, S.mandat.anneeFin - S.annee + 1) : 0; }
 
 /* Valeur marchande d'un pilote : ce qu'il rapportera, pondéré par sa jeunesse.
@@ -1608,18 +1644,40 @@ function demarchageRivaux(){
   syncDossier();
   for(let i=0;i<S.dossiers.length;i++){
     const v = S.dossiers[i];
-    if(!v.pilote || S.flags['offreEnCours_'+v.pilote.id]) continue;
-    if(v.pilote.relation > 70) continue;              // bien traité, on ne l'approche pas
-    if(Math.random() > 0.055) continue;
+    if(!v.pilote) continue;
+    const enCours = S.flags['offreEnCours_'+v.pilote.id];
+    if(enCours){
+      // Une offre laissée sans réponse ne bloque pas la mécanique : au bout de
+      // trois manches, ne rien avoir proposé compte comme une réponse.
+      if((S.manche||0) - (enCours.manche||0) >= 3){
+        // On retient l'identifiant : répondre peut faire partir le pilote, et
+        // v.pilote devient alors nul.
+        const pilId = v.pilote.id;
+        S.actif = i;
+        for(const k of CHAMPS_DOSSIER) S[k] = S.dossiers[i][k];
+        const r = repondreOffreRivale(pilId, 'refuser');
+        const m = S.inbox.find(x=>x.actions && x.actions.kind==='offreRivale' && x.actions.pilId===pilId);
+        if(m){ m.actions=null; m.reponse = r ? r.txt : 'Sans réponse de votre part.'; }
+        syncDossier();
+      }
+      continue;
+    }
+    const libre = v.mandat && v.mandat.anneeFin < S.annee;
+    // Un pilote sous mandat et bien traité n'est pas approché ; un pilote libre
+    // l'est quoi qu'il arrive, c'est tout l'enjeu de l'échéance.
+    if(!libre && v.pilote.relation > 70) continue;
+    if(Math.random() > (libre ? 0.42 : 0.055)) continue;
     S.actif = i;
     for(const k of CHAMPS_DOSSIER) S[k] = S.dossiers[i][k];
     const o = offreSurMonPilote();
     if(o){
+      o.manche = S.manche||0;
       S.flags['offreEnCours_'+S.pilote.id] = o;
       msg('pilote', S.pilote.nom, 'Un manager est venu me voir',
         `« ${escapeHtml(o.manager)} m’a fait une proposition : `+
         `il ne prendrait que <em>${Math.round(o.commission*100)} %</em>.\n\n`+
-        `Je ne te cache rien, mais j’attends de savoir ce que tu proposes. »`,
+        `Je ne te cache rien, mais j’attends de savoir ce que tu proposes. »\n\n`+
+        `<em>Sans réponse de votre part d’ici trois manches, il tranchera seul.</em>`,
         {kind:'offreRivale', pilId:S.pilote.id});
     }
     syncDossier();
@@ -1683,12 +1741,16 @@ function cederPilote(o){
     m.signatures++;
   }
   // On touche l'indemnité que le rival verse : c'est la contrepartie du départ.
-  const indem = indemniteTransfert(p, p.catId, anneesMandatRestantes());
-  argent('Indemnité de transfert — '+(m?m.nom:'un concurrent'), indem, 'transfert');
+  // Mandat échu : le pilote est libre, personne ne vous doit rien.
+  const echu = !!(S.mandat && S.mandat.anneeFin < S.annee);
+  const indem = echu ? 0 : indemniteTransfert(p, p.catId, anneesMandatRestantes());
+  if(indem>0) argent('Indemnité de transfert — '+(m?m.nom:'un concurrent'), indem, 'transfert');
   msg('pilote', p.nom, 'Il part chez '+(m?m.nom:'un concurrent'),
     `${p.nom} accepte la proposition de ${m?m.nom:'un concurrent'}.\n\n`+
-    `Vous touchez une indemnité de <em>${fmtEurFull(indem)}</em> pour les commissions perdues — `+
-    `mais c'est lui qui touchera les suivantes.`);
+    (indem>0
+      ? `Vous touchez une indemnité de <em>${fmtEurFull(indem)}</em> pour les commissions perdues — `+
+        `mais c'est lui qui touchera les suivantes.`
+      : `<b>Son mandat était échu : vous ne touchez rien.</b> C'est le prix d'une échéance laissée passer.`));
   const id = p.id;
   perdrePilote('transfert');
   // Il est chez un rival, pas au vivier : on le retire de la liste des libres.
@@ -3779,6 +3841,17 @@ function passerAnneeSuivante(){
   });
   S.flags.renvoye=false;
   for(const k of Object.keys(S.flags)) if(k.startsWith('retrait_')) delete S.flags[k];
+  // Mandats arrivés à échéance : le pilote est libre tant qu'on n'a pas
+  // renégocié, et un concurrent peut le prendre sans rien verser.
+  pourChaqueDossier(()=>{
+    if(!S.pilote || !S.mandat) return;
+    if(S.mandat.anneeFin < S.annee){
+      msg('pilote', S.pilote.nom, 'Mon mandat est arrivé à terme',
+        `« Notre accord s’arrête là. Je ne suis lié à personne pour ${S.annee}.\n\n`+
+        `Si tu veux qu’on continue, il va falloir en reparler — et d’autres me font déjà les yeux doux. »\n\n`+
+        `<em>Tant que le mandat n’est pas renouvelé, un concurrent peut le prendre sans vous indemniser.</em>`);
+    }
+  });
   formerEleves();                                    // GDD §22.2
   progresserManagers();
   if(!S.monde.managers || !S.monde.managers.length) creerManagersRivaux();
@@ -4749,6 +4822,20 @@ function ctaBureau(){
       </div>
     </div>`;
   }
+  // Le mandat prime : sans lui, tout le reste est prématuré.
+  if(ph==='intersaison' && mandatEchu()){
+    const essais = S.flags['renouRefus_'+p.id]||0;
+    return `<div class="card accent"><h2>Mandat à renouveler</h2>
+      <div class="note mb">Votre accord avec <b>${escapeHtml(p.nom)}</b> est arrivé à terme.
+        Tant qu’il n’est pas renouvelé, <b class="txt-red">il est libre</b> : un concurrent peut le
+        prendre sans rien vous verser.</div>
+      ${essais?`<div class="note warn mb">Il a déjà décliné ${essais} proposition(s). Descendez, ou renoncez.</div>`:''}
+      <div class="note mb">Quelle commission lui proposez-vous ?</div>
+      ${[0.05,0.08,0.12].map(tx=>`<button class="btn-ghost btn-block mt" data-act="renouveler" data-tx="${tx}">
+        ${Math.round(tx*100)} % — il accepte à ${Math.round(probaRenouvellement(tx)*100)} %</button>`).join('')}
+      <button class="btn-ghost btn-sm btn-block mt" data-act="modalRompre">Le laisser partir</button>
+    </div>`;
+  }
   if(ph==='intersaison'){
     if(!S.contrat || S.contrat.anneeDebut!==S.annee){
       const enRetrait = S.flags['retrait_'+p.id]===S.annee;
@@ -4926,6 +5013,12 @@ ACTIONS.confirmApprocher = d=>{
     `sur trois saisons.`);
   closeModal(); saveGame(); go('bureau');
   showToast(p.nom+' rejoint votre écurie');
+};
+ACTIONS.renouveler = d=>{
+  const r = renouvelerMandat(+d.tx);
+  saveGame(); render();
+  if(r.issue==='accord') showToast('Mandat renouvelé à '+Math.round(r.taux*100)+' %');
+  else if(r.issue==='refus') showToast(S.pilote.nom+' décline — il veut mieux');
 };
 ACTIONS.modalRompre = ()=>{
   const p = S.pilote; if(!p) return;

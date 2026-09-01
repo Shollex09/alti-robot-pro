@@ -1235,15 +1235,53 @@ pouvait débaucher — dans les deux sens. Mesuré, aucune offre n'arrivait apr�
 s'il est prêt à se séparer de son moins bon pilote pour le vôtre — ce qui est
 d'ailleurs la façon dont ces choses se passent.
 
+### L'échéance du mandat
+
+Le mandat avait une durée affichée, une fonction `mandatActif()` — et cette
+fonction n'était **appelée nulle part**. Le mandat expirait en silence : la
+fiche annonçait une échéance qui n'arrivait jamais, et les commissions
+continuaient de tomber. Un trou dans du code livré une heure plus tôt.
+
+L'échéance a maintenant des conséquences. À l'intersaison, un mandat arrivé à
+terme bloque le bureau : il faut renégocier avant toute autre chose, en
+proposant un taux, avec la probabilité d'acceptation affichée. Le pilote pèse
+l'écart avec l'ancien taux, sa relation, votre réputation, et ce qu'il a
+accompli sous votre houlette.
+
+Tant qu'il n'est pas renouvelé, **le pilote est libre** — et c'est là que
+l'échéance coûte cher :
+
+| | Sous mandat | Mandat échu |
+|---|---|---|
+| Probabilité d'être approché, par manche | 5,5 % | 42 % |
+| Approché malgré une bonne relation | non | oui |
+| Indemnité si le pilote part | proportionnelle aux années restantes | **rien** |
+
+### Une offre ignorée bloquait tout
+
+Deuxième trou, plus vicieux. Une offre rivale en attente empêchait toute
+nouvelle approche sur ce pilote — et elle ne se levait qu'en répondant. Ignorer
+le message rendait donc **définitivement immunisé**, exactement l'inverse de
+l'intention. Mesuré : 7,8 mandats arrivés à terme par carrière, et zéro pilote
+perdu.
+
+Une offre sans réponse se tranche maintenant d'elle-même au bout de trois
+manches, comme si l'on n'avait rien proposé — ce qui est le cas. Le message le
+dit. Après correction, pour un bot qui ne renouvelle jamais et ne répond
+jamais : 6,1 échéances, 0,6 offre reçue et **1 pilote perdu** par carrière de
+quinze saisons. C'est la sanction juste d'une passivité totale, sans être
+punitif pour qui suit ses dossiers.
+
 ### Test
 
-`unit19.js` : 41 assertions sur la création du mandat, l'application du taux aux
+`unit19.js` : 59 assertions sur la création du mandat, l'application du taux aux
 trois assiettes, la valeur marchande (qui accepte aussi bien un pilote complet
 qu'un résumé détenu par un rival), l'indemnité croissante avec les années
 restantes, les trois facteurs d'intérêt du pilote, le contenu du marché, la
 reconstruction d'un pilote jouable depuis un résumé, le débauchage complet, et
-les trois réponses à une offre reçue. `browser8.js` rejoue les deux sens par de
-vrais clics.
+les trois réponses à une offre reçue, l'échéance et le renouvellement, l'absence
+d'indemnité sur un mandat échu, et le délai de réponse. `browser8.js` rejoue les
+deux sens du transfert par de vrais clics, `browser9.js` le cycle de l'échéance.
 
 ## Ce qui reste à faire avant de parler de « jeu »
 
