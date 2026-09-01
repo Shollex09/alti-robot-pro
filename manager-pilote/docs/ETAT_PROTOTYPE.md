@@ -313,6 +313,115 @@ directement le paiement des manches. Mesuré sur 24 carrières, avec et sans R&D
 +0,3 à +0,8 titre par carrière quand on peut se le permettre, et une faillite
 supplémentaire sur le profil le plus serré.
 
+## §11 — la réglementation évolutive
+
+Le §11 demandait aussi, en V2, des « changements de règles (aéro, plafond
+budgétaire) d'une saison à l'autre, obligeant à réadapter la stratégie ».
+
+La fédération publie désormais un règlement technique par saison, dans **deux
+univers séparés** : le karting et la monoplace (les voies alternatives du §8.4
+courent sous le règlement monoplace). Un règlement aéro n'a aucun sens sur un
+kart, un châssis homologué unique n'en a aucun en F1.
+
+Dix règlements, chacun déplaçant un curseur sur lequel le joueur avait bâti sa
+saison précédente :
+
+| Règlement | Univers | Ce qu'il change |
+|---|---|---|
+| Règlement inchangé | les deux | rien — toutes les saisons ne sont pas une remise à plat |
+| Refonte aérodynamique | monoplace | plateau resserré de 42 %, l'aéro pèse ×1,7 et le moteur ×0,5, engagement +8 % |
+| Gel des moteurs | monoplace | axe moteur bloqué à 4, châssis et aéro revalorisés, fiabilité +3, engagement −6 % |
+| Plafond budgétaire | les deux | R&D plafonnée à 15 % du budget d'engagement, plateau resserré de 30 %, engagement −14 % |
+| Dérégulation technique | monoplace | plafond d'axe porté à 26, écarts entre écuries **creusés** de 30 %, engagement +16 % |
+| Nouveau manufacturier | les deux | usure ×1,4, incidents ×1,15, fiabilité −2 |
+| Renforcement sécurité | les deux | blessures ×0,45, incidents ×0,82, engagement +7 % |
+| Quota de propulseurs | monoplace | fiabilité −6, le moteur repasse ×1,4 |
+| Châssis homologué unique | karting | plateau resserré de 55 %, axe châssis bloqué à 5 |
+| Moteur homologué unique | karting | plateau resserré de 35 %, axe moteur bloqué à 4, fiabilité +4 |
+
+**Le règlement tombe à l'intersaison, avant les offres de baquet et avant le
+premier euro de R&D.** C'est la condition pour qu'on puisse s'y adapter au lieu
+de le subir : sous une refonte aéro, une écurie modeste redevient jouable ; sous
+une dérégulation, prendre le baquet le moins cher condamne la saison.
+
+Une règle tient **environ deux saisons** (50 % de chance de changer chaque
+intersaison, mesuré 0,49 sur 600 tirages) et un tirage ne redonne jamais celle
+qui est en place — sans quoi « évolutive » ne veut rien dire.
+
+### Trois points d'implémentation qui n'étaient pas évidents
+
+1. **Le règlement d'une saison est figé à l'engagement**, comme le nombre de
+   manches l'avait été pour le §15. Sans ce gel, un changement de règles à
+   l'intersaison réécrivait rétroactivement une saison encore ouverte dans un
+   autre dossier : avec plusieurs pilotes, les saisons ne se terminent pas
+   toutes en même temps.
+2. **Les poids de R&D sont renormalisés.** Un règlement redistribue la valeur
+   entre les trois axes, il ne rend pas la R&D globalement plus ou moins
+   rentable. Sans renormalisation, « refonte aérodynamique » aurait
+   silencieusement affaibli toute la R&D de 21 % sur un tracé rapide, ce que
+   rien n'annonçait au joueur.
+3. **Un axe au plafond refuse désormais l'argent** au lieu de le rogner en
+   silence. C'était déjà vrai du plafond ordinaire (18) : on pouvait investir
+   200 000 € sur un axe saturé et ne rien recevoir. La modale grise les
+   montants au-dessus du plafond budgétaire restant et remplace les boutons
+   d'un axe bloqué par « Axe au plafond — plus rien à en tirer ».
+
+### Effet mesuré
+
+Casse mécanique du pilote sur 150 saisons de F3 par règlement (≈1 500 manches
+chacune, la fiabilité et l'usure étant les seuls canaux assez peu bruités pour
+être mesurés à cette échelle) :
+
+| Règlement | Casse mécanique | Abandons toutes causes |
+|---|---|---|
+| Inchangé | 6,0 % | 13,3 % |
+| Nouveau manufacturier | 9,7 % | 16,3 % |
+| Quota de propulseurs | 9,6 % | 16,8 % |
+| Gel des moteurs | 4,0 % | 10,7 % |
+
+Sur le plateau, l'écart entre la meilleure et la pire écurie de karting passe de
+15 points à 7 sous châssis unique ; en F1, la dérégulation le fait au contraire
+grimper.
+
+Sur l'équilibrage général, 8 profils × 8 carrières × 15 saisons, avec le même
+bot dans les deux cas — une fois le règlement figé sur « inchangé », une fois
+tiré normalement :
+
+| | Règlement figé | Réglementation active |
+|---|---|---|
+| Faillites | 6 / 64 | 2 / 64 |
+| Accès à la monoplace | 6–8 / 8 | 6–8 / 8 |
+| Accès à la F1 | 1–8 / 8 | 1–8 / 8 |
+| Titres par carrière | 7,5 à 11,4 | 8,5 à 11,3 |
+
+**La conclusion honnête est qu'à cette taille d'échantillon on ne les distingue
+pas** : le bruit entre deux séries de 8 carrières est plus grand que l'effet. La
+réglementation ajoute de la variance saison par saison — une année de
+dérégulation coûte 16 % de plus, une année de plafond 14 % de moins — sans
+déplacer l'enveloppe de la carrière. C'était l'intention : réadapter sa
+stratégie, pas subir un handicap.
+
+### Test
+
+`unit20.js` : 81 assertions sur le catalogue, le tirage (couverture complète des
+deux catalogues, jamais deux fois la même règle d'affilée, durée moyenne), le
+gel du règlement dans une saison en cours, le resserrement et le creusement du
+plateau, la fiabilité, la conservation de la somme des poids de R&D pour chaque
+règlement et chaque type de circuit, les plafonds d'axe, le plafond budgétaire
+(y compris le fait que la caisse ne soit débitée que de ce qui a été accepté),
+le coût d'engagement (y compris l'apport réclamé au joueur dans les offres de
+baquet, qui doit suivre le coût réglementaire), les blessures, la casse mesurée
+sur 600 saisons, la migration d'une partie antérieure et douze intersaisons
+enchaînées.
+`browser10.js` vérifie dans le navigateur l'encart du tableau de bord, les axes
+plafonnés, le grisage des montants au-delà du plafond budgétaire et l'arrivée
+des annonces dans la messagerie.
+
+Le bot de carrière a été mis au niveau en même temps : il lit maintenant les
+poids corrigés, évite les axes bloqués et respecte le plafond budgétaire. Sans
+cette mise à jour, la mesure d'équilibrage aurait décrit un joueur qui ignore le
+règlement, pas un joueur compétent.
+
 ## §12 — la décision de mi-course
 
 Le §12 demande que la stratégie se décide « avant **et pendant** la course ».
@@ -1164,12 +1273,37 @@ signer — et le joueur peut le regretter, ou le reprendre. Attention à l'ordre
 `genererScoutPool()` régénère le vivier quand la structure se vide, il fallait
 donc réinsérer le pilote **après** cet appel, sans quoi il était effacé.
 
+### Le plantage du départ à l'arrivée
+
+Trouvé en mesurant l'équilibrage de la réglementation évolutive, sur deux séries
+de 64 carrières : **le jeu plantait quand le pilote partait à la seconde même où
+la course se terminait.**
+
+L'usure de relation est évaluée dans les effets psychologiques d'après-course.
+Si c'est le troisième avertissement, `perdrePilote` remet `S.pilote` et
+`S.saison` à `null` — et la suite de `traiterResultat` continuait à tourner :
+progression de la grille, évaluation du contrat, sponsors, tous sur une saison
+qui n'existait plus. `TypeError: Cannot read properties of null`. Dans le
+navigateur, cela laissait le week-end bloqué sur le débrief, sans aucun moyen de
+continuer la partie.
+
+Corrigé en trois endroits, parce que le premier correctif n'a fait que déplacer
+le plantage d'un cran : `traiterResultat` s'arrête dès que le pilote est parti,
+`progresserGrille` ne tourne plus hors saison, et `finirWeekend` fait avancer le
+calendrier commun des autres dossiers sans toucher à une saison disparue.
+
+Le bug n'a rien à voir avec le §11 : il existait avant, mais il demande une
+séquence rare — relation au plus bas *et* troisième avertissement *à l'arrivée
+d'une course*. Il a fallu 128 carrières simulées pour le déclencher deux fois.
+
 ### Test
 
-`unit18.js` : 26 assertions sur les deux avertissements puis le départ, le
+`unit18.js` : 31 assertions sur les deux avertissements puis le départ, le
 désarmement par une relation qui remonte, l'absence d'usure au-dessus du seuil,
 le coût de rupture (plus cher en saison, plus cher pour un bon pilote, égal au
-montant annoncé), l'indemnité prélevée, et le retour au vivier en état signable.
+montant annoncé), l'indemnité prélevée, le retour au vivier en état signable, et
+la non-régression du plantage ci-dessus — vérifiée dans les deux sens : le test
+échoue bien si l'on retire les gardes.
 `browser7.js` rejoue les deux chemins par de vrais clics.
 
 ## Le mandat et le marché des transferts
@@ -1285,8 +1419,9 @@ deux sens du transfert par de vrais clics, `browser9.js` le cycle de l'échéanc
 
 ## Ce qui reste à faire avant de parler de « jeu »
 
-- La réglementation évolutive d'une saison à l'autre (§11), marquée V2.
-- La gestion tour par tour de la course (§12) : il n'y a qu'un seul arbitrage
-  à mi-course, pas un suivi continu.
+- Les essais libres (§12, V2) : « week-end complet en trois temps (EL /
+  Qualifs / Course) ». La structure existe déjà — `etapesWeekend` sait rendre
+  `libres, essais, qualifs, course` — mais seul le format F1 y a droit ; le
+  karting en est à deux temps et la monoplace à trois.
 - Le §22.3 (devenir Team Principal en F1), que le GDD écarte lui-même : « cette
   extension représente pratiquement un second jeu greffé sur le premier ».

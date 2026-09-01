@@ -710,12 +710,18 @@ const ECURIES_ALT = {
   ],
 };
 
-function ecuriesPour(catId){
+function ecuriesBrutes(catId){
   const c=CAT[catId];
   if(!c) return ECURIES.f4;
   if(c.alt) return ECURIES_ALT[catId] || ECURIES_ALT.fe;
   if(c.format==='kart') return ECURIES.kart;
   return ECURIES[catId] || ECURIES.f4;
+}
+/* Le plateau tel qu'il court cette saison : la base des écuries corrigée par
+   le règlement en vigueur (GDD §11). Tout passe par ici — grille, offres de
+   baquet, fiche d'engagement — pour que le joueur voie ce qu'il aura. */
+function ecuriesPour(catId){
+  return ajusterEcuries(ecuriesBrutes(catId), catId);
 }
 
 /* --- 1.5 Réputation manager (GDD §2.2, §3) --- */
@@ -940,10 +946,184 @@ const POIDS_DEV = {
 const PLAFOND_AXE = 18;
 const axesDev = ()=> AXES_DEV[CAT[S.saison.catId].format==='kart' ? 'kart' : 'mono'];
 
+/* --- 1.10quater Réglementation évolutive (GDD §11) ---
+   La fédération change les règles d'une saison à l'autre. Ce n'est pas
+   décoratif : chaque règlement déplace un curseur sur lequel le joueur avait
+   bâti sa stratégie — la hiérarchie des écuries, l'axe de R&D qui paie, le
+   plafond de dépense, l'usure des pneus, la fiabilité. Le règlement est annoncé
+   à l'intersaison, donc AVANT le choix du baquet et avant le premier euro de
+   développement : on peut s'y adapter, pas le subir.
+   Deux univers réglementaires distincts : le karting et la monoplace. Un
+   règlement aéro n'a aucun sens sur un kart. */
+const REGLEMENTS = [
+  {id:'stable', dom:['kart','mono'], w:2.6, nom:'Règlement inchangé', ico:'📘',
+   resume:'Aucune évolution technique majeure cette saison.',
+   effet:'Les rapports de force de l’an dernier restent valables.',
+   conseil:'Capitalisez sur ce que vous avez appris la saison passée.'},
+
+  {id:'aero', dom:['mono'], w:1.2, nom:'Refonte aérodynamique', ico:'🌀',
+   resserre:0.42, poids:{chassis:1.10, aero:1.70, moteur:0.50}, mCout:1.08,
+   resume:'Les appuis sont remis à plat : tout le plateau repart d’une feuille blanche.',
+   effet:'L’écart entre les écuries se resserre nettement. L’aérodynamique décide de tout, le moteur ne pèse presque plus.',
+   conseil:'Une écurie modeste redevient jouable. Mettez la R&D sur l’aéro.'},
+
+  {id:'gelmot', dom:['mono'], w:1.0, nom:'Gel des moteurs', ico:'🧊',
+   plafondAxe:{moteur:4}, poids:{chassis:1.30, aero:1.25, moteur:0.45}, dFiab:3, mCout:0.94,
+   resume:'Les groupes propulseurs sont homologués pour la saison entière.',
+   effet:'Le développement moteur est bloqué à 4. En échange la mécanique casse moins et la saison coûte moins cher.',
+   conseil:'Tout le budget R&D doit partir sur le châssis et l’aéro.'},
+
+  {id:'plafond', dom:['kart','mono'], w:1.3, nom:'Plafond budgétaire', ico:'⚖️',
+   capDev:0.15, resserre:0.30, mCout:0.86,
+   resume:'Les dépenses de développement sont plafonnées pour toutes les écuries.',
+   effet:'Votre R&D est limitée sur la saison. Les écarts se resserrent et l’engagement coûte moins cher.',
+   conseil:'Chaque euro compte : investissez tôt, et sur le bon axe.'},
+
+  {id:'liberal', dom:['mono'], w:0.8, nom:'Dérégulation technique', ico:'🔓',
+   capAxe:26, resserre:-0.30, mCout:1.16,
+   resume:'La fédération lève les restrictions de développement.',
+   effet:'Le plafond de développement passe à 26 par axe, mais les écarts entre écuries se creusent et la saison coûte plus cher.',
+   conseil:'Année de riches : visez le meilleur baquet possible et prévoyez large côté sponsors.'},
+
+  {id:'pneus', dom:['kart','mono'], w:1.1, nom:'Nouveau manufacturier de pneus', ico:'🛞',
+   mUsure:1.40, mRisque:1.15, dFiab:-2,
+   resume:'Une nouvelle gomme, que personne ne connaît vraiment.',
+   effet:'Les pneus s’usent beaucoup plus vite : attaquer se paie cash, et la casse augmente.',
+   conseil:'La stratégie conservatrice reprend toute sa valeur.'},
+
+  {id:'secu', dom:['kart','mono'], w:1.0, nom:'Renforcement de la sécurité', ico:'🛡️',
+   mBlessure:0.45, mRisque:0.82, mCout:1.07,
+   resume:'Nouvelles normes de structure et de protection.',
+   effet:'Nettement moins d’accrochages, et un pilote sort rarement blessé d’une sortie de piste. La mise aux normes coûte cher.',
+   conseil:'Année idéale pour attaquer : le risque est bas.'},
+
+  {id:'quota', dom:['mono'], w:1.0, nom:'Quota de groupes propulseurs', ico:'🔧',
+   dFiab:-6, poids:{chassis:0.85, aero:0.85, moteur:1.40},
+   resume:'Nombre de moteurs limité sur la saison, sous peine de pénalité.',
+   effet:'La fiabilité chute pour tout le monde. Le développement moteur redevient prioritaire.',
+   conseil:'Finir vaut mieux que gagner : levez le pied et fiabilisez.'},
+
+  {id:'chassisu', dom:['kart'], w:1.2, nom:'Châssis homologué unique', ico:'🔩',
+   resserre:0.55, plafondAxe:{chassis:5}, poids:{chassis:0.50, aero:1.35, moteur:1.35},
+   resume:'Un seul châssis homologué pour tout le plateau.',
+   effet:'Le matériel est presque identique partout : c’est le pilote qui fait la différence. Le développement châssis est bloqué à 5.',
+   conseil:'Inutile de payer cher le meilleur team : misez sur le pilote, le moteur et les réglages.'},
+
+  {id:'moteurk', dom:['kart'], w:1.1, nom:'Moteur homologué unique', ico:'⚙️',
+   resserre:0.35, plafondAxe:{moteur:4}, poids:{chassis:1.35, aero:1.30, moteur:0.45}, dFiab:4,
+   resume:'Un moteur scellé, distribué par tirage au sort.',
+   effet:'Plus aucune préparation moteur possible. La mécanique est bien plus fiable et le plateau plus serré.',
+   conseil:'Tout se joue au châssis, au train roulant et dans les réglages.'},
+];
+const REGL = Object.fromEntries(REGLEMENTS.map(r=>[r.id,r]));
+const REGL_STABLE = REGL.stable;
+
+/* Deux univers réglementaires : le kart et la monoplace (voies alternatives
+   comprises, elles courent sous le règlement monoplace). */
+const domaineRegl = catId => (CAT[catId] && CAT[catId].format==='kart') ? 'kart' : 'mono';
+
+/* Règlement en vigueur dans le monde pour ce domaine. Tolérant : une partie
+   d'avant le §11 n'a pas de bloc `regl`, elle tourne sous règlement inchangé. */
+function reglMondeDom(dom){
+  const r = S && S.monde && S.monde.regl && S.monde.regl[dom];
+  return (r && REGL[r.id]) || REGL_STABLE;
+}
+const reglMonde = catId => reglMondeDom(domaineRegl(catId));
+
+/* Règlement d'une saison EN COURS : figé à l'engagement, comme le nombre de
+   manches. Sans ce gel, un changement de règles à l'intersaison réécrirait
+   rétroactivement une saison encore ouverte dans un autre dossier (GDD §15). */
+function reglSaison(sa){
+  const s = sa || (S && S.saison);
+  if(!s) return REGL_STABLE;
+  return REGL[s.regl] || REGL_STABLE;
+}
+
+/* Tirage pondéré d'un règlement pour un domaine, en excluant celui en place :
+   « évolutive » veut dire que ça change. */
+function tirerReglement(dom, exclureId){
+  const pool = REGLEMENTS.filter(r=>r.dom.includes(dom) && r.id!==exclureId);
+  const t = sum(pool, r=>r.w);
+  let x = Math.random()*t;
+  for(const r of pool){ x -= r.w; if(x<=0) return r; }
+  return pool[pool.length-1];
+}
+
+/* Une règle tient deux saisons en moyenne : assez pour qu'on ait le temps de
+   bâtir dessus, assez peu pour qu'il faille se réadapter. */
+function majReglements(annonce){
+  if(!S.monde.regl) S.monde.regl = {};
+  const nouv = [];
+  for(const dom of ['kart','mono']){
+    const cur = S.monde.regl[dom];
+    if(cur && cur.depuis!=null && Math.random()>0.5) continue;   // la règle reste en place
+    const r = tirerReglement(dom, cur && cur.id);
+    S.monde.regl[dom] = {id:r.id, depuis:S.annee};
+    if(r.id!=='stable' || (cur && cur.id!=='stable')) nouv.push({dom, r});
+  }
+  if(annonce && nouv.length) annoncerReglements(nouv);
+}
+
+const DOM_NOM = {kart:'Karting', mono:'Monoplace'};
+
+function annoncerReglements(nouv){
+  const corps = nouv.map(({dom,r})=>
+    `<b>${DOM_NOM[dom]} — ${r.ico} ${r.nom}</b>\n${r.resume}\n${r.effet}\n<em>${r.conseil}</em>`
+  ).join('\n\n');
+  msg('systeme','Fédération','Règlement '+S.annee+' publié',
+    `La fédération publie le règlement technique de la saison ${S.annee}.\n\n${corps}\n\n`+
+    `<em>Ces règles s’appliquent dès l’engagement : tenez-en compte en choisissant le baquet et en répartissant la R&D.</em>`);
+}
+
+/* Effet du règlement sur le plateau : `resserre` rapproche toutes les écuries
+   de la moyenne de la catégorie (valeur négative = les écarts se creusent),
+   `dFiab` déplace la fiabilité de tout le monde. On l'applique au point de
+   lecture unique des écuries, pour que la grille, les offres de baquet et la
+   fiche d'engagement montrent tous la même chose. */
+function ajusterEcuries(list, catId){
+  const r = reglMonde(catId);
+  if(!r || (!r.resserre && !r.dFiab)) return list;
+  const moy = avg(list, e=>e.voiture);
+  return list.map(e=>({...e,
+    voiture: clamp(Math.round(e.voiture + (moy-e.voiture)*(r.resserre||0)), 30, 99),
+    fiab:    clamp(e.fiab + (r.dFiab||0), 55, 99),
+  }));
+}
+
+/* Poids R&D d'un type de circuit, corrigés par le règlement. La correction est
+   renormalisée : un règlement redistribue la valeur entre les axes, il ne rend
+   pas la R&D globalement plus ou moins rentable. */
+function poidsDevCourse(type){
+  const base = POIDS_DEV[type] || POIDS_DEV['Mixte'];
+  const r = reglSaison();
+  if(!r.poids) return base;
+  const m = r.poids;
+  const b = {chassis:base.chassis*(m.chassis??1), aero:base.aero*(m.aero??1), moteur:base.moteur*(m.moteur??1)};
+  const t = b.chassis+b.aero+b.moteur;
+  if(!(t>0)) return base;
+  const s = base.chassis+base.aero+base.moteur;
+  return {chassis:b.chassis/t*s, aero:b.aero/t*s, moteur:b.moteur/t*s};
+}
+
+/* Plafond de développement d'un axe pour la saison en cours. */
+function plafondAxeCourant(axe, sa){
+  const r = reglSaison(sa);
+  if(r.plafondAxe && r.plafondAxe[axe]!=null) return r.plafondAxe[axe];
+  return r.capAxe || PLAFOND_AXE;
+}
+/* Plafond budgétaire de R&D sur la saison, ou Infinity s'il n'y en a pas. */
+function devPlafondSaison(sa){
+  const s = sa || S.saison;
+  if(!s) return Infinity;
+  const r = reglSaison(s);
+  if(!r.capDev) return Infinity;
+  return Math.round(CAT[s.catId].cout * (r.mCout||1) * r.capDev / 500)*500;
+}
+
 /* Gain de performance apporté par la R&D sur un circuit donné. */
 function bonusDev(course){
   const d = (S.saison && S.saison.dev) || {chassis:0,aero:0,moteur:0};
-  const w = POIDS_DEV[course.type] || POIDS_DEV['Mixte'];
+  const w = poidsDevCourse(course.type);
   return d.chassis*w.chassis + d.aero*w.aero + d.moteur*w.moteur;
 }
 /* Performance réelle de la voiture sur ce circuit : base de l'écurie + R&D. */
@@ -1064,6 +1244,14 @@ function migrerPartie(o){
   completer(o.pilote);
   for(const c of o.monde.scoutPool) completer(c);
   for(const r of (o.monde.rivaux||[])) completer(r);
+
+  // §11 — une partie d'avant la réglementation évolutive n'a pas de règlement :
+  // on la laisse démarrer sous « règlement inchangé », le tirage prendra le
+  // relais à la prochaine intersaison. Les saisons déjà en cours restent sous
+  // le règlement sous lequel elles ont commencé, c'est-à-dire aucun.
+  if(!o.monde.regl) o.monde.regl = {kart:{id:'stable', depuis:o.annee}, mono:{id:'stable', depuis:o.annee}};
+  for(const d of o.dossiers) if(d.saison && !d.saison.regl) d.saison.regl = 'stable';
+  if(o.saison && !o.saison.regl) o.saison.regl = 'stable';
 
   o.v = 2;
   return o;
@@ -1275,13 +1463,14 @@ function nouvellePartie(budgetId, repPalierId, nomManager){
     inbox: [],
     finances: [],                     // {annee, lab, montant, type}
     historique: [],                   // saisons terminées
-    monde: {rivaux:[], managers:[], scoutPool:[], poolAnnee:0},
+    monde: {rivaux:[], managers:[], scoutPool:[], poolAnnee:0, regl:null},
     offres: null,
     actions: 0,
     stats:{coursesGagnees:0, podiums:0, titres:0, sponsorsSignes:0, saisonsJouees:0},
     flags:{},
   };
   reinitialiserNoms();
+  majReglements(false);          // règlement de départ, sans courrier (GDD §11)
   creerManagersRivaux();
   genererScoutPool();
   msg('scout','Votre réseau','Bienvenue dans le métier',
@@ -1990,7 +2179,7 @@ function risqueBlessure(catId, abandon){
   const base = abandon==='Accrochage' ? 0.30 : 0.20;
   // Les voies alternatives ne s'équivalent pas : les ovales de l'IndyCar sont
   // bien plus exposés que l'endurance (GDD §8.4).
-  return base * (0.45 + c.niv*0.11) * (c.risque || 1);
+  return base * (0.45 + c.niv*0.11) * (c.risque || 1) * (reglSaison().mBlessure || 1);
 }
 function tirerBlessure(catId){
   const c = CAT[catId];
@@ -2195,8 +2384,22 @@ function classementManagers(){
   return l;
 }
 
+/* Coût d'engagement d'une saison sous le règlement en vigueur : un plafond
+   budgétaire fait baisser la facture de tout le monde, une dérégulation la
+   fait grimper (GDD §11). */
+function coutEngagement(catId){
+  const c = CAT[catId];
+  if(!c) return 0;
+  return Math.round(c.cout * (reglMonde(catId).mCout || 1) / 1000)*1000;
+}
+
 function demarrerSaison(catId, ecurieId){
   const c = CAT[catId];
+  // Le règlement est figé à l'engagement, comme le nombre de manches : un
+  // changement de règles à l'intersaison ne doit pas réécrire une saison
+  // encore ouverte dans un autre dossier (GDD §11 et §15).
+  const regl = reglMonde(catId);
+  const coutRegl = coutEngagement(catId);
   const ecu = ecuriesPour(catId).find(e=>e.id===ecurieId) || ecuriesPour(catId)[Math.floor(ecuriesPour(catId).length/2)];
   S.pilote.catId = catId;
   S.saison = {
@@ -2208,8 +2411,9 @@ function demarrerSaison(catId, ecurieId){
     fiab: ecu.fiab,
     pts:0, victoires:0, podiums:0, abandons:0, meilleur:99,
     dernierBilan: null,
-    coutTotal: c.cout,
-    coutRestant: c.cout,
+    regl: regl.id,
+    coutTotal: coutRegl,
+    coutRestant: coutRegl,
     caisse: 0,
     mouvements: [],
     resultats: [],
@@ -2220,7 +2424,7 @@ function demarrerSaison(catId, ecurieId){
   };
   // Apport de l'écurie (programme jeunes) : elle prend une part du budget à sa charge
   if(S.contrat && S.contrat.partEcurie>0){
-    const part = Math.round(c.cout * S.contrat.partEcurie);
+    const part = Math.round(coutRegl * S.contrat.partEcurie);
     S.saison.coutRestant -= part;
     S.saison.coutTotal   -= part;
     S.saison.priseEnCharge = part;
@@ -2251,6 +2455,7 @@ function demarrerSaison(catId, ecurieId){
     `${S.pilote.nom} est engagé en ${c.nom} avec ${ecu.nom}.\n\n`+
     `Budget de saison à financer : <em>${fmtEurFull(S.saison.coutTotal)}</em> sur ${c.courses} manches.\n`+
     `Chaque manche prélève ${fmtEurFull(Math.round(S.saison.coutTotal/c.courses))} sur la caisse de saison.\n\n`+
+    `Règlement ${S.annee} : <b>${regl.ico} ${regl.nom}</b> — ${regl.effet}\n\n`+
     `Rappel : cet argent vient des sponsors, pas de votre trésorerie. Si la caisse est vide, c’est vous qui comblez.`);
   saveGame();
 }
@@ -2645,11 +2850,12 @@ function resoudreCourse(etat, course, meteo, choix){
   }
   if(safetyCar) log.push({t:'Course', s:'Voiture de sécurité en piste, le peloton se regroupe.', c:'big'});
 
+  const regl = reglSaison();
   for(const f of field){
     f.abandon = null;
-    const risqueMeca = (100-f.fiab)/100 * 0.55 * st.usure;
+    const risqueMeca = (100-f.fiab)/100 * 0.55 * st.usure * (regl.mUsure||1);
     if(Math.random() < risqueMeca){ f.abandon='Panne mécanique'; continue; }
-    const risqueCrash = (0.035 + (f.agr/100)*0.055) * meteo.incident
+    const risqueCrash = (0.035 + (f.agr/100)*0.055) * meteo.incident * (regl.mRisque||1)
                       * (f.moi ? st.risque*risqueChoix : 1)
                       * (1 - (f.racecraft-50)/280);
     if(Math.random() < risqueCrash){ f.abandon = Math.random()<0.5?'Accrochage':'Sortie de piste'; }
@@ -2828,6 +3034,7 @@ function traiterResultat(course, meteo, r, reg){
   const moi = r.classement.find(f=>f.moi);
   const pos = moi.pos, dnf = !!moi.abandon;
   if(dnf) verifierBlessure(course, moi.abandon);       // GDD §7.3
+  if(!S.pilote || !S.saison) return;                   // la famille l'a repris
   const pts = dnf?0:pointsPour(sa.catId,pos);
 
   // --- championnat
@@ -2898,6 +3105,10 @@ function traiterResultat(course, meteo, r, reg){
   progresserPilote(dnf?null:pos);
   // --- moral, fatigue, réputation
   effetsPsy(pos, dnf, r.classement.length);
+  // Le pilote peut claquer la porte à la seconde où la course se termine :
+  // relation au plus bas (§9.6) ou famille à bout (§7.4). Il n'y a alors plus
+  // ni pilote ni saison, et tout ce qui suit n'a plus d'objet.
+  if(!S.pilote || !S.saison) return;
   // --- rivaux et IA progressent aussi
   progresserGrille();
   // --- contrat : évaluation, avertissements (GDD §9.5)
@@ -2942,6 +3153,7 @@ function progresserPilote(pos){
 }
 
 function progresserGrille(){
+  if(!S.saison) return;
   const c=CAT[S.saison.catId];
   const base = GAIN_SAISON/c.courses;
   for(const g of S.saison.grille){
@@ -3813,6 +4025,9 @@ function passerAnneeSuivante(){
   S.annee++;
   S.manche = 0;
   S.manches = 0;
+  // Le règlement de la nouvelle saison tombe AVANT les offres de baquet et
+  // avant le premier euro de R&D : le joueur doit pouvoir s'y adapter (GDD §11).
+  majReglements(true);
   for(const r of S.monde.rivaux){ r.age++; progresserPiloteAbstrait(r); }
   // Chaque dossier vieillit pour son compte : un pilote peut raccrocher pendant
   // que les autres continuent (GDD §7.2 et §15).
@@ -4034,7 +4249,7 @@ function genererOffres(){
       if(c.niv===8 || c.alt) partEcurie = 1;
       else if(junior) partEcurie = clamp(0.45 + ecart/60 + rnd(0.2), 0.4, 1);
       else partEcurie = clamp(ecart/55 + rnd(0.18) - 0.05, 0, 0.65);
-      const apport = Math.max(0, Math.round(c.cout*(1-partEcurie)/1000)*1000);
+      const apport = Math.max(0, Math.round(coutEngagement(catId)*(1-partEcurie)/1000)*1000);
 
       // Salaire : en F1, et dans les voies alternatives où le pilote est payé
       // au lieu de payer (GDD §8.4). C'est le basculement économique du jeu.
@@ -4102,7 +4317,7 @@ function negocier(offre, levierId){
   if(Math.random() < proba){
     switch(levierId){
       case 'apport':  offre.apport = Math.max(0, Math.round(offre.apport*0.85/1000)*1000);
-                      offre.partEcurie = round(1 - offre.apport/Math.max(1,CAT[offre.catId].cout||1),2); break;
+                      offre.partEcurie = round(1 - offre.apport/Math.max(1,coutEngagement(offre.catId)||1),2); break;
       case 'salaire': if(offre.salaire>0){ offre.salaire=Math.round(offre.salaire*1.18/1e4)*1e4; } break;
       case 'duree':   offre.duree = Math.max(1, offre.duree-1); break;
       case 'clause':  offre.clauseLiberation = true; break;
@@ -4214,7 +4429,19 @@ function developpement(axe, montant){
   if(!S.saison){ return null; }
   if(!S.saison.dev) S.saison.dev = {chassis:0, aero:0, moteur:0};
   if(!(axe in S.saison.dev)){ return null; }
+  const plafAxe = plafondAxeCourant(axe);
+  if(S.saison.dev[axe] >= plafAxe-0.01){
+    showToast('Cet axe est au plafond ('+round(plafAxe,0)+') — l’argent serait perdu');
+    return null;
+  }
   if(S.saison.caisse < montant){ showToast('La caisse de saison ne le permet pas'); return null; }
+  // Plafond budgétaire réglementaire (GDD §11) : on refuse plutôt que de rogner
+  // le montant en silence, sinon le joueur croit avoir investi ce qu'il a vu.
+  const plafBudget = devPlafondSaison();
+  if(S.saison.devDepense + montant > plafBudget){
+    showToast('Plafond budgétaire : il reste '+fmtEurFull(Math.max(0, plafBudget-S.saison.devDepense)));
+    return null;
+  }
   S.actions--;
   const nom = axesDev().find(a=>a.k===axe).nom;
   caisse('Développement — '+nom, -montant, 'dev');
@@ -4229,7 +4456,7 @@ function developpement(axe, montant){
   // sous zéro et rendre tout investissement supplémentaire inutile.
   const fatigue = 1 / (1 + S.saison.devDepense/(ref*9));
   const g = clamp(6.0 * Math.log10(1 + montant/ref*9) * fatigue, 0, 5);
-  S.saison.dev[axe] = clamp(S.saison.dev[axe] + g, 0, PLAFOND_AXE);
+  S.saison.dev[axe] = clamp(S.saison.dev[axe] + g, 0, plafondAxeCourant(axe));
   saveGame();
   return {gain:g, axe, nom};
 }
@@ -4250,6 +4477,15 @@ function avancerSemaine(){
   ouvrirWeekend();
 }
 function finirWeekend(){
+  // Le pilote peut avoir claqué la porte pendant le débrief : plus de saison à
+  // faire avancer, mais le calendrier commun des autres dossiers, lui, doit
+  // continuer de tourner (GDD §15).
+  if(!S.saison){
+    S.weekend=null;
+    syncDossier(); avancerCalendrier();
+    saveGame();
+    return;
+  }
   S.saison.courseIndex++;
   S.weekend=null;
   if(S.flags.ruptureEnCours){
@@ -4701,6 +4937,12 @@ function renderBureau(){
 
   // ---- CTA principal selon la phase
   h += ctaBureau();
+
+  // ---- règlement en vigueur : il conditionne le baquet et la R&D (GDD §11).
+  // Placé sous le CTA : c'est un cadre de décision, pas l'action du moment.
+  if(p) h += sa
+    ? carteReglement(domaineRegl(sa.catId), false, reglSaison(sa), 'Règlement '+sa.annee+' — '+CAT[sa.catId].nom)
+    : carteReglement(domaineRegl(p.catId));
 
   // ---- pilote
   if(p){
@@ -5924,6 +6166,20 @@ function renderContrats(){
   $('#v-contrats').innerHTML=h;
 }
 
+/* Encart règlement, réutilisé partout où une décision en dépend : choix du
+   baquet, répartition de la R&D, tableau de bord (GDD §11). */
+function carteReglement(dom, plate, r, titre){
+  // Une saison en cours tourne sous SON règlement, figé à l'engagement : afficher
+  // celui du monde pendant qu'elle court induirait le joueur en erreur.
+  r = r || reglMondeDom(dom);
+  return `<div class="card ${plate?'flat':''}">
+    <div class="small txt-muted b" style="text-transform:uppercase;letter-spacing:.05em">${titre || ('Règlement '+S.annee+' — '+DOM_NOM[dom])}</div>
+    <div class="note mt"><b class="txt-amber">${r.ico} ${escapeHtml(r.nom)}</b> — ${escapeHtml(r.resume)}</div>
+    <div class="note txt-muted mt">${escapeHtml(r.effet)}</div>
+    ${r.id!=='stable'?`<div class="note txt-muted"><em>${escapeHtml(r.conseil)}</em></div>`:''}
+  </div>`;
+}
+
 /* ---------------------- OFFRES : comparaison + négociation (GDD §9.2/9.4) */
 ACTIONS.ouvrirOffres = ()=>{
   if(!S.offres || !S.offres.length) S.offres = genererOffres();
@@ -5966,15 +6222,18 @@ function afficherOffres(){
     openModal('Marché des baquets',
       `<div class="note mb">Aucune écurie ne se manifeste. Le résultat sportif, votre réputation ou le budget disponible ne suffisent pas.</div>
        <div class="note mb">Il reste un baquet chez l’écurie la plus modeste de <b>${cs.nom}</b>
-       (apport ${fmtEur(Math.round(cs.cout*0.65))}, l’écurie prend 35 % à sa charge)${descend
+       (apport ${fmtEur(Math.round(coutEngagement(cs.id)*0.65))}, l’écurie prend 35 % à sa charge)${descend
          ? ` — soit une descente d’${CAT[S.pilote.catId].niv-cs.niv===1?'une catégorie':'échelon'}, le temps de reconstruire.`
          : `, dans la même catégorie.`}</div>
-       <div class="note txt-muted">Le GDD le prévoit : on redescend quand le budget ne suit pas. Ce n’est pas une fin de partie.</div>`,
+       <div class="note txt-muted">Le GDD le prévoit : on redescend quand le budget ne suit pas. Ce n’est pas une fin de partie.</div>
+       ${carteReglement(domaineRegl(cs.id), true)}`,
       `<button class="btn-ghost" data-act="fermerModal">Fermer</button>
        <button class="btn" data-act="baquetSecours">Prendre ce baquet</button>`);
     return;
   }
+  const doms = [...new Set(list.map(o=>domaineRegl(o.catId)))];
   const body = `<div class="note mb">Comparez au-delà du seul salaire : la vitesse de progression et le risque de renvoi comptent autant.</div>`
+   + doms.map(d=>carteReglement(d, true)).join('')
    + list.map(o=>{
       const c=CAT[o.catId];
       const progr = o.junior?'Élevée' : c.niv>CAT[S.pilote.catId].niv?'Très élevée':'Moyenne';
@@ -6067,7 +6326,7 @@ function categorieDeSecours(){
   let niv = Math.max(CAT[S.pilote.catId].niv, nivPlancher);
   while(niv>nivPlancher){
     const c = catByNiv(niv);
-    if(c.cout*0.65 <= dispo) break;      // l'écurie modeste prend 35 % à sa charge
+    if(coutEngagement(c.id)*0.65 <= dispo) break;   // l'écurie modeste prend 35 % à sa charge
     niv--;
   }
   return catByNiv(niv);
@@ -6076,7 +6335,7 @@ ACTIONS.baquetSecours = ()=>{
   const c = categorieDeSecours();
   const e = ecuriesPour(c.id).slice(-1)[0];
   const partEcurie = 0.35;
-  const apport = Math.max(0, Math.round(c.cout*(1-partEcurie)/1000)*1000);
+  const apport = Math.max(0, Math.round(coutEngagement(c.id)*(1-partEcurie)/1000)*1000);
   const descente = c.niv < CAT[S.pilote.catId].niv;
   signerOffre({id:uid(), catId:c.id, ecurieId:e.id, ecurieNom:e.nom, prestige:e.prestige, voiture:e.voiture,
     junior:false, partEcurie, apport, salaire:0, primeVictoire:0, primePoint:0, duree:1,
@@ -6560,13 +6819,27 @@ ACTIONS.modalDev = ()=>{
   const c=CAT[S.saison.catId], axes=axesDev(), dev=S.saison.dev||{chassis:0,aero:0,moteur:0};
   const mix=mixCircuits(), total=sum(Object.values(mix));
   // poids moyen de chaque axe sur les circuits qui restent à courir
-  const poidsMoyen = k => total ? sum(Object.entries(mix), ([t,n])=>(POIDS_DEV[t]||POIDS_DEV['Mixte'])[k]*n)/total : 1/3;
-  const meilleur = axes.map(a=>({k:a.k, p:poidsMoyen(a.k)})).sort((x,y)=>y.p-x.p)[0];
+  const poidsMoyen = k => total ? sum(Object.entries(mix), ([t,n])=>poidsDevCourse(t)[k]*n)/total : 1/3;
+  // Un axe bloqué par le règlement ne doit jamais être conseillé (GDD §11).
+  const libre = a => (dev[a]||0) < plafondAxeCourant(a)-0.01;
+  const classes = axes.map(a=>({k:a.k, p:poidsMoyen(a.k)})).sort((x,y)=>y.p-x.p);
+  const meilleur = classes.find(x=>libre(x.k)) || classes[0];
+  const regl = reglSaison();
+  const plafBudget = devPlafondSaison();
+  const resteBudget = plafBudget===Infinity ? Infinity : Math.max(0, plafBudget-S.saison.devDepense);
   openModal('Développement technique',
-    `<div class="note mb">Le budget R&D se répartit sur trois axes. Chaque type de circuit en privilégie un :
-     le moteur sur un tracé rapide, le châssis sur un tracé technique. L’argent sort de la <b>caisse de saison</b>.</div>
+    `<div class="note mb">Le budget R&D se répartit sur trois axes. Chaque type de circuit en privilégie un${regl.poids
+       ? `, et le règlement de la saison redistribue encore ces poids`
+       : ` : le moteur sur un tracé rapide, le châssis sur un tracé technique`}.
+     L’argent sort de la <b>caisse de saison</b>.</div>
      <div class="note mb">Base de l’écurie : <b>${Math.round(S.saison.voiture)}/100</b> · caisse : <b>${fmtEur(S.saison.caisse)}</b>
      · déjà investi : ${fmtEur(S.saison.devDepense)}</div>
+     ${regl.id!=='stable' ? `<div class="card flat" style="margin-bottom:12px">
+       <div class="small txt-muted b" style="text-transform:uppercase;letter-spacing:.05em">Règlement ${S.saison.annee}</div>
+       <div class="note"><b class="txt-amber">${regl.ico} ${escapeHtml(regl.nom)}</b> — ${escapeHtml(regl.effet)}</div>
+       ${plafBudget!==Infinity?`<div class="note txt-muted mt">Plafond budgétaire : <b>${fmtEurFull(plafBudget)}</b> sur la saison —
+         il vous reste <b class="${resteBudget>0?'txt-green':'txt-red'}">${fmtEurFull(resteBudget)}</b>.</div>`:''}
+     </div>` : ''}
      <div class="card flat" style="margin-bottom:12px">
        <div class="small txt-muted b" style="text-transform:uppercase;letter-spacing:.05em">Circuits restants</div>
        <div class="note">${total?Object.entries(mix).map(([t,n])=>`${n} ${t.toLowerCase()}`).join(' · '):'—'}</div>
@@ -6574,14 +6847,17 @@ ACTIONS.modalDev = ()=>{
          <b class="txt-amber">${escapeHtml(axes.find(a=>a.k===meilleur.k).nom)}</b>.</div>
      </div>
      ${axes.map(a=>{
-       const niv=dev[a.k]||0, pm=poidsMoyen(a.k);
+       const niv=dev[a.k]||0, pm=poidsMoyen(a.k), plaf=plafondAxeCourant(a.k), bloque=!libre(a.k);
        return `<div class="grp">
-         <div class="h"><b>${escapeHtml(a.nom)}</b><span>${round(niv,1)}</span></div>
+         <div class="h"><b>${escapeHtml(a.nom)}</b><span>${round(niv,1)}/${round(plaf,0)}</span></div>
          <div class="note txt-muted">${escapeHtml(a.desc)} — pèse ${Math.round(pm*100)} % sur les circuits restants.</div>
-         ${gline('Niveau', niv/PLAFOND_AXE*100, niv/PLAFOND_AXE>0.66?'green':'blue','')}
-         <div class="row tight mt">${paliersDev(c.cout).map(m=>
-           `<button class="btn-ghost btn-sm" data-act="investir" data-axe="${a.k}" data-m="${m}"
-             ${S.saison.caisse<m?'disabled':''}>${fmtEurFull(m)}</button>`).join('')}</div>
+         ${plaf<PLAFOND_AXE?`<div class="note txt-amber">Plafonné à ${round(plaf,0)} par le règlement.</div>`:''}
+         ${gline('Niveau', niv/plaf*100, niv/plaf>0.66?'green':'blue','')}
+         <div class="row tight mt">${bloque
+           ? `<span class="note txt-muted">Axe au plafond — plus rien à en tirer.</span>`
+           : paliersDev(c.cout).map(m=>
+             `<button class="btn-ghost btn-sm" data-act="investir" data-axe="${a.k}" data-m="${m}"
+               ${(S.saison.caisse<m || m>resteBudget)?'disabled':''}>${fmtEurFull(m)}</button>`).join('')}</div>
        </div>`;
      }).join('')}
      <div class="note txt-muted">Rendement décroissant sur le <b>total dépensé</b> dans la saison, pas par axe :
@@ -6592,7 +6868,7 @@ ACTIONS.investir = d=>{
   const r=developpement(d.axe, +d.m); if(!r) return;
   const prochaine = S.saison.calendrier[S.saison.courseIndex];
   openModal('Développement livré',
-    `<div class="note">${escapeHtml(r.nom)} : <b class="txt-green">+${round(r.gain,2)}</b> — niveau ${round(S.saison.dev[r.axe],1)}/${PLAFOND_AXE}.</div>
+    `<div class="note">${escapeHtml(r.nom)} : <b class="txt-green">+${round(r.gain,2)}</b> — niveau ${round(S.saison.dev[r.axe],1)}/${round(plafondAxeCourant(r.axe),0)}.</div>
      ${prochaine?`<div class="note mt">Voiture sur la prochaine manche (${escapeHtml(prochaine.nom)}, ${prochaine.type.toLowerCase()}) :
        <b>${Math.round(voitureEffective(prochaine))}/100</b> — base ${Math.round(S.saison.voiture)} + R&D ${round(bonusDev(prochaine),1)}.</div>`:''}
      <div class="note txt-muted mt">Caisse restante : ${fmtEur(S.saison.caisse)}</div>`,
