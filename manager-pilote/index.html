@@ -1052,7 +1052,15 @@ function migrerPartie(o){
     if(!pi.entourage) pi.entourage = 'discret';
     if(pi.patienceFamille===undefined) pi.patienceFamille = 100;
   };
-  for(const d of o.dossiers){ completer(d.pilote); }
+  for(const d of o.dossiers){
+    completer(d.pilote);
+    // Mandat manager ↔ pilote, ajouté après coup : on crédite les conditions
+    // historiques (10 %, trois saisons) pour ne rien changer aux parties en cours.
+    if(d.pilote && !d.mandat)
+      d.mandat = {anneeDebut:o.annee, anneeFin:o.annee+2, duree:3, commission:0.10, indemnite:0};
+  }
+  if(o.pilote && !o.mandat)
+    o.mandat = {anneeDebut:o.annee, anneeFin:o.annee+2, duree:3, commission:0.10, indemnite:0};
   completer(o.pilote);
   for(const c of o.monde.scoutPool) completer(c);
   for(const r of (o.monde.rivaux||[])) completer(r);
@@ -1073,7 +1081,7 @@ function wipeGame(){ localStorage.removeItem(SAVE_KEY); S=null; }
    fonctionner sans indirection. `syncDossier()` renvoie l'état à plat dans le
    tableau, `activerDossier()` fait le mouvement inverse. Toute opération qui
    parcourt les dossiers doit donc appeler `syncDossier()` d'abord. */
-const CHAMPS_DOSSIER = ['pilote','contrat','saison','weekend','sponsors','offres'];
+const CHAMPS_DOSSIER = ['pilote','contrat','saison','weekend','sponsors','offres','mandat'];
 
 /* Places disponibles selon la réputation du manager (GDD §15). */
 /* La réputation donne le droit de suivre plusieurs pilotes, les locaux en
@@ -1113,7 +1121,7 @@ function ouvrirPlace(){
 }
 function dossierVide(){
   return {pilote:null, contrat:null, saison:null, weekend:null,
-          sponsors:{actifs:[],prospects:[],vus:[]}, offres:null};
+          sponsors:{actifs:[],prospects:[],vus:[]}, offres:null, mandat:null};
 }
 function syncDossier(){
   if(!S.dossiers || !S.dossiers[S.actif]) return;
@@ -1252,6 +1260,7 @@ function nouvellePartie(budgetId, repPalierId, nomManager){
     // dossier actif, recopié à plat (voir CHAMPS_DOSSIER)
     pilote: null,
     contrat: null,
+    mandat: null,                     // contrat manager ↔ pilote
     sponsors: {actifs:[], prospects:[], vus:[]},
     saison: null,
     weekend: null,
@@ -1482,6 +1491,224 @@ function creerRivaux(){
       part: clamp(0.34+gauss()*0.05,0.24,0.55)});
     S.monde.rivaux.push(r);
   }
+}
+
+/* ================= MANDAT ET MARCHÉ DES TRANSFERTS =====================
+   Jusqu'ici, représenter un pilote n'était encadré par rien : on le signait, on
+   le gardait, et la commission était figée. Le mandat en fait un vrai contrat —
+   une durée, un taux négocié — et ouvre un marché : on peut aller chercher le
+   pilote d'un concurrent en l'indemnisant, et se faire prendre le sien. */
+const COMMISSION_BASE = 0.10;        // taux de référence sur les gains de course
+const COMMISSION_MIN  = 0.04;
+const COMMISSION_MAX  = 0.22;
+
+/* Taux effectivement appliqué. Les trois assiettes gardent leur rapport
+   historique : course ×1, sponsors ×1,5, titre ×2. */
+function tauxCommission(assiette){
+  const m = S.mandat;
+  const base = m && m.commission ? m.commission : COMMISSION_BASE;
+  const mult = assiette==='sponsor' ? 1.5 : assiette==='titre' ? 2 : 1;
+  return clamp(base*mult, 0.02, 0.5);
+}
+function mandatActif(){ return !!(S.mandat && S.mandat.anneeFin >= S.annee); }
+function anneesMandatRestantes(){ return S.mandat ? Math.max(0, S.mandat.anneeFin - S.annee + 1) : 0; }
+
+/* Valeur marchande d'un pilote : ce qu'il rapportera, pondéré par sa jeunesse.
+   Sert d'indemnité de transfert et de repère de négociation. */
+function valeurMarchande(p, catId){
+  const cat = CAT[catId || p.catId] || CAT.kmini;
+  // Accepte aussi bien un pilote complet qu'un résumé détenu par un rival, qui
+  // ne porte que deux nombres et pas les neuf statistiques.
+  const plaf = p.plafonds ? notePlafond(p) : (p.plafond ?? 60);
+  const note = p.stats    ? notePilote(p)  : (p.note ?? 40);
+  const jeunesse = clamp((26 - (p.age||18))/12, 0.15, 1);
+  const socle = 3000 + cat.niv*cat.niv*900;
+  return Math.round((socle + plaf*plaf*14 + note*260) * (0.5 + jeunesse*0.8) / 500)*500;
+}
+/* Indemnité due au manager sortant : il perd ses commissions à venir. */
+function indemniteTransfert(p, catId, anneesRestantes){
+  return Math.round(valeurMarchande(p, catId) * (0.35 + clamp(anneesRestantes,0,3)*0.22) / 500)*500;
+}
+
+/* Ce qu'un pilote pense d'une proposition de mandat. Il compare le taux qu'on
+   lui prend, la réputation du manager, et ce qu'il vit chez le sien. */
+function interetMandat(p, commission, repManager, relationActuelle, repActuel){
+  const gain = (COMMISSION_BASE - commission) * 420;      // un taux bas le séduit
+  const prestige = (repManager - (repActuel||0)) * 6;
+  const lassitude = relationActuelle===null ? 12 : clamp((55 - relationActuelle)*0.7, -25, 40);
+  return gain + prestige + lassitude;
+}
+function probaMandat(interet){ return clamp(0.30 + interet/110, 0.03, 0.95); }
+
+/* Un rival ne stocke qu'un résumé de ses pilotes. Pour en faire un pilote
+   jouable, on reconstruit ses statistiques autour de sa note et de son plafond. */
+function pilotePourTransfert(e){
+  const p = creerPilote({age:e.age, potId:3, catId:e.catId, nom:e.nom, id:e.id});
+  const cible = clamp(e.note, 5, 99), plaf = clamp(e.plafond, cible+1, 99);
+  for(const k of ALL_STATS){
+    p.plafonds[k] = clamp(Math.round(plaf + rint(-3,3)), 20, 99);
+    p.stats[k]    = clamp(Math.round(cible + rint(-3,3)), 5, p.plafonds[k]);
+  }
+  p.role='joueur'; p.relation=52; p.moral=clamp(p.moral,55,90);
+  p.observe=2; p.blessure=null; p.rupture=0;
+  return p;
+}
+
+/* Approcher le pilote d'un concurrent. Deux étapes : il faut d'abord qu'il
+   accepte le principe, puis payer l'indemnité à son manager. */
+function approcherPilote(eleveId, commission){
+  const cible = marcheTransferts().find(x=>x.eleve.id===eleveId);
+  if(!cible) return {issue:'introuvable'};
+  const {eleve, manager} = cible;
+  const rp = repPalier(S.manager.repPoints).p;
+  // Un pilote bien traité chez lui n'écoute pas : on approxime sa satisfaction
+  // par la réputation de son manager et son niveau de catégorie.
+  const relationChezLui = clamp(45 + manager.rep*3 + CAT[eleve.catId].niv*2, 20, 92);
+  const interet = interetMandat(eleve, commission, rp, relationChezLui, manager.rep);
+  const proba = probaMandat(interet);
+  if(Math.random() > proba){
+    eleve.approches = (eleve.approches||0)+1;
+    return {issue:'refus', proba, nom:eleve.nom, manager:manager.nom};
+  }
+  return {issue:'accord', proba, eleve, manager,
+          indemnite: indemniteTransfert(eleve, eleve.catId, 2)};
+}
+
+/* L'inverse : un concurrent vient chercher VOTRE pilote. Il vise ceux qui
+   valent quelque chose et dont la relation avec vous s'est distendue. Le joueur
+   peut répondre en baissant sa commission — ce qui coûte, mais retient. */
+function offreSurMonPilote(){
+  if(!S.pilote || !S.monde.managers || !S.monde.managers.length) return null;
+  const p = S.pilote;
+  const rp = repPalier(S.manager.repPoints).p;
+  // Un manager plein peut quand même venir, s'il est prêt à se séparer de son
+  // moins bon pour votre pilote — sans quoi le marché se fige dès que les
+  // rivaux ont rempli leurs places, et plus personne ne débauche personne.
+  const monPlafond = notePlafond(p);
+  const pretendants = S.monde.managers.filter(m => {
+    if(m.rep < rp-3) return false;
+    if(m.pilotes.length < placesRival(m)) return true;
+    const faible = m.pilotes.reduce((b,x)=> !b || x.plafond<b.plafond ? x : b, null);
+    return !!faible && faible.plafond < monPlafond - 4;
+  });
+  if(!pretendants.length) return null;
+  const m = pretendants[Math.floor(Math.random()*pretendants.length)];
+  const tx = pick([0.05,0.06,0.08]);
+  const interet = interetMandat(p, tx, m.rep, p.relation, rp);
+  if(interet < 10) return null;                 // il n'est pas tenté
+  return {managerId:m.id, manager:m.nom, repRival:m.rep, commission:tx,
+          interet:Math.round(interet), valeur:valeurMarchande(p)};
+}
+
+/* Un concurrent tente sa chance sur l'un de vos pilotes. Rare, et seulement
+   quand la relation laisse une prise. */
+function demarchageRivaux(){
+  if(!S.dossiers) return;
+  const retour = S.actif;
+  syncDossier();
+  for(let i=0;i<S.dossiers.length;i++){
+    const v = S.dossiers[i];
+    if(!v.pilote || S.flags['offreEnCours_'+v.pilote.id]) continue;
+    if(v.pilote.relation > 70) continue;              // bien traité, on ne l'approche pas
+    if(Math.random() > 0.055) continue;
+    S.actif = i;
+    for(const k of CHAMPS_DOSSIER) S[k] = S.dossiers[i][k];
+    const o = offreSurMonPilote();
+    if(o){
+      S.flags['offreEnCours_'+S.pilote.id] = o;
+      msg('pilote', S.pilote.nom, 'Un manager est venu me voir',
+        `« ${escapeHtml(o.manager)} m’a fait une proposition : `+
+        `il ne prendrait que <em>${Math.round(o.commission*100)} %</em>.\n\n`+
+        `Je ne te cache rien, mais j’attends de savoir ce que tu proposes. »`,
+        {kind:'offreRivale', pilId:S.pilote.id});
+    }
+    syncDossier();
+  }
+  S.actif = retour;
+  for(const k of CHAMPS_DOSSIER) S[k] = S.dossiers[retour][k];
+}
+
+/* Réponse du joueur à une offre rivale. */
+function repondreOffreRivale(pilId, choix){
+  const o = S.flags['offreEnCours_'+pilId];
+  const p = S.pilote;
+  if(!o || !p || p.id!==pilId) return null;
+  delete S.flags['offreEnCours_'+pilId];
+  const rp = repPalier(S.manager.repPoints).p;
+  if(choix==='aligner'){
+    // On s'aligne sur le taux du rival : il reste, mais vos revenus baissent.
+    if(!S.mandat) S.mandat = {anneeDebut:S.annee, anneeFin:S.annee+2, duree:3, commission:COMMISSION_BASE};
+    S.mandat.commission = Math.max(COMMISSION_MIN, o.commission);
+    S.mandat.anneeFin = S.annee+2;
+    p.relation = clamp(p.relation+16, 0, 100);
+    p.moral = clamp(p.moral+6, 5, 100);
+    saveGame();
+    return {txt:`Il reste. Votre commission tombe à ${Math.round(S.mandat.commission*100)} %, `+
+      `et le mandat repart pour trois saisons.`};
+  }
+  if(choix==='prolonger'){
+    // On ne baisse pas le taux mais on s'engage : moins efficace, gratuit.
+    const interet = interetMandat(p, S.mandat?S.mandat.commission:COMMISSION_BASE, rp, p.relation, o.repRival);
+    if(Math.random() < clamp(0.30 + (p.relation-45)/110, 0.08, 0.85)){
+      if(S.mandat) S.mandat.anneeFin = S.annee+2;
+      p.relation = clamp(p.relation+8, 0, 100);
+      saveGame();
+      return {txt:'Il accepte de prolonger sans changer vos conditions. La confiance a suffi.'};
+    }
+    cederPilote(o);
+    return {txt:'Il n’a pas été convaincu. Il part.'};
+  }
+  // refuser de discuter
+  p.relation = clamp(p.relation-12, 0, 100);
+  if(Math.random() < clamp(0.45 + (55-p.relation)/120, 0.15, 0.9)){
+    cederPilote(o);
+    return {txt:'Il part. Vous n’avez rien proposé.'};
+  }
+  saveGame();
+  return {txt:'Il reste, sans enthousiasme. Le sujet reviendra.'};
+}
+
+/* Le pilote part chez le rival qui l'a approché. */
+function cederPilote(o){
+  const p = S.pilote;
+  const m = (S.monde.managers||[]).find(x=>x.id===o.managerId);
+  if(m && m.pilotes.length >= placesRival(m)){
+    // Il fait de la place : son moins bon pilote retourne au vivier.
+    const faible = m.pilotes.reduce((b,x)=> !b || x.plafond<b.plafond ? x : b, null);
+    if(faible) m.pilotes = m.pilotes.filter(x=>x.id!==faible.id);
+  }
+  if(m && m.pilotes.length < placesRival(m)){
+    m.pilotes.push({id:p.id, nom:p.nom, catId:p.catId, note:round(notePilote(p),1),
+                    plafond:round(notePlafond(p),1), age:p.age, annee:S.annee});
+    m.signatures++;
+  }
+  // On touche l'indemnité que le rival verse : c'est la contrepartie du départ.
+  const indem = indemniteTransfert(p, p.catId, anneesMandatRestantes());
+  argent('Indemnité de transfert — '+(m?m.nom:'un concurrent'), indem, 'transfert');
+  msg('pilote', p.nom, 'Il part chez '+(m?m.nom:'un concurrent'),
+    `${p.nom} accepte la proposition de ${m?m.nom:'un concurrent'}.\n\n`+
+    `Vous touchez une indemnité de <em>${fmtEurFull(indem)}</em> pour les commissions perdues — `+
+    `mais c'est lui qui touchera les suivantes.`);
+  const id = p.id;
+  perdrePilote('transfert');
+  // Il est chez un rival, pas au vivier : on le retire de la liste des libres.
+  S.monde.scoutPool = S.monde.scoutPool.filter(x=>x.id!==id);
+  saveGame();
+}
+
+/* Pilotes sous mandat rival, visibles au marché. On ne voit que ceux dont la
+   catégorie est à portée de la réputation du manager — comme pour le vivier. */
+function marcheTransferts(){
+  const rp = repPalier(S.manager.repPoints).p;
+  const plafondNiv = rp>=9?8 : rp>=7?7 : rp>=5?6 : rp>=3?4 : 2;
+  const l = [];
+  for(const m of (S.monde.managers||[])){
+    for(const e of m.pilotes){
+      if(CAT[e.catId] && CAT[e.catId].niv > plafondNiv) continue;
+      l.push({eleve:e, manager:m});
+    }
+  }
+  return l.sort((a,b)=> b.eleve.plafond - a.eleve.plafond);
 }
 
 /* ================= ACADÉMIE DE PILOTES (GDD §22.2) =====================
@@ -2073,6 +2300,7 @@ function avancerCalendrier(){
   S.phase='semaine';
   S.actions=actionsParSemaine();
   tourDeMarche(0.5);                 // le vivier bouge aussi pendant la saison
+  demarchageRivaux();                // et vos pilotes se font approcher
 
   S.flags.bonusReglages = 0;
   // Plusieurs semaines séparent deux manches : les pilotes récupèrent seuls.
@@ -2573,20 +2801,23 @@ function traiterResultat(course, meteo, r, reg){
   }
   if(gain>0){
     caisse('Prime de course — '+ordinal(pos), gain, 'gain');
-    const com = Math.round(gain*0.10);
-    argent('Commission course '+course.nom+' (10 %)', com, 'commission');
+    const tx = tauxCommission('course');
+    const com = Math.round(gain*tx);
+    argent('Commission course '+course.nom+' ('+Math.round(tx*100)+' %)', com, 'commission');
   }
   // salaire F1 : versé par manche
   if(sa.catId==='f1' && S.contrat && S.contrat.salaire>0){
     const parManche = Math.round(S.contrat.salaire/c.courses);
-    const com = Math.round(parManche*0.10);
-    argent('Commission sur salaire — '+course.nom+' (10 %)', com, 'commission');
+    const tx = tauxCommission('course');
+    const com = Math.round(parManche*tx);
+    argent('Commission sur salaire — '+course.nom+' ('+Math.round(tx*100)+' %)', com, 'commission');
     // primes de résultat
     let prime=0;
     if(!dnf && pos===1) prime = S.contrat.primeVictoire||0;
     else if(!dnf && pos<=3) prime = Math.round((S.contrat.primeVictoire||0)*0.4);
     else if(pts>0) prime = (S.contrat.primePoint||0)*pts;
-    if(prime>0) argent('Commission primes '+course.nom+' (10 %)', Math.round(prime*0.10), 'commission');
+    if(prime>0) argent('Commission primes '+course.nom+' ('+Math.round(tauxCommission('course')*100)+' %)',
+      Math.round(prime*tauxCommission('course')), 'commission');
   }
   // staff : 12 mois de salaire répartis sur la saison
   const staffManche = Math.round(staffCoutMensuel()*12/c.courses);
@@ -2924,8 +3155,9 @@ function signerSponsor(sponsorId, montant){
   S.sponsors.actifs.push(s);
   S.sponsors.prospects = S.sponsors.prospects.filter(x=>x.id!==s.id);
   S.stats.sponsorsSignes++;
-  const com = Math.round(montant*0.15);
-  argent('Commission sponsor — '+s.nom+' (15 %)', com, 'commission');
+  const txS = tauxCommission('sponsor');
+  const com = Math.round(montant*txS);
+  argent('Commission sponsor — '+s.nom+' ('+Math.round(txS*100)+' %)', com, 'commission');
   gagnerRep(Math.round(4 + s.niv*9), 'sponsor');
   // Le montant alimente la caisse de saison, pas la poche du manager (GDD §19.1)
   if(S.saison){
@@ -2935,7 +3167,7 @@ function signerSponsor(sponsorId, montant){
   msg('sponsor', s.nom, 'Contrat de partenariat signé',
     `${s.nom} s’engage pour <em>${fmtEurFull(montant)}</em> sur la saison`+(s.duree>1?` (contrat de ${s.duree} ans)`:'')+`.\n\n`+
     `Secteur : ${s.secteur}. Contreparties : ${s.obligations.map(o=>OBLIGATIONS.find(x=>x.id===o).lab).join(', ')}.\n\n`+
-    `Votre commission de 15 % (${fmtEurFull(com)}) est créditée. Le reste finance la saison du pilote.`);
+    `Votre commission de ${Math.round(txS*100)} % (${fmtEurFull(com)}) est créditée. Le reste finance la saison du pilote.`);
   majSponsorsProspects();
   saveGame();
   return true;
@@ -2988,7 +3220,8 @@ function primesSponsorsFinSaison(posChamp){
       const prime = Math.round(s.montant*s.partConditionnelle);
       total += prime;
       caisse('Prime d’objectif — '+s.nom, prime, 'sponsor');
-      argent('Commission prime sponsor — '+s.nom+' (15 %)', Math.round(prime*0.15), 'commission');
+      argent('Commission prime sponsor — '+s.nom+' ('+Math.round(tauxCommission('sponsor')*100)+' %)',
+        Math.round(prime*tauxCommission('sponsor')), 'commission');
     }
   }
   return total;
@@ -3373,6 +3606,8 @@ function perdrePilote(cause){
     cause==='manager'
       ? `Vous ne représentez plus ${p.nom}. Les commissions à venir sur lui vous échappent, `+
         `et le paddock retiendra que vous avez lâché un pilote en cours de route.`
+      : cause==='transfert'
+        ? `${p.nom} est désormais représenté par un autre manager.`
       : `${p.nom} change de manager. Toutes vos commissions futures sur lui sont perdues.\n\n`+
         (cause==='famille'
           ? `Ce n’est pas lui qui a tranché, mais sa famille : elle finançait la saison, elle a décidé.`
@@ -3381,9 +3616,10 @@ function perdrePilote(cause){
   // Quand c'est le manager qui rompt, le coût en réputation a déjà été prélevé
   // par confirmRompre() — celui qui l'a annoncé au joueur. En rajouter ici
   // ferait payer plus que le montant affiché.
-  if(cause!=='manager') gagnerRep(cause==='famille' ? -70 : -120, 'départ du pilote');
+  if(cause==='transfert') gagnerRep(-40, 'pilote débauché');
+  else if(cause!=='manager') gagnerRep(cause==='famille' ? -70 : -120, 'départ du pilote');
   S.historique.push({annee:S.annee, type:'depart', pilote:p.nom, cause:cause||'relation'});
-  S.pilote=null; S.contrat=null; S.saison=null; S.weekend=null;
+  S.pilote=null; S.contrat=null; S.mandat=null; S.saison=null; S.weekend=null;
   S.sponsors.actifs=[]; S.sponsors.prospects=[]; S.sponsors.vus=[];
   S.offres=null;
   syncDossier();
@@ -3440,7 +3676,8 @@ function terminerSaison(interrompue){
       S.stats.titres++;
       if(c.titre>0){
         caisse('Prime de champion — '+c.nom, c.titre, 'gain');
-        argent('Commission titre (20 %)', Math.round(c.titre*0.20), 'commission');
+        argent('Commission titre ('+Math.round(tauxCommission('titre')*100)+' %)',
+          Math.round(c.titre*tauxCommission('titre')), 'commission');
       }
       gagnerRep(Math.round(80+c.niv*46), 'titre');
       msg('systeme','Fédération','Champion !', `${p.nom} est sacré champion de ${c.nom} ${S.annee}.\n\nVotre réputation en profite pleinement.`);
@@ -4628,6 +4865,68 @@ ACTIONS.nouvellePartieDepuisFin = ()=>{ wipeGame(); UI.tab='bureau'; render(); }
    en karting un pilote ne rapporte aucune commission et sa saison se finance sur
    ses seuls sponsors. Mettre un pilote en retrait est donc une vraie décision. */
 /* Rompre soi-même la collaboration. */
+/* Approcher un pilote sous mandat rival : on choisit d'abord son taux. */
+ACTIONS.modalApprocher = d=>{
+  const cible = marcheTransferts().find(x=>x.eleve.id===d.id);
+  if(!cible) return;
+  const {eleve, manager} = cible;
+  const indem = indemniteTransfert(eleve, eleve.catId, 2);
+  const rp = repPalier(S.manager.repPoints).p;
+  const relChezLui = clamp(45 + manager.rep*3 + CAT[eleve.catId].niv*2, 20, 92);
+  const ligne = tx => {
+    const pr = probaMandat(interetMandat(eleve, tx, rp, relChezLui, manager.rep));
+    return `<button class="btn-ghost btn-block mt" data-act="confirmApprocher" data-id="${eleve.id}" data-tx="${tx}">
+      Commission ${Math.round(tx*100)} % — il accepte à ${Math.round(pr*100)} %</button>`;
+  };
+  openModal('Approcher '+escapeHtml(eleve.nom),
+    `<div class="note mb">Il est représenté par <b>${escapeHtml(manager.nom)}</b>.
+       Plus vous lui prenez peu, plus il est tenté de changer — mais moins il vous rapportera.</div>
+     <div class="slider-box">
+       <div class="top"><b>Indemnité à ${escapeHtml(manager.nom)}</b><span class="${S.manager.budget>=indem?'txt-amber':'txt-red'}">${fmtEurFull(indem)}</span></div>
+       <div class="note">Versée seulement s’il accepte. Vous avez ${fmtEur(S.manager.budget)}.</div>
+     </div>
+     ${[0.06,0.10,0.15].map(ligne).join('')}
+     <div class="note txt-muted mt">Une approche refusée se sait : le pilote devient plus difficile à convaincre,
+       et son manager vous en tiendra rigueur.</div>`,
+    `<button class="btn-ghost" data-act="fermerModal">Renoncer</button>`);
+};
+ACTIONS.confirmApprocher = d=>{
+  const tx = +d.tx;
+  const cible = marcheTransferts().find(x=>x.eleve.id===d.id);
+  if(!cible){ closeModal(); return; }
+  const indem = indemniteTransfert(cible.eleve, cible.eleve.catId, 2);
+  if(S.manager.budget < indem){ showToast('Il vous manque '+fmtEur(indem-S.manager.budget)); return; }
+  if(!resteDeLaPlace()){ showToast('Plus de place dans votre écurie'); return; }
+  const r = approcherPilote(d.id, tx);
+  if(r.issue!=='accord'){
+    gagnerRep(-8, 'approche refusée');
+    closeModal(); saveGame(); render();
+    showToast(r.nom+' décline votre proposition');
+    return;
+  }
+  // Il accepte : on indemnise, on le retire de chez son manager, on le prend.
+  argent('Indemnité de transfert — '+r.manager.nom, -indem, 'transfert');
+  r.manager.pilotes = r.manager.pilotes.filter(x=>x.id!==r.eleve.id);
+  const place = ouvrirPlace();
+  if(place<0){ closeModal(); showToast('Plus de place'); return; }
+  const p = pilotePourTransfert(r.eleve);
+  syncDossier();
+  S.actif = place;
+  for(const k of CHAMPS_DOSSIER) S[k] = S.dossiers[place][k];
+  S.pilote = p;
+  S.contrat = null;
+  S.mandat = {anneeDebut:S.annee, anneeFin:S.annee+2, duree:3, commission:tx, indemnite:indem};
+  S.sponsors = {actifs:[],prospects:[],vus:[]};
+  S.offres = null;
+  syncDossier();
+  gagnerRep(Math.round(10 + notePlafond(p)/8), 'transfert réussi');
+  msg('pilote', p.nom, 'Il change de manager',
+    `${p.nom} quitte ${r.manager.nom} pour vous rejoindre.\n\n`+
+    `Indemnité versée : <em>${fmtEurFull(indem)}</em>. Votre commission : <em>${Math.round(tx*100)} %</em>, `+
+    `sur trois saisons.`);
+  closeModal(); saveGame(); go('bureau');
+  showToast(p.nom+' rejoint votre écurie');
+};
 ACTIONS.modalRompre = ()=>{
   const p = S.pilote; if(!p) return;
   const c = coutRupture();
@@ -4821,6 +5120,19 @@ function renderPilote(){
     ${gline('Forme physique', p.forme, couleurMoral(p.forme))}
     ${gline('Fatigue', p.fatigue, p.fatigue>60?'red':p.fatigue>35?'amber':'green')}
     ${gline('Relation avec vous', p.relation, couleurMoral(p.relation))}
+    ${S.mandat?`<div class="hr"></div>
+      <div class="row" style="gap:14px;flex-wrap:wrap">
+        <div><div class="small txt-muted">Votre commission</div>
+          <div class="b">${Math.round(S.mandat.commission*100)} % <span class="txt-2 small">(course)</span></div></div>
+        <div><div class="small txt-muted">Sponsors / titre</div>
+          <div class="b txt-2">${Math.round(tauxCommission('sponsor')*100)} % · ${Math.round(tauxCommission('titre')*100)} %</div></div>
+        <div><div class="small txt-muted">Mandat</div>
+          <div class="b ${anneesMandatRestantes()<=1?'txt-amber':''}">${anneesMandatRestantes()} saison(s)</div></div>
+        <div><div class="small txt-muted">Valeur estimée</div>
+          <div class="b txt-green">${fmtEur(valeurMarchande(p))}</div></div>
+      </div>
+      ${anneesMandatRestantes()<=1?`<div class="note warn mt">Le mandat arrive à échéance : un concurrent
+        peut le débaucher sans rien vous verser une fois qu’il aura expiré.</div>`:''}`:''}
     ${p.relation<RELATION_RUPTURE?`<div class="note warn mt">⚠ <b>Rupture imminente.</b>
       ${(p.rupture||0)>=2?'Il a déjà rencontré un autre manager. Une manche de plus dans cet état et il part.'
         :'Il ne se sent plus suivi. Encore '+(3-(p.rupture||0))+' manche(s) ainsi et il changera de manager.'}</div>`:''}
@@ -4928,6 +5240,34 @@ function renderScouting(){
       </div>
     </div>`;
   }
+  // ---- marché des transferts : les pilotes déjà sous mandat
+  const marche = marcheTransferts();
+  if(marche.length){
+    h += `<div class="card"><h2><span class="vig"><span>🔁</span></span>Marché des transferts
+        <span class="hint">${marche.length} pilote(s) sous mandat</span></h2>
+      <div class="note mb">Ces pilotes sont représentés par un concurrent. Vous pouvez les approcher :
+        si le pilote accepte votre offre, vous <b>indemnisez son manager</b> pour les commissions
+        qu’il perd. Un taux de commission bas vous rend plus attractif — et vous rapporte moins.</div>
+      ${marche.slice(0,8).map(({eleve,manager})=>{
+        const indem = indemniteTransfert(eleve, eleve.catId, 2);
+        return `<div class="slider-box">
+          <div class="top"><b>${escapeHtml(eleve.nom)}</b><span>${CAT[eleve.catId].court} · ${eleve.age} ans</span></div>
+          <div class="note">Sous mandat de <b>${escapeHtml(manager.nom)}</b> (réputation ${manager.rep}/10)</div>
+          <div class="row tight mt">
+            ${tag('Note '+Math.round(eleve.note),'t-blue')}
+            ${tag('Plafond '+Math.round(eleve.plafond),'t-green')}
+            ${tag('Indemnité '+fmtEur(indem), S.manager.budget>=indem?'t-amber':'t-red')}
+            ${eleve.approches?tag(eleve.approches+' approche(s)','t-grey'):''}
+            <div class="spacer"></div>
+            <button class="btn btn-sm" data-act="modalApprocher" data-id="${eleve.id}"
+              ${resteDeLaPlace()?'':'disabled'}>Approcher</button>
+          </div>
+        </div>`;
+      }).join('')}
+      ${resteDeLaPlace()?'':`<div class="note warn mt">Plus de place dans votre écurie : libérez un dossier avant d’approcher quelqu’un.</div>`}
+    </div>`;
+  }
+
   h += `<div class="card flat"><div class="note txt-muted">Le vivier se renouvelle à chaque nouvelle saison, et s’élargit avec votre réputation.
     Vous n’êtes pas seul à le regarder : les managers concurrents signent aussi, et un jeune observé trop longtemps finit par partir.</div></div>`;
   $('#v-pilote').innerHTML = h;
@@ -4983,11 +5323,13 @@ ACTIONS.confirmSignerPilote = d=>{
   const place = ouvrirPlace();
   if(place<0){ closeModal(); showToast('Plus de place : votre réputation n’en autorise pas davantage'); return; }
   c.role='joueur'; c.relation=58; c.moral=Math.max(c.moral,62);
+  const commission = UI.commissionProposee || COMMISSION_BASE;
   syncDossier();
   S.actif = place;
   for(const k of CHAMPS_DOSSIER) S[k] = S.dossiers[place][k];
   S.pilote=c;
   S.contrat=null;
+  S.mandat={anneeDebut:S.annee, anneeFin:S.annee+2, duree:3, commission, indemnite:0};
   S.sponsors={actifs:[],prospects:[],vus:[]};
   S.offres=null;
   syncDossier();
@@ -5029,8 +5371,31 @@ function renderMsgActions(m){
     return `<div class="msg-actions">`+d.options.map((o,i)=>
       `<button class="btn-ghost btn-sm" data-act="repDemande" data-id="${m.id}" data-i="${i}">${escapeHtml(o.lab)}</button>`).join('')+`</div>`;
   }
+  if(m.actions.kind==='offreRivale'){
+    const o = S.flags['offreEnCours_'+m.actions.pilId];
+    if(!o) return '';
+    return `<div class="msg-actions">
+      <button class="btn-ghost btn-sm" data-act="repOffre" data-id="${m.id}" data-c="aligner">S’aligner sur ${Math.round(o.commission*100)} %</button>
+      <button class="btn-ghost btn-sm" data-act="repOffre" data-id="${m.id}" data-c="prolonger">Le convaincre sans baisser</button>
+      <button class="btn-ghost btn-sm" data-act="repOffre" data-id="${m.id}" data-c="refuser">Ne rien proposer</button>
+    </div>`;
+  }
   return '';
 }
+ACTIONS.repOffre = d=>{
+  const m = S.inbox.find(x=>x.id===d.id); if(!m || !m.actions) return;
+  const pilId = m.actions.pilId;
+  // Se placer sur le bon dossier avant de répondre.
+  if(S.dossiers) for(let i=0;i<S.dossiers.length;i++){
+    const v = vueDossier(i);
+    if(v && v.pilote && v.pilote.id===pilId){ activerDossier(i); break; }
+  }
+  const r = repondreOffreRivale(pilId, d.c);
+  m.actions = null;
+  m.reponse = r ? r.txt : 'La proposition n’est plus d’actualité.';
+  saveGame(); render();
+  if(r) showToast(r.txt.slice(0,60));
+};
 ACTIONS.ouvrirMsg = d=>{
   const m=S.inbox.find(x=>x.id===d.id); if(!m) return;
   m.lu=true; m.ouvert=!m.ouvert;

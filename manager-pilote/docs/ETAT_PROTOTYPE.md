@@ -1172,6 +1172,79 @@ le coût de rupture (plus cher en saison, plus cher pour un bon pilote, égal au
 montant annoncé), l'indemnité prélevée, et le retour au vivier en état signable.
 `browser7.js` rejoue les deux chemins par de vrais clics.
 
+## Le mandat et le marché des transferts
+
+Signalé en jouant : le marché est trop petit, et représenter un pilote n'est
+encadré par rien. C'était exact — on signait un jeune du vivier, on le gardait,
+et la commission était figée dans le code (10 % course, 15 % sponsors, 20 %
+titre). Il n'existait aucun contrat entre le manager et son pilote.
+
+### Le mandat
+
+Un vrai contrat manager ↔ pilote, distinct du contrat pilote ↔ écurie : une
+durée de trois saisons et un **taux de commission négocié**. Les trois assiettes
+gardent leur rapport historique — sponsors à une fois et demie le taux, titre au
+double — si bien qu'un mandat à 10 % reproduit exactement l'ancien
+comportement. Les parties existantes sont migrées à ces conditions, rien ne
+change pour elles.
+
+Le taux est le cœur de la négociation : **plus vous prenez peu, plus vous êtes
+attirant, moins vous gagnez**. La fiche du pilote affiche le taux, les années
+restantes et sa valeur marchande estimée.
+
+### Aller chercher le pilote d'un concurrent
+
+Un marché apparaît sous le vivier : les pilotes sous mandat rival, avec le nom
+de leur manager et l'indemnité qu'il faudrait lui verser. On approche en
+choisissant son taux, et la fenêtre annonce la probabilité d'acceptation avant
+de s'engager :
+
+| Taux proposé | Il accepte |
+|---|---|
+| 6 % | 58 % |
+| 10 % | 43 % |
+| 15 % | 23 % |
+
+L'intérêt du pilote croise trois choses : le taux qu'on lui prend, l'écart de
+réputation entre les deux managers, et sa satisfaction chez le sien. L'indemnité
+suit sa valeur marchande — plafond, catégorie, jeunesse — et n'est versée que
+s'il accepte. Une approche refusée coûte de la réputation et rend le pilote plus
+difficile à convaincre ensuite.
+
+### Se faire prendre le sien
+
+L'inverse existe aussi. Un concurrent peut approcher votre pilote si la relation
+laisse une prise (au-dessus de 70, personne ne vient). Un message arrive, et
+trois réponses :
+
+- **s'aligner** sur le taux du rival — il reste, le mandat repart pour trois
+  saisons, mais vos revenus baissent d'autant ;
+- **le convaincre sans baisser** — gratuit, mais la réussite dépend de la
+  relation ; un échec et il part ;
+- **ne rien proposer** — la relation chute, et il part le plus souvent.
+
+S'il part, vous touchez une indemnité proportionnelle aux années de mandat
+restantes. C'est ce qui rend l'échéance lisible : un mandat à un an de la fin ne
+protège presque plus rien, et la fiche du pilote le signale.
+
+### Un marché qui se figeait
+
+Première version : une fois les rivaux à court de places, plus personne ne
+pouvait débaucher — dans les deux sens. Mesuré, aucune offre n'arrivait après
+80 mouvements de marché. Un manager plein peut maintenant venir quand même,
+s'il est prêt à se séparer de son moins bon pilote pour le vôtre — ce qui est
+d'ailleurs la façon dont ces choses se passent.
+
+### Test
+
+`unit19.js` : 41 assertions sur la création du mandat, l'application du taux aux
+trois assiettes, la valeur marchande (qui accepte aussi bien un pilote complet
+qu'un résumé détenu par un rival), l'indemnité croissante avec les années
+restantes, les trois facteurs d'intérêt du pilote, le contenu du marché, la
+reconstruction d'un pilote jouable depuis un résumé, le débauchage complet, et
+les trois réponses à une offre reçue. `browser8.js` rejoue les deux sens par de
+vrais clics.
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - La réglementation évolutive d'une saison à l'autre (§11), marquée V2.
