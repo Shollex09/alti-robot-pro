@@ -1490,6 +1490,62 @@ les trois réponses à une offre reçue, l'échéance et le renouvellement, l'ab
 d'indemnité sur un mandat échu, et le délai de réponse. `browser8.js` rejoue les
 deux sens du transfert par de vrais clics, `browser9.js` le cycle de l'échéance.
 
+### Un onglet à part, et des conditions écrites
+
+Signalé en jouant : **on ne savait pas ce qu'il fallait pour approcher un
+pilote.** Le marché tenait dans une carte au bas de l'onglet Pilote, sous le
+vivier, et aucune de ses règles n'était écrite nulle part. Elles existaient
+pourtant toutes dans le code.
+
+Le marché a désormais son propre onglet, qui commence par énoncer les quatre
+conditions, chiffrées et à jour :
+
+| Condition | Ce qui la détermine |
+|---|---|
+| Une place libre dans votre écurie | `min(pilotesMax(réputation), capacité des locaux)` — l'écran donne les deux et dit lequel limite |
+| Un nom qui porte jusqu'à lui | palier de réputation → niveau de catégorie maximal, et le palier qui ouvrira le suivant |
+| De quoi indemniser son manager | fourchette réelle des indemnités du marché, face à votre trésorerie |
+| Et qu'il dise oui | les trois termes de `interetMandat`, nommés et chiffrés pilote par pilote |
+
+La table des paliers (`PALIERS_MARCHE`) est devenue la **seule source de
+vérité** : `marcheTransferts` filtre avec elle, l'écran l'annonce avec elle. Un
+test vérifie sur cinq paliers que rien au-dessus de la portée annoncée
+n'apparaît dans la liste.
+
+Trois choix qui découlent de la mise à plat :
+
+1. **Les pilotes hors de portée sont montrés, grisés, pas cachés.** On voit à
+   quoi sert la réputation qu'on n'a pas encore, et l'écran nomme le palier
+   exact qui les ouvrira.
+2. **Les boutons fermés disent pourquoi** — « Aucune place libre », « Il vous
+   manque 42 k€ » — plutôt que d'être simplement grisés.
+3. **L'écran montre aussi vos propres pilotes vus d'en face** : relation,
+   commission, saisons de mandat restantes, et un niveau de risque. Un mandat
+   échu passe en risque élevé même avec une excellente relation, puisqu'un
+   concurrent peut alors prendre le pilote sans rien verser.
+
+**Ce que la mise à plat a révélé.** En chiffrant le troisième facteur pour
+l'afficher, on constate que le terme « ce qu'il vit chez son manager » vaut au
+mieux **+3,5** (manager de réputation 1, karting) et descend à **−25**. Il ne
+joue donc jamais vraiment en votre faveur : c'est un frein, jamais un argument.
+Les deux vrais leviers sont votre taux de commission et votre réputation. La
+carte le dit maintenant franchement plutôt que de laisser croire à trois leviers
+symétriques — c'est le genre de chose qu'on ne voit qu'en écrivant les règles
+noir sur blanc.
+
+### Test
+
+`unit22.js` : 75 assertions sur la table des paliers (monotone, jamais en
+recul), l'égalité entre le filtre appliqué et la portée annoncée sur cinq
+paliers, la correspondance exacte entre la probabilité affichée et celle qui
+sera jouée à cinq taux de commission, le sens des trois facteurs, la présence
+des quatre conditions à l'écran, la section « hors de portée » et le palier
+annoncé, les boutons qui disent pourquoi ils sont fermés, l'exposition de vos
+propres pilotes (relation dégradée et mandat échu), l'écran vide qui reste
+informatif, le renvoi depuis le vivier sans duplication, l'unicité des noms sur
+25 marchés réellement peuplés, et la troncature annoncée au-delà de douze
+pilotes. `browser12.js` parcourt l'onglet par de vrais clics.
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - Le §22.3 (devenir Team Principal en F1), le seul point du GDD encore ouvert,

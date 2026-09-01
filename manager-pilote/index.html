@@ -376,6 +376,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
   <button class="tab-btn active" data-tab="bureau">Bureau</button>
   <button class="tab-btn" data-tab="inbox">Messagerie<span class="dot" id="navUnread" hidden>0</span></button>
   <button class="tab-btn" data-tab="pilote">Pilote</button>
+  <button class="tab-btn" data-tab="transferts">Transferts</button>
   <button class="tab-btn" data-tab="weekend">Week-end</button>
   <button class="tab-btn" data-tab="sponsors">Sponsors</button>
   <button class="tab-btn" data-tab="contrats">Contrats</button>
@@ -393,6 +394,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
   <div class="view" id="v-bureau"></div>
   <div class="view" id="v-inbox"></div>
   <div class="view" id="v-pilote"></div>
+  <div class="view" id="v-transferts"></div>
   <div class="view" id="v-weekend"></div>
   <div class="view" id="v-sponsors"></div>
   <div class="view" id="v-contrats"></div>
@@ -1949,17 +1951,48 @@ function cederPilote(o){
 
 /* Pilotes sous mandat rival, visibles au marché. On ne voit que ceux dont la
    catégorie est à portée de la réputation du manager — comme pour le vivier. */
-function marcheTransferts(){
+/* Jusqu'où porte votre nom sur le marché : un inconnu ne débauche pas un pilote
+   de Formule 2. Une seule table, pour que l'écran des transferts annonce
+   exactement ce que le code applique. */
+const PALIERS_MARCHE = [
+  {rep:1, niv:2}, {rep:3, niv:4}, {rep:5, niv:6}, {rep:7, niv:7}, {rep:9, niv:8},
+];
+function niveauMarche(rp){
+  let n = PALIERS_MARCHE[0].niv;
+  for(const x of PALIERS_MARCHE) if(rp>=x.rep) n = x.niv;
+  return n;
+}
+function prochainPalierMarche(rp){
+  return PALIERS_MARCHE.find(x=>x.rep>rp && x.niv>niveauMarche(rp)) || null;
+}
+/* `tout` renvoie aussi les pilotes hors de portée, marqués comme tels : les
+   montrer grisés vaut mieux que de les cacher, on voit à quoi sert la
+   réputation qu'on n'a pas encore. */
+function marcheTransferts(tout){
   const rp = repPalier(S.manager.repPoints).p;
-  const plafondNiv = rp>=9?8 : rp>=7?7 : rp>=5?6 : rp>=3?4 : 2;
+  const plafondNiv = niveauMarche(rp);
   const l = [];
   for(const m of (S.monde.managers||[])){
     for(const e of m.pilotes){
-      if(CAT[e.catId] && CAT[e.catId].niv > plafondNiv) continue;
-      l.push({eleve:e, manager:m});
+      const horsPortee = !!(CAT[e.catId] && CAT[e.catId].niv > plafondNiv);
+      if(horsPortee && !tout) continue;
+      l.push({eleve:e, manager:m, horsPortee});
     }
   }
   return l.sort((a,b)=> b.eleve.plafond - a.eleve.plafond);
+}
+
+/* Le détail de ce qui pousse — ou retient — un pilote, aux valeurs réelles.
+   C'est ce que l'écran des transferts affiche : les trois termes de
+   `interetMandat`, nommés et chiffrés. */
+function detailInteret(eleve, manager, commission){
+  const rp = repPalier(S.manager.repPoints).p;
+  const relChezLui = clamp(45 + manager.rep*3 + CAT[eleve.catId].niv*2, 20, 92);
+  const gain      = (COMMISSION_BASE - commission) * 420;
+  const prestige  = (rp - manager.rep) * 6;
+  const lassitude = clamp((55 - relChezLui)*0.7, -25, 40);
+  const interet   = gain + prestige + lassitude;
+  return {rp, relChezLui, gain, prestige, lassitude, interet, proba:probaMandat(interet)};
 }
 
 /* ================= ACADÉMIE DE PILOTES (GDD §22.2) =====================
@@ -3420,7 +3453,7 @@ function genererSponsor(niv){
     partConditionnelle: obl.includes('objectif') ? 0.3 : 0,
     obligations: obl,
     duree: rint(1,niv>=3?3:2),
-    // critères d'intérêt (GDD §4.2)
+    // critères d’intérêt (GDD §4.2)
     exigeRepManager: Math.max(1, N.repMin - 1 + rint(0,1)),
     exigeRepPilote: clamp(Math.round((niv-1)*16 + rnd(14)), 0, 92),
     approches:0, statut:'prospect',
@@ -3443,7 +3476,7 @@ function majSponsorsProspects(){
   S.sponsors.prospects.sort((a,b)=>b.niv-a.niv || b.montant-a.montant);
 }
 
-/* Score d'intérêt d'un sponsor pour le duo manager/pilote (GDD §4.2) */
+/* Score d’intérêt d'un sponsor pour le duo manager/pilote (GDD §4.2) */
 function interetSponsor(s){
   const p=S.pilote, rp=repPalier(S.manager.repPoints).p;
   let sc = 0;
@@ -4788,7 +4821,8 @@ function echelle(catId){
 
 /* --- routeur --- */
 const RENDERERS = {
-  bureau:renderBureau, inbox:renderInbox, pilote:renderPilote, weekend:renderWeekend,
+  bureau:renderBureau, inbox:renderInbox, pilote:renderPilote, transferts:renderTransferts,
+  weekend:renderWeekend,
   sponsors:renderSponsors, contrats:renderContrats, staff:renderStaff,
   champ:renderChamp, finances:renderFinances, save:renderSave,
 };
@@ -5276,13 +5310,12 @@ ACTIONS.modalApprocher = d=>{
   if(!cible) return;
   const {eleve, manager} = cible;
   const indem = indemniteTransfert(eleve, eleve.catId, 2);
-  const rp = repPalier(S.manager.repPoints).p;
-  const relChezLui = clamp(45 + manager.rep*3 + CAT[eleve.catId].niv*2, 20, 92);
   const ligne = tx => {
-    const pr = probaMandat(interetMandat(eleve, tx, rp, relChezLui, manager.rep));
+    const d = detailInteret(eleve, manager, tx);
     return `<button class="btn-ghost btn-block mt" data-act="confirmApprocher" data-id="${eleve.id}" data-tx="${tx}">
-      Commission ${Math.round(tx*100)} % — il accepte à ${Math.round(pr*100)} %</button>`;
+      Commission ${Math.round(tx*100)} % — il accepte à ${Math.round(d.proba*100)} %</button>`;
   };
+  const det = detailInteret(eleve, manager, 0.06);
   openModal('Approcher '+escapeHtml(eleve.nom),
     `<div class="note mb">Il est représenté par <b>${escapeHtml(manager.nom)}</b>.
        Plus vous lui prenez peu, plus il est tenté de changer — mais moins il vous rapportera.</div>
@@ -5290,9 +5323,17 @@ ACTIONS.modalApprocher = d=>{
        <div class="top"><b>Indemnité à ${escapeHtml(manager.nom)}</b><span class="${S.manager.budget>=indem?'txt-amber':'txt-red'}">${fmtEurFull(indem)}</span></div>
        <div class="note">Versée seulement s’il accepte. Vous avez ${fmtEur(S.manager.budget)}.</div>
      </div>
+     <div class="card flat" style="margin:10px 0">
+       <div class="small txt-muted b" style="text-transform:uppercase;letter-spacing:.05em">Ce qui le décide</div>
+       ${ligneFacteur('Votre réputation face à la sienne', det.prestige,
+         `Vous ${det.rp}/10 contre ${manager.rep}/10.`)}
+       ${ligneFacteur('Ce qu’il vit chez lui', det.lassitude,
+         `Estimé à ${Math.round(det.relChezLui)}/100.`)}
+       <div class="note txt-muted mt">La commission, elle, dépend du taux que vous choisissez ci-dessous.</div>
+     </div>
      ${[0.06,0.10,0.15].map(ligne).join('')}
      <div class="note txt-muted mt">Une approche refusée se sait : le pilote devient plus difficile à convaincre,
-       et son manager vous en tiendra rigueur.</div>`,
+       et son manager vous en tiendra rigueur — <b>8 points de réputation</b> en moins.</div>`,
     `<button class="btn-ghost" data-act="fermerModal">Renoncer</button>`);
 };
 ACTIONS.confirmApprocher = d=>{
@@ -5651,31 +5692,15 @@ function renderScouting(){
       </div>
     </div>`;
   }
-  // ---- marché des transferts : les pilotes déjà sous mandat
+  // ---- renvoi vers l'onglet Transferts : le vivier et le débauchage sont deux
+  // métiers différents, ils ne tiennent plus sur le même écran.
   const marche = marcheTransferts();
   if(marche.length){
     h += `<div class="card"><h2><span class="vig"><span>🔁</span></span>Marché des transferts
-        <span class="hint">${marche.length} pilote(s) sous mandat</span></h2>
-      <div class="note mb">Ces pilotes sont représentés par un concurrent. Vous pouvez les approcher :
-        si le pilote accepte votre offre, vous <b>indemnisez son manager</b> pour les commissions
-        qu’il perd. Un taux de commission bas vous rend plus attractif — et vous rapporte moins.</div>
-      ${marche.slice(0,8).map(({eleve,manager})=>{
-        const indem = indemniteTransfert(eleve, eleve.catId, 2);
-        return `<div class="slider-box">
-          <div class="top"><b>${escapeHtml(eleve.nom)}</b><span>${CAT[eleve.catId].court} · ${eleve.age} ans</span></div>
-          <div class="note">Sous mandat de <b>${escapeHtml(manager.nom)}</b> (réputation ${manager.rep}/10)</div>
-          <div class="row tight mt">
-            ${tag('Note '+Math.round(eleve.note),'t-blue')}
-            ${tag('Plafond '+Math.round(eleve.plafond),'t-green')}
-            ${tag('Indemnité '+fmtEur(indem), S.manager.budget>=indem?'t-amber':'t-red')}
-            ${eleve.approches?tag(eleve.approches+' approche(s)','t-grey'):''}
-            <div class="spacer"></div>
-            <button class="btn btn-sm" data-act="modalApprocher" data-id="${eleve.id}"
-              ${resteDeLaPlace()?'':'disabled'}>Approcher</button>
-          </div>
-        </div>`;
-      }).join('')}
-      ${resteDeLaPlace()?'':`<div class="note warn mt">Plus de place dans votre écurie : libérez un dossier avant d’approcher quelqu’un.</div>`}
+        <span class="hint">${marche.length} pilote(s) à portée</span></h2>
+      <div class="note mb">Le vivier n’est pas le seul moyen de trouver un pilote : ceux qui courent déjà
+        sont représentés par un concurrent, et peuvent être débauchés.</div>
+      <button class="btn btn-block" data-act="tab" data-tab="transferts">Ouvrir le marché des transferts</button>
     </div>`;
   }
 
@@ -5683,6 +5708,191 @@ function renderScouting(){
     Vous n’êtes pas seul à le regarder : les managers concurrents signent aussi, et un jeune observé trop longtemps finit par partir.</div></div>`;
   $('#v-pilote').innerHTML = h;
 }
+
+/* ---------------------------------------- ÉCRAN : MARCHÉ DES TRANSFERTS
+   Signalé en jouant : on ne savait pas ce qu'il fallait pour approcher un
+   pilote. Les conditions existaient toutes dans le code — portée du nom,
+   place libre, indemnité, intérêt du pilote — mais aucune n'était écrite.
+   Cet écran les énonce, chiffrées et à jour, avant même de proposer quoi que
+   ce soit (GDD §20.2). */
+const MARCHE_AFFICHES = 12;
+function ligneCondition(ok, titre, detail){
+  return `<div class="row mt" style="align-items:flex-start">
+    <b class="${ok?'txt-green':'txt-red'}" style="flex:0 0 20px;font-size:16px;line-height:1.3">${ok?'✓':'✗'}</b>
+    <div style="flex:1"><b>${titre}</b><div class="note txt-muted">${detail}</div></div></div>`;
+}
+
+function renderTransferts(){
+  const rp = repPalier(S.manager.repPoints).p;
+  const nivMax = niveauMarche(rp);
+  const suivant = prochainPalierMarche(rp);
+  const catMax = catByNiv(nivMax);
+  const tous = marcheTransferts(true);
+  const dispo = tous.filter(x=>!x.horsPortee);
+  const horsPortee = tous.filter(x=>x.horsPortee);
+  const place = resteDeLaPlace();
+  const parRep = pilotesMax(rp), parLoc = capaciteLocaux();
+  const moinsCher = dispo.length
+    ? Math.min(...dispo.map(x=>indemniteTransfert(x.eleve, x.eleve.catId, 2)))
+    : null;
+
+  let h = '';
+
+  // ---- 1. Les conditions, énoncées
+  h += `<div class="card accent"><h2><span class="vig"><span>📋</span></span>Approcher un pilote
+      <span class="hint">4 conditions</span></h2>
+    <div class="note mb">Débaucher le pilote d’un concurrent n’a rien d’automatique. Voici ce qu’il faut,
+      et où vous en êtes aujourd’hui.</div>
+
+    ${ligneCondition(place, 'Une place libre dans votre écurie',
+      `Vous suivez ${nbPilotes()} pilote(s) sur ${placesPilotes()} possibles — `+
+      `${parRep} autorisé(s) par votre réputation, ${parLoc} par vos locaux, c’est le plus petit qui compte.`+
+      (place?'' : ` Libérez un dossier, montez d’un palier de réputation, ou agrandissez le bureau.`))}
+
+    ${ligneCondition(!tous.length || dispo.length>0, 'Un nom qui porte jusqu’à lui',
+      `Réputation ${rp}/10 : vous pouvez approcher les pilotes jusqu’à la <b>${escapeHtml(catMax?catMax.nom:'—')}</b>.`+
+      (suivant ? ` À partir du palier ${suivant.rep}/10, vous atteindrez la ${escapeHtml((catByNiv(suivant.niv)||{}).nom||'catégorie supérieure')}.`
+               : ` C’est la portée maximale : tout le plateau vous est ouvert.`)+
+      ` ${dispo.length} pilote(s) à portée, ${horsPortee.length} encore hors d’atteinte.`)}
+
+    ${ligneCondition(moinsCher===null || S.manager.budget>=moinsCher, 'De quoi indemniser son manager',
+      moinsCher===null
+        ? `Aucun pilote sur le marché pour l’instant.`
+        : `L’indemnité va de ${fmtEur(moinsCher)} à `+
+          `${fmtEur(Math.max(...dispo.map(x=>indemniteTransfert(x.eleve, x.eleve.catId, 2))))} selon le pilote. `+
+          `Vous avez ${fmtEur(S.manager.budget)}. Elle n’est versée que s’il accepte.`)}
+
+    ${ligneCondition(true, 'Et surtout : qu’il dise oui',
+      `Trois choses le décident — la commission que vous lui prenez (moins vous prenez, plus il est tenté,
+       mais moins il vous rapporte), votre réputation face à celle de son manager actuel, et à quel point
+       il est bien là où il est. Ce dernier point ne joue jamais en votre faveur : au mieux il est neutre,
+       au pire il le retient. Les deux vrais leviers sont donc votre taux et votre nom.
+       Le détail chiffré est donné pilote par pilote ci-dessous.`)}
+
+    <div class="note warn mt">Un refus coûte <b>8 points de réputation</b>, et le pilote devient plus
+      difficile à convaincre ensuite. On n’approche pas au hasard.</div>
+  </div>`;
+
+  // ---- 2. Les pilotes à portée
+  if(dispo.length){
+    h += `<div class="card"><h2><span class="vig"><span>🔁</span></span>Pilotes approchables
+        <span class="hint">${dispo.length}</span></h2>
+      <div class="note mb">Classés par potentiel. Le pourcentage annoncé est sa chance d’accepter au
+        taux le plus généreux pour lui (6 %) ; plus vous montez votre commission, plus elle baisse.</div>
+      ${dispo.length>MARCHE_AFFICHES?`<div class="note txt-muted mb">${dispo.length-MARCHE_AFFICHES}
+        autre(s) pilote(s) à votre portée ne sont pas listés ici : ils ont moins de potentiel que ceux-ci.</div>`:''}`;
+    for(const {eleve, manager} of dispo.slice(0, MARCHE_AFFICHES)){
+      const indem = indemniteTransfert(eleve, eleve.catId, 2);
+      const d6  = detailInteret(eleve, manager, 0.06);
+      const d15 = detailInteret(eleve, manager, 0.15);
+      const payable = S.manager.budget >= indem;
+      h += `<div class="slider-box">
+        <div class="top"><b>${escapeHtml(eleve.nom)}</b><span>${CAT[eleve.catId].court} · ${eleve.age} ans</span></div>
+        <div class="note">Sous mandat de <b>${escapeHtml(manager.nom)}</b> (réputation ${manager.rep}/10)</div>
+        <div class="row tight mt">
+          ${tag('Note '+Math.round(eleve.note),'t-blue')}
+          ${tag('Plafond '+Math.round(eleve.plafond),'t-green')}
+          ${tag('Indemnité '+fmtEur(indem), payable?'t-amber':'t-red')}
+          ${tag('Il accepte à '+Math.round(d6.proba*100)+' %', d6.proba>0.5?'t-green':d6.proba>0.25?'t-amber':'t-red')}
+          ${eleve.approches?tag(eleve.approches+' approche(s) déjà','t-grey'):''}
+        </div>
+        <details class="repli mt"><summary>Ce qui le décide</summary>
+          ${ligneFacteur('Commission proposée', d6.gain,
+            `À 6 % il gagne par rapport aux 10 % habituels ; à 15 % l’argument se retourne (${Math.round(d15.gain)}).`)}
+          ${ligneFacteur('Votre réputation face à la sienne', d6.prestige,
+            `Vous ${rp}/10 contre ${manager.rep}/10 pour ${escapeHtml(manager.nom)}.`)}
+          ${ligneFacteur('Ce qu’il vit chez lui', d6.lassitude,
+            `Estimé à ${Math.round(d6.relChezLui)}/100. ${d6.lassitude>-3
+              ? 'Sa situation ne le retient pas particulièrement.'
+              : d6.lassitude<-8
+                ? 'Il est très bien où il est — manager réputé, belle catégorie. Difficile à sortir de là.'
+                : 'Sa situation le retient un peu.'}`)}
+          <div class="note mt">Total : <b>${Math.round(d6.interet)}</b> d’intérêt →
+            <b class="${d6.proba>0.5?'txt-green':'txt-amber'}">${Math.round(d6.proba*100)} %</b> de chances à 6 %,
+            <b>${Math.round(d15.proba*100)} %</b> à 15 %.</div>
+        </details>
+        <button class="btn btn-block mt" data-act="modalApprocher" data-id="${eleve.id}"
+          ${(place && payable)?'':'disabled'}>${
+            !place ? 'Aucune place libre'
+            : !payable ? 'Il vous manque '+fmtEur(indem-S.manager.budget)
+            : 'Approcher '+escapeHtml(eleve.nom)}</button>
+      </div>`;
+    }
+    h += `</div>`;
+  }else{
+    h += `<div class="card"><h2><span class="vig"><span>🔁</span></span>Pilotes approchables</h2>
+      <div class="empty">Aucun pilote à votre portée pour l’instant.</div>
+      <div class="note txt-muted mt">Les managers concurrents signent au fil des saisons : le marché
+        se remplit tout seul. Montez en réputation pour voir plus haut.</div></div>`;
+  }
+
+  // ---- 3. Ce que la réputation débloquera
+  if(horsPortee.length){
+    h += `<div class="card"><h2><span class="vig"><span>🔒</span></span>Hors de portée
+        <span class="hint">${horsPortee.length}</span></h2>
+      <div class="note mb">Ces pilotes existent, courent, et progressent. Votre nom ne porte simplement
+        pas encore jusqu’à eux${suivant?` — il faudra le palier ${suivant.rep}/10`:''}.</div>
+      ${horsPortee.slice(0,6).map(({eleve,manager})=>`<div class="row tight mt">
+        <b class="txt-muted">${escapeHtml(eleve.nom)}</b>
+        ${tag(CAT[eleve.catId].court,'t-grey')}
+        <span class="note txt-muted">chez ${escapeHtml(manager.nom)}</span>
+        <div class="spacer"></div>
+        <span class="note txt-muted">plafond ${Math.round(eleve.plafond)}</span>
+      </div>`).join('')}
+    </div>`;
+  }
+
+  // ---- 4. L'autre sens : vos pilotes sont regardés aussi
+  h += blocExposition();
+
+  h += `<div class="card flat"><div class="note txt-muted">Le marché fonctionne dans les deux sens :
+    ce que vous pouvez faire à un concurrent, il peut vous le faire.
+    <button class="btn-ghost btn-sm mt" data-act="tab" data-tab="champ">Voir le classement des managers</button></div></div>`;
+
+  $('#v-transferts').innerHTML = h;
+}
+
+/* Une ligne de facteur, signée : on voit tout de suite ce qui pousse et ce qui retient. */
+function ligneFacteur(nom, valeur, detail){
+  const v = Math.round(valeur);
+  return `<div class="row tight mt">
+    <b class="${v>0?'txt-green':v<0?'txt-red':'txt-muted'}" style="flex:0 0 46px">${v>0?'+':''}${v}</b>
+    <div style="flex:1"><b class="small">${nom}</b><div class="note txt-muted">${detail}</div></div></div>`;
+}
+
+/* Vos pilotes vus depuis l'extérieur : ce qui les rend prenables. */
+function blocExposition(){
+  const mesPilotes = [];
+  pourChaqueDossier(()=>{ if(S.pilote) mesPilotes.push({p:S.pilote, mandat:S.mandat}); });
+  if(!mesPilotes.length) return '';
+  return `<div class="card"><h2><span class="vig"><span>🛡️</span></span>Vos pilotes, vus d’en face
+      <span class="hint">${mesPilotes.length}</span></h2>
+    <div class="note mb">Un concurrent regarde exactement les mêmes choses que vous : la relation que
+      vous entretenez, la commission que vous prenez, et si votre mandat court encore.</div>
+    ${mesPilotes.map(({p,mandat})=>{
+      const rel = p.relation ?? 60;
+      const tx = mandat ? mandat.commission : COMMISSION_BASE;
+      const reste = mandat ? (mandat.anneeFin - S.annee + 1) : 0;
+      const risque = rel<35 || reste<=0 ? 'élevé' : rel<55 || reste<=1 ? 'réel' : 'faible';
+      const cls = risque==='élevé' ? 't-red' : risque==='réel' ? 't-amber' : 't-green';
+      return `<div class="slider-box">
+        <div class="top"><b>${escapeHtml(p.nom)}</b><span>${CAT[p.catId].court} · ${p.age} ans</span></div>
+        <div class="row tight mt">
+          ${tag('Risque '+risque, cls)}
+          ${tag('Relation '+Math.round(rel), rel>60?'t-green':rel>40?'t-amber':'t-red')}
+          ${tag('Commission '+Math.round(tx*100)+' %','t-blue')}
+          ${tag(reste>0?reste+' saison(s) de mandat':'mandat échu', reste>0?'t-grey':'t-red')}
+        </div>
+        <div class="note txt-muted mt">${
+          reste<=0 ? `Mandat échu : un concurrent peut le prendre <b>sans rien vous verser</b>. Renégociez.`
+          : rel<35 ? `La relation est mauvaise : il écoutera la première offre venue.`
+          : rel<55 ? `La relation se distend. Parlez-lui, ou baissez votre commission.`
+          : `Il est bien chez vous. Un concurrent devra payer cher pour le convaincre.`}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
 /* Un élève formé par vous n'a plus de secret : le §22.2 supprime l'estimation
    floue pour eux, c'est la contrepartie de dix saisons d'investissement. */
 function traitsRevele(c){
