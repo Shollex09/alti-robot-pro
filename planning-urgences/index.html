@@ -1,0 +1,2476 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Planning Secrétaires — Urgences CH Mâcon</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f6fb8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Planning Urgences">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef2f7;
+  --card:#ffffff;
+  --border:#dbe3ed;
+  --border2:#c3cfde;
+  --text:#1e293b;
+  --text2:#5b6b80;
+  --muted:#93a2b5;
+  --accent:#0f6fb8;
+  --accent-dark:#0a4f85;
+  --accent-soft:#e3f0fb;
+  --green:#16794c;
+  --green2:#e4f5ec;
+  --red:#c02626;
+  --red2:#fdeaea;
+  --orange:#b45309;
+  --orange2:#fdf0dc;
+  --r:10px;--r-sm:7px;--r-lg:16px;
+  --shadow:0 2px 10px rgba(20,45,80,.07);
+  --shadow-lg:0 10px 32px rgba(20,45,80,.18);
+
+  /* Codes — postes */
+  --c-M:#d6f0e2;   --c-M-t:#0d5c3c;
+  --c-J:#d9e8fb;   --c-J-t:#0b4a80;
+  --c-DJ:#e4dcfa;  --c-DJ-t:#4527a0;
+  --c-S:#ffe3c7;   --c-S-t:#8a4b06;
+  --c-N:#39406e;   --c-N-t:#ffffff;
+  /* Codes — absences / repos */
+  --c-CR:#ffe14d;  --c-CR-t:#5c4700;
+  --c-JA:#fff6b0;  --c-JA-t:#6b5800;
+  --c-REC:#ffd7a8; --c-REC-t:#7a3f04;
+  --c-RF:#ffd0e4;  --c-RF-t:#8c1f52;
+  --c-RH:#e2e8f0;  --c-RH-t:#475569;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Inter','Segoe UI',system-ui,sans-serif;font-size:14px;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+input,select,textarea{
+  background:#fff;border:1.5px solid var(--border2);border-radius:var(--r-sm);
+  padding:8px 10px;outline:none;transition:border-color .15s,box-shadow .15s;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+button{cursor:pointer;border:none;border-radius:var(--r-sm);padding:9px 15px;font-weight:600;transition:background .15s,border-color .15s}
+.btn{background:var(--accent);color:#fff}
+.btn:hover{background:var(--accent-dark)}
+.btn-outline{background:#fff;border:1.5px solid var(--border2);color:var(--text)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent-dark)}
+.btn-danger{background:var(--red2);color:var(--red)}
+.btn-danger:hover{background:var(--red);color:#fff}
+.btn-ghost{background:transparent;color:var(--text2);padding:6px 10px}
+.btn-ghost:hover{background:var(--accent-soft);color:var(--accent-dark)}
+.btn-sm{padding:5px 10px;font-size:12.5px;border-radius:6px}
+.btn:disabled,.btn-outline:disabled{opacity:.45;cursor:not-allowed}
+a{color:var(--accent-dark)}
+h2,h3{font-weight:700}
+
+/* ---------- header ---------- */
+#hdr{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:12px 18px;background:linear-gradient(180deg,#ffffff,#f2f7fc);
+  border-bottom:2px solid var(--border2);
+}
+#hdr .logo{font-size:26px;line-height:1}
+#hdr h1{font-size:17px;font-weight:800;letter-spacing:-.01em}
+#hdr .sub{font-size:11.5px;color:var(--text2);font-weight:500}
+#hdr .spacer{flex:1}
+#installBtn{display:none}
+.badge-save{font-size:11px;color:var(--muted);font-weight:600}
+
+/* ---------- nav ---------- */
+#nav{
+  display:flex;gap:2px;padding:8px 14px 0;overflow-x:auto;
+  background:var(--bg);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:40;
+}
+.tab-btn{
+  background:transparent;color:var(--text2);font-weight:600;font-size:13px;
+  padding:9px 13px;border-radius:var(--r-sm) var(--r-sm) 0 0;white-space:nowrap;
+  border-bottom:3px solid transparent;
+}
+.tab-btn.active{color:var(--accent-dark);border-bottom-color:var(--accent);background:var(--card)}
+.tab-btn:hover:not(.active){color:var(--text)}
+.tab-btn .pill{
+  display:inline-block;min-width:17px;padding:0 5px;margin-left:5px;border-radius:9px;
+  background:var(--red);color:#fff;font-size:10.5px;font-weight:700;line-height:17px;text-align:center;
+}
+.tab-btn .pill.zero{display:none}
+
+main{max-width:1800px;margin:0 auto;padding:14px 14px 70px}
+.view{display:none}
+.view.active{display:block}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:15px;box-shadow:var(--shadow)}
+.card + .card{margin-top:14px}
+.card > h2{font-size:14.5px;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card > h2 .hint{font-weight:500;font-size:12px;color:var(--muted);margin-left:auto}
+.card p.help{font-size:12.5px;color:var(--text2);line-height:1.55;margin-bottom:10px}
+
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.toolbar .spacer{flex:1}
+.field{display:flex;flex-direction:column;gap:4px;min-width:120px}
+.field label{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.03em}
+.field.grow{flex:1}
+.form-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.chk{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:500;cursor:pointer}
+.chk input{width:16px;height:16px;padding:0;accent-color:var(--accent)}
+
+/* ---------- planning grid ---------- */
+#gridWrap{
+  overflow:auto;border:1px solid var(--border2);border-radius:var(--r);
+  background:var(--card);max-height:calc(100vh - 250px);
+}
+table.planning{border-collapse:separate;border-spacing:0;font-size:12px;table-layout:fixed}
+table.planning th,table.planning td{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:0}
+table.planning thead th{
+  position:sticky;top:0;z-index:20;background:#f7fafd;font-weight:700;color:var(--text2);
+  height:22px;font-size:11px;text-align:center;
+}
+table.planning thead tr.r-week th{height:24px;font-size:11.5px;color:var(--accent-dark);background:#eaf3fb;border-bottom:1px solid var(--border2)}
+table.planning thead tr.r-dow th{top:24px;height:19px;font-size:10px;text-transform:lowercase;color:var(--muted)}
+table.planning thead tr.r-num th{top:43px;height:22px;font-size:12px;color:var(--text);border-bottom:2px solid var(--border2)}
+th.agent-col{
+  position:sticky;left:0;z-index:30;background:#f7fafd;text-align:left;
+  min-width:194px;width:194px;max-width:194px;padding:0 8px;
+  border-right:2px solid var(--border2);
+}
+thead th.agent-col{z-index:35}
+tbody th.agent-col{font-weight:600;font-size:12.5px;color:var(--text);height:34px}
+tbody tr:nth-child(even) th.agent-col{background:#fbfdff}
+.agent-cell{display:flex;align-items:center;gap:6px;overflow:hidden}
+.agent-cell .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.agent-cell .q{font-size:9px;font-weight:700;color:var(--muted);background:#eef2f7;border-radius:4px;padding:1px 3px;flex:none}
+.agent-cell .q.nuit{background:var(--c-N);color:#fff}
+.agent-cell .q.we{background:var(--accent-soft);color:var(--accent-dark)}
+.agent-cell .q.rempl{background:var(--orange2);color:var(--orange)}
+
+td.day{
+  width:38px;min-width:38px;max-width:38px;height:34px;text-align:center;vertical-align:middle;
+  cursor:pointer;position:relative;user-select:none;
+}
+td.day:hover{outline:2px solid var(--accent);outline-offset:-2px;z-index:5}
+/* Le grisé du week-end et le rosé des fériés sont posés en calque (background-image)
+   pour ne pas écraser la couleur de fond du code, qui est un background-color. */
+td.day.we{background-image:linear-gradient(rgba(25,45,75,.10),rgba(25,45,75,.10))}
+td.day.ferie{background-image:linear-gradient(rgba(190,30,110,.10),rgba(190,30,110,.10))}
+td.day.today{box-shadow:inset 0 0 0 2px var(--accent)}
+td.day .code{display:block;font-size:12px;font-weight:800;line-height:1.05;letter-spacing:-.02em}
+td.day .note{display:block;font-size:8px;font-weight:600;line-height:1.05;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 1px}
+td.day.has-note .code{margin-top:-1px}
+td.day.sel{outline:3px solid var(--accent);outline-offset:-3px;z-index:6}
+td.day.dep::after{
+  content:"";position:absolute;top:0;right:0;border-width:0 8px 8px 0;
+  border-style:solid;border-color:transparent var(--orange) transparent transparent;
+}
+td.day.lock::before{
+  content:"";position:absolute;top:1px;left:1.5px;width:4px;height:4px;border-radius:50%;
+  background:var(--accent);opacity:.65;
+}
+td.day.alerte{box-shadow:inset 0 0 0 2px var(--red)}
+td.day.alerte-w{box-shadow:inset 0 0 0 2px var(--orange)}
+th.we-sep,td.we-sep{border-right:2px solid var(--border2)}
+tbody tr.sep-row td,tbody tr.sep-row th{border-bottom:2px solid var(--border2)}
+
+/* code colours (shared with legend + editor chips) */
+.c-M{background-color:var(--c-M);color:var(--c-M-t)}
+.c-J{background-color:var(--c-J);color:var(--c-J-t)}
+.c-DJ{background-color:var(--c-DJ);color:var(--c-DJ-t)}
+.c-S{background-color:var(--c-S);color:var(--c-S-t)}
+.c-N{background-color:var(--c-N);color:var(--c-N-t)}
+.c-CR{background-color:var(--c-CR);color:var(--c-CR-t)}
+.c-JA{background-color:var(--c-JA);color:var(--c-JA-t)}
+.c-REC{background-color:var(--c-REC);color:var(--c-REC-t)}
+.c-RF{background-color:var(--c-RF);color:var(--c-RF-t)}
+.c-RH{background-color:var(--c-RH);color:var(--c-RH-t)}
+.c-X{background-color:#fff;color:var(--muted)}
+
+/* coverage footer rows */
+tbody tr.cover th.agent-col{background:#eaf3fb;font-size:11.5px;color:var(--accent-dark);font-weight:700;height:24px}
+tbody tr.cover td{height:24px;font-size:11px;font-weight:700;background:#f4f9fd;color:var(--text2)}
+tbody tr.cover td.ko{background:var(--red2);color:var(--red)}
+tbody tr.cover td.ok{color:var(--green)}
+
+/* legend */
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.lg{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:20px;padding:3px 10px 3px 4px;font-size:11.5px;font-weight:600;background:#fff}
+.lg .sw{width:22px;height:19px;border-radius:5px;display:grid;place-items:center;font-size:10.5px;font-weight:800}
+.lg .hr{color:var(--muted);font-weight:500}
+
+/* ---------- cell editor popover ---------- */
+#backdrop{position:fixed;inset:0;background:rgba(15,30,50,.28);z-index:90;display:none}
+#backdrop.show{display:block}
+#editor{
+  position:fixed;z-index:100;display:none;width:308px;background:#fff;border:1px solid var(--border2);
+  border-radius:var(--r-lg);box-shadow:var(--shadow-lg);padding:13px;
+}
+#editor.show{display:block}
+#editor .eh{font-size:13.5px;font-weight:800;margin-bottom:1px}
+#editor .es{font-size:11.5px;color:var(--text2);margin-bottom:10px}
+.code-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-bottom:9px}
+.code-chip{
+  border:1.5px solid transparent;border-radius:7px;height:34px;font-size:12px;font-weight:800;
+  display:grid;place-items:center;line-height:1;
+}
+.code-chip small{display:block;font-size:8px;font-weight:600;opacity:.7;margin-top:1px}
+.code-chip.on{border-color:var(--text);box-shadow:0 0 0 2px #fff inset}
+.code-sec{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:2px 0 5px}
+#editor .warn{
+  background:var(--red2);border:1px solid #f3bcbc;color:var(--red);border-radius:var(--r-sm);
+  padding:7px 9px;font-size:11.5px;font-weight:600;line-height:1.45;margin-bottom:8px;
+}
+#editor .warn.soft{background:var(--orange2);border-color:#f0d19a;color:var(--orange)}
+#editor .warn ul{margin:0;padding-left:15px}
+#editor .ef{display:flex;gap:6px;align-items:center;margin-top:8px}
+#editor .ef .spacer{flex:1}
+
+/* ---------- tables (équipe, contrôles) ---------- */
+.table-wrap{overflow-x:auto;border-radius:var(--r-sm)}
+table.data{width:100%;border-collapse:collapse;font-size:13px}
+table.data th{
+  text-align:left;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;
+  letter-spacing:.03em;padding:7px 9px;border-bottom:2px solid var(--border2);white-space:nowrap;
+}
+table.data td{padding:6px 9px;border-bottom:1px solid var(--border);vertical-align:middle}
+table.data tr:last-child td{border-bottom:none}
+table.data tr:hover td{background:#f7fafd}
+table.data td.num,table.data th.num{text-align:right;font-variant-numeric:tabular-nums}
+table.data input,table.data select{padding:5px 7px;font-size:12.5px}
+.tag{display:inline-block;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700}
+.tag.jour{background:var(--c-J);color:var(--c-J-t)}
+.tag.nuit{background:var(--c-N);color:#fff}
+.tag.mixte{background:var(--c-DJ);color:var(--c-DJ-t)}
+.tag.a{background:var(--green2);color:var(--green)}
+.tag.b{background:var(--orange2);color:var(--orange)}
+.tag.off{background:#eef2f7;color:var(--muted)}
+
+/* alerts list */
+.alert-item{
+  display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:var(--r-sm);
+  border:1px solid var(--border);margin-bottom:6px;font-size:12.5px;background:#fff;cursor:pointer;
+}
+.alert-item:hover{border-color:var(--accent)}
+.alert-item .ic{font-size:15px;line-height:1.2}
+.alert-item .bd{flex:1}
+.alert-item .who{font-weight:700}
+.alert-item .msg{color:var(--text2);line-height:1.45}
+.alert-item.err{background:var(--red2);border-color:#f3bcbc}
+.alert-item.warn{background:var(--orange2);border-color:#f0d19a}
+.alert-item.info{background:#f2f7fc;border-color:#cfe1f2}
+.empty{padding:22px;text-align:center;color:var(--muted);font-size:13px}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:11px 13px;box-shadow:var(--shadow)}
+.kpi .lbl{font-size:10.5px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em}
+.kpi .val{font-size:21px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .val.red{color:var(--red)}.kpi .val.orange{color:var(--orange)}.kpi .val.green{color:var(--green)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}}
+
+.toast{
+  position:fixed;left:50%;bottom:22px;transform:translate(-50%,14px);z-index:200;
+  background:#1e293b;color:#fff;padding:10px 18px;border-radius:22px;font-size:13px;font-weight:600;
+  opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;box-shadow:var(--shadow-lg);
+  max-width:88vw;text-align:center;
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.err{background:var(--red)}
+
+/* ---------- impression ---------- */
+@media print{
+  @page{size:A4 landscape;margin:8mm}
+  #hdr,#nav,.toolbar,.legend-toggle,#backdrop,#editor,.toast,.no-print{display:none!important}
+  body{background:#fff;font-size:9px}
+  main{max-width:none;padding:0}
+  .view{display:none!important}
+  .view.active{display:block!important}
+  .card{border:none;box-shadow:none;padding:0;border-radius:0}
+  #gridWrap{max-height:none;overflow:visible;border:none;border-radius:0}
+  table.planning{font-size:8px;width:100%}
+  table.planning thead th{position:static}
+  th.agent-col{position:static;min-width:0;width:132px;max-width:132px;font-size:7.5px}
+  tbody th.agent-col{height:auto}
+  .agent-cell .q{font-size:6px;padding:0 2px}
+  tbody tr.cover th.agent-col span{display:none}   /* les horaires sont dans la légende */
+  td.day.today{box-shadow:none}                    /* pas de surlignage du jour sur le papier */
+  td.day{width:auto;min-width:0;height:16px}
+  td.day .code{font-size:8px}
+  td.day .note{font-size:6px}
+  td.day:hover{outline:none}
+  .print-title{display:block!important;font-size:13px;font-weight:800;margin-bottom:5px}
+  .legend{margin-top:6px}
+  .lg{font-size:7.5px;padding:1px 6px 1px 2px}
+  .lg .sw{width:15px;height:12px;font-size:7px}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+.print-title{display:none}
+</style>
+</head>
+<body>
+
+<header id="hdr">
+  <span class="logo">🗓️</span>
+  <div>
+    <h1>Planning Secrétaires — Urgences</h1>
+    <div class="sub">CH de Mâcon · génération automatique &amp; édition</div>
+  </div>
+  <span class="spacer"></span>
+  <span class="badge-save" id="saveBadge"></span>
+  <button class="btn-outline btn-sm" id="installBtn">📲 Installer</button>
+</header>
+
+<nav id="nav">
+  <button class="tab-btn active" data-view="planning">Planning</button>
+  <button class="tab-btn" data-view="generer">Génération</button>
+  <button class="tab-btn" data-view="absences">Absences</button>
+  <button class="tab-btn" data-view="equipe">Équipe</button>
+  <button class="tab-btn" data-view="controles">Contrôles<span class="pill zero" id="pillAlertes">0</span></button>
+  <button class="tab-btn" data-view="reglages">Réglages</button>
+  <button class="tab-btn" data-view="aide">Aide</button>
+</nav>
+
+<main>
+
+<!-- ============ PLANNING ============ -->
+<section class="view active" id="view-planning">
+  <div class="toolbar no-print">
+    <button class="btn-outline btn-sm" id="moisPrev">‹ Mois précédent</button>
+    <div class="field" style="min-width:150px">
+      <label for="moisPicker">Mois affiché</label>
+      <input type="month" id="moisPicker">
+    </div>
+    <button class="btn-outline btn-sm" id="moisNext">Mois suivant ›</button>
+    <button class="btn-ghost btn-sm" id="moisToday">Aujourd'hui</button>
+    <span class="spacer"></span>
+    <button class="btn btn-sm" id="btnGenMois">⚙️ Générer ce mois</button>
+    <button class="btn-outline btn-sm" id="btnPrint">🖨️ PDF / Imprimer</button>
+    <button class="btn-outline btn-sm" id="btnXls">📊 Excel</button>
+    <button class="btn-outline btn-sm" id="btnUndo" disabled>↶ Annuler</button>
+  </div>
+
+  <div class="card">
+    <div class="print-title" id="printTitle"></div>
+    <div id="gridWrap"><div class="empty">Chargement…</div></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="card no-print" id="cardResumeMois">
+    <h2>Résumé du mois <span class="hint" id="resumeHint"></span></h2>
+    <div class="table-wrap"><table class="data" id="tblResume"></table></div>
+  </div>
+</section>
+
+<!-- ============ GENERATION ============ -->
+<section class="view" id="view-generer">
+  <div class="card">
+    <h2>⚙️ Générer un planning</h2>
+    <p class="help">
+      L'application remplit automatiquement les postes (M, J, DJ, S, N) puis complète avec les repos
+      (RH), les journées aménagées (JA) et les récupérations (REC) selon les règles du service.
+      <b>Les congés posés (CR) et les cases que vous avez verrouillées 🔒 ne sont jamais écrasés.</b>
+    </p>
+    <div class="form-row">
+      <div class="field"><label for="genDebut">Du</label><input type="date" id="genDebut"></div>
+      <div class="field"><label for="genFin">Au</label><input type="date" id="genFin"></div>
+      <div class="field"><label>Raccourcis</label>
+        <select id="genRaccourci">
+          <option value="">— choisir —</option>
+          <option value="mois-courant">Mois affiché</option>
+          <option value="mois-suivant">Mois suivant</option>
+          <option value="3mois">3 prochains mois</option>
+        </select>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn" id="btnGenerer">Générer le planning</button>
+    </div>
+    <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:16px">
+      <label class="chk"><input type="checkbox" id="optPreserverManuel" checked> Conserver mes modifications manuelles</label>
+      <label class="chk"><input type="checkbox" id="optRemplacants"> Autoriser les remplaçants en renfort</label>
+      <label class="chk"><input type="checkbox" id="optResetWE"> Réinitialiser l'alternance des week-ends</label>
+    </div>
+    <div id="genRapport" style="margin-top:14px"></div>
+  </div>
+
+  <div class="card">
+    <h2>🧹 Effacer une période</h2>
+    <p class="help">Vide les cases d'une période (utile pour repartir de zéro). Les congés CR et les cases verrouillées peuvent être conservés.</p>
+    <div class="form-row">
+      <div class="field"><label for="clrDebut">Du</label><input type="date" id="clrDebut"></div>
+      <div class="field"><label for="clrFin">Au</label><input type="date" id="clrFin"></div>
+      <label class="chk"><input type="checkbox" id="clrGarderCR" checked> Garder les CR et les cases verrouillées</label>
+      <div style="flex:1"></div>
+      <button class="btn-danger" id="btnEffacer">Effacer la période</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ABSENCES ============ -->
+<section class="view" id="view-absences">
+  <div class="card">
+    <h2>🌴 Poser une absence</h2>
+    <p class="help">
+      Posez un congé ou une absence sur plusieurs jours d'un coup. La case est <b>verrouillée</b> :
+      la génération automatique ne l'écrasera pas. Cochez « réajuster » pour recalculer immédiatement
+      les postes de la période concernée.
+    </p>
+    <div class="form-row">
+      <div class="field grow"><label for="absAgent">Agent</label><select id="absAgent"></select></div>
+      <div class="field"><label for="absCode">Motif</label><select id="absCode"></select></div>
+      <div class="field"><label for="absDebut">Du</label><input type="date" id="absDebut"></div>
+      <div class="field"><label for="absFin">Au</label><input type="date" id="absFin"></div>
+      <div class="field grow"><label for="absNote">Annotation (facultatif)</label><input type="text" id="absNote" placeholder="ex : formation Formalis"></div>
+    </div>
+    <div class="form-row" style="margin-top:10px">
+      <label class="chk"><input type="checkbox" id="absReajuster" checked> Réajuster automatiquement les postes de la période</label>
+      <div style="flex:1"></div>
+      <button class="btn" id="btnPoserAbsence">Poser l'absence</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>👥 Renfort / intérimaire</h2>
+    <p class="help">
+      Nommez un remplaçant sur un emplacement libre, puis affectez-le à des postes ponctuels
+      sans toucher au reste du planning. Les emplacements de remplacement se gèrent dans l'onglet <b>Équipe</b>.
+    </p>
+    <div class="form-row">
+      <div class="field grow"><label for="rmpSlot">Emplacement</label><select id="rmpSlot"></select></div>
+      <div class="field grow"><label for="rmpNom">Nom affiché</label><input type="text" id="rmpNom" placeholder="ex : BILLER-CHETOUX Lilou"></div>
+      <div class="field"><label for="rmpCode">Poste</label><select id="rmpCode"></select></div>
+      <div class="field"><label for="rmpDebut">Du</label><input type="date" id="rmpDebut"></div>
+      <div class="field"><label for="rmpFin">Au</label><input type="date" id="rmpFin"></div>
+      <div style="flex:1"></div>
+      <button class="btn" id="btnRenfort">Affecter</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📋 Absences et affectations verrouillées <span class="hint" id="absHint"></span></h2>
+    <div class="table-wrap"><table class="data" id="tblAbsences"></table></div>
+  </div>
+</section>
+
+<!-- ============ EQUIPE ============ -->
+<section class="view" id="view-equipe">
+  <div class="card">
+    <h2>👤 Effectif <span class="hint">Quotité · roulement · groupe de week-end · compteur REC</span></h2>
+    <p class="help">
+      <b>Roulement</b> : <i>jour</i> = ne fait jamais de nuit · <i>nuit</i> = uniquement des nuits ·
+      <i>mixte</i> = alterne des semaines de jour et des semaines de nuit (jamais les deux la même semaine).<br>
+      <b>Groupe WE</b> : les groupes A et B travaillent un week-end sur deux, en alternance.<br>
+      <b>Ancre REC</b> : date du dernier jour de récupération ; le suivant est posé automatiquement 6 semaines après.
+    </p>
+    <div class="table-wrap"><table class="data" id="tblEquipe"></table></div>
+    <div class="form-row" style="margin-top:12px">
+      <button class="btn-outline btn-sm" id="btnAddAgent">+ Ajouter un agent</button>
+      <button class="btn-outline btn-sm" id="btnAddRempl">+ Ajouter un emplacement de remplacement</button>
+      <div style="flex:1"></div>
+      <button class="btn-outline btn-sm" id="btnEquilibrerWE">⚖️ Rééquilibrer les groupes de week-end</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🔁 Remplacer un agent (départ / nouvelle recrue)</h2>
+    <p class="help">
+      Le nom est remplacé <b>partout</b> dans le planning, sans reconstruire l'historique : la ligne, ses
+      congés et ses compteurs sont conservés. Choisissez une date d'effet si vous voulez repartir
+      d'un compteur REC neuf pour la nouvelle personne.
+    </p>
+    <div class="form-row">
+      <div class="field grow"><label for="rnAgent">Agent à remplacer</label><select id="rnAgent"></select></div>
+      <div class="field grow"><label for="rnNom">Nouveau nom</label><input type="text" id="rnNom" placeholder="DUPONT"></div>
+      <div class="field grow"><label for="rnPrenom">Nouveau prénom</label><input type="text" id="rnPrenom" placeholder="Camille"></div>
+      <div class="field"><label for="rnDate">Date d'effet</label><input type="date" id="rnDate"></div>
+      <div style="flex:1"></div>
+      <button class="btn" id="btnRenommer">Remplacer</button>
+    </div>
+    <label class="chk" style="margin-top:10px"><input type="checkbox" id="rnResetRec" checked> Repartir d'un compteur REC neuf à la date d'effet</label>
+  </div>
+</section>
+
+<!-- ============ CONTROLES ============ -->
+<section class="view" id="view-controles">
+  <div class="kpis" id="kpisControles"></div>
+  <div class="card">
+    <h2>🔎 Contrôle des règles <span class="hint" id="ctrlPeriode"></span></h2>
+    <div class="form-row" style="margin-bottom:10px">
+      <div class="field"><label for="ctrlDebut">Du</label><input type="date" id="ctrlDebut"></div>
+      <div class="field"><label for="ctrlFin">Au</label><input type="date" id="ctrlFin"></div>
+      <div class="field"><label for="ctrlNiveau">Afficher</label>
+        <select id="ctrlNiveau">
+          <option value="tout">Tout</option>
+          <option value="err">Erreurs seulement</option>
+          <option value="warn">Erreurs + avertissements</option>
+        </select>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn-outline btn-sm" id="btnRecontroler">Relancer le contrôle</button>
+    </div>
+    <div id="listeAlertes"></div>
+  </div>
+  <div class="card">
+    <h2>📊 Compteurs par agent</h2>
+    <div class="table-wrap"><table class="data" id="tblCompteurs"></table></div>
+  </div>
+</section>
+
+<!-- ============ REGLAGES ============ -->
+<section class="view" id="view-reglages">
+  <div class="grid2">
+    <div class="card">
+      <h2>🎯 Besoins quotidiens</h2>
+      <p class="help">Nombre d'agents nécessaires sur chaque poste, chaque jour (week-ends compris, sans réduction).</p>
+      <div class="table-wrap"><table class="data" id="tblBesoins"></table></div>
+    </div>
+    <div class="card">
+      <h2>📐 Règles</h2>
+      <div class="table-wrap"><table class="data" id="tblRegles"></table></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>💾 Sauvegarde des données</h2>
+    <p class="help">
+      Les données sont enregistrées <b>sur cet appareil uniquement</b> (mémoire locale du navigateur).
+      Exportez régulièrement un fichier de sauvegarde : c'est aussi le moyen de transférer le planning
+      sur un autre poste ou de le partager avec une collègue.
+    </p>
+    <div class="form-row">
+      <button class="btn" id="btnExportJson">⬇️ Exporter une sauvegarde (.json)</button>
+      <button class="btn-outline" id="btnImportJson">⬆️ Restaurer une sauvegarde</button>
+      <input type="file" id="fileImport" accept=".json,application/json" style="display:none">
+      <div style="flex:1"></div>
+      <button class="btn-danger" id="btnReset">Tout réinitialiser</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AIDE ============ -->
+<section class="view" id="view-aide">
+  <div class="card" id="aideContenu"></div>
+</section>
+
+</main>
+
+<div id="backdrop"></div>
+
+<div id="editor">
+  <div class="eh" id="edTitre"></div>
+  <div class="es" id="edSousTitre"></div>
+  <div id="edWarn"></div>
+  <div class="code-sec">Postes</div>
+  <div class="code-grid" id="edPostes"></div>
+  <div class="code-sec">Absences &amp; repos</div>
+  <div class="code-grid" id="edAbsences"></div>
+  <div class="field" style="margin-top:4px">
+    <label for="edNote">Annotation libre</label>
+    <input type="text" id="edNote" placeholder="ex : formation, réunion…" maxlength="40">
+  </div>
+  <label class="chk" style="margin-top:9px"><input type="checkbox" id="edVerrou"> 🔒 Verrouiller (protéger de la génération)</label>
+  <div class="ef">
+    <button class="btn-ghost btn-sm" id="edVider">Vider la case</button>
+    <span class="spacer"></span>
+    <button class="btn-outline btn-sm" id="edAnnuler">Fermer</button>
+    <button class="btn btn-sm" id="edValider">Valider</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+/* ==========================================================================
+   1. MODÈLE — codes, état, persistance
+   ========================================================================== */
+
+const STORAGE_KEY = 'planning_urgences_macon_v1';
+const APP_VERSION = 1;
+
+/* Heures exprimées en heures depuis minuit du jour où le code est posé.
+   S finit à 24 (minuit) et N finit à 31 (7h le lendemain) : cela permet de
+   calculer le repos entre deux postes par simple soustraction. */
+const CODES = {
+  M:  {type:'poste',  lib:'Matin',            h:'7h — 16h',   debut:7,  fin:16},
+  J:  {type:'poste',  lib:'Journée',          h:'9h — 17h',   debut:9,  fin:17},
+  DJ: {type:'poste',  lib:'Décalé journée',   h:'11h — 19h',  debut:11, fin:19},
+  S:  {type:'poste',  lib:'Soir',             h:'14h — 00h',  debut:14, fin:24},
+  N:  {type:'poste',  lib:'Nuit',             h:'19h — 7h',   debut:19, fin:31},
+  CR: {type:'absence',lib:'Congé',            h:'posé à l’avance'},
+  JA: {type:'absence',lib:'Journée aménagée', h:'agents à 80 %'},
+  REC:{type:'absence',lib:'Récupération',     h:'toutes les 6 semaines'},
+  RF: {type:'absence',lib:'Récup. jour férié',h:''},
+  RH: {type:'repos',  lib:'Repos hebdomadaire',h:''},
+};
+const POSTES = ['M','J','DJ','S','N'];
+const POSTES_JOUR = ['M','J','DJ','S'];
+/* Ordre d'affectation : les postes les plus contraignants d'abord
+   (la nuit n'a qu'un seul titulaire, le soir bloque le lendemain matin). */
+const ORDRE_AFFECTATION = ['N','S','M','J','DJ'];
+const ABSENCES = ['CR','JA','REC','RF','RH'];
+const CODES_REPOS = ['RH','CR','REC','RF'];   // interrompent les jours consécutifs
+const JOURS_FR = ['lun.','mar.','mer.','jeu.','ven.','sam.','dim.'];
+const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août',
+                 'septembre','octobre','novembre','décembre'];
+
+function estPoste(code){ return !!code && CODES[code] && CODES[code].type === 'poste'; }
+function estRepos(code){ return CODES_REPOS.indexOf(code) >= 0; }
+
+/* --------------------------- état par défaut --------------------------- */
+
+const EFFECTIF_INITIAL = [
+  ['BESSON',   'Pauline',    100, 'jour'],
+  ['VANDROUX', 'Elodie',      80, 'mixte'],
+  ['DUPRAT',   'Sandra',     100, 'jour'],
+  ['ARTHUS',   'Emilie',      80, 'mixte'],
+  ['BERRY',    'Nathalie',    80, 'mixte'],
+  ['GOY',      'Olivia',      80, 'mixte'],
+  ['MERCIER',  'Cindy',       80, 'mixte'],
+  ['EN NACHI', 'Dounia',     100, 'nuit'],
+  ['REHILA',   'Selma',       80, 'mixte'],
+  ['LACHARME', 'Astrid',      80, 'mixte'],
+  ['GARDIN',   'Noemie',      80, 'mixte'],
+  ['PERRET',   'Regis',       80, 'mixte'],
+  ['LAFAURIE', 'Mélissa',     80, 'mixte'],
+  ['MARIAMON', 'Emmanuelle',  80, 'mixte'],
+];
+
+function configDefaut(){
+  return {
+    besoins:            {M:1, J:1, DJ:1, S:1, N:1},
+    rhParSemaine:       2,
+    recSemaines:        6,
+    reposMinHeures:     11,
+    maxJoursConsecutifs:4,
+    weekendAlterne:     true,
+    jaInterrompt:       true,   // JA casse-t-il le décompte des jours consécutifs ?
+    equipeNuitTaille:   3,      // agents affectés au roulement de nuit chaque semaine
+    joursMaxSemaine100: 5,
+    joursMaxSemaine80:  4,
+  };
+}
+
+function agentsDefaut(){
+  let iA = 0;
+  const list = EFFECTIF_INITIAL.map((e, i) => ({
+    id:'a'+(i+1),
+    nom:e[0], prenom:e[1], quotite:e[2], roulement:e[3],
+    groupeWE:(iA++ % 2 === 0) ? 'A' : 'B',
+    recAncre:'', actif:true, remplacant:false,
+  }));
+  list.push({id:'r1', nom:'Remplaçant 1', prenom:'', quotite:100, roulement:'mixte',
+             groupeWE:'A', recAncre:'', actif:true, remplacant:true});
+  list.push({id:'r2', nom:'Remplaçant 2', prenom:'', quotite:100, roulement:'mixte',
+             groupeWE:'B', recAncre:'', actif:true, remplacant:true});
+  return list;
+}
+
+function etatDefaut(){
+  return {
+    version: APP_VERSION,
+    agents:  agentsDefaut(),
+    /* planning : { "<agentId>|<YYYY-MM-DD>" : {c:code, n:note, v:verrou, d:dépannage} } */
+    planning:{},
+    config:  configDefaut(),
+    moisAffiche: moisCourantISO(),
+    majLe: '',
+  };
+}
+
+function moisCourantISO(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+/* --------------------------- chargement / sauvegarde --------------------------- */
+
+function chargerEtat(){
+  try{
+    const brut = localStorage.getItem(STORAGE_KEY);
+    if(!brut) return etatDefaut();
+    const s = JSON.parse(brut);
+    const base = etatDefaut();
+    const etat = Object.assign(base, s);
+    etat.config = Object.assign(configDefaut(), s.config || {});
+    etat.config.besoins = Object.assign({M:1,J:1,DJ:1,S:1,N:1}, (s.config||{}).besoins || {});
+    if(!Array.isArray(etat.agents) || !etat.agents.length) etat.agents = agentsDefaut();
+    etat.agents.forEach(a => {
+      if(!a.groupeWE) a.groupeWE = 'A';
+      if(!a.roulement) a.roulement = 'mixte';
+      if(a.actif === undefined) a.actif = true;
+    });
+    if(!etat.planning || typeof etat.planning !== 'object') etat.planning = {};
+    return etat;
+  }catch(e){
+    console.error('Chargement impossible', e);
+    return etatDefaut();
+  }
+}
+
+let etat = chargerEtat();
+let historique = [];             // pile pour « Annuler »
+
+function sauver(){
+  etat.majLe = new Date().toISOString();
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(etat));
+  }catch(e){
+    toast('Sauvegarde impossible (mémoire du navigateur pleine)', true);
+    return;
+  }
+  majBadgeSauvegarde();
+}
+function snapshot(libelle){
+  historique.push({lib:libelle, planning:JSON.stringify(etat.planning), agents:JSON.stringify(etat.agents)});
+  if(historique.length > 12) historique.shift();
+  const b = document.getElementById('btnUndo');
+  if(b){ b.disabled = false; b.title = 'Annuler : ' + libelle; }
+}
+function annuler(){
+  const h = historique.pop();
+  if(!h) return;
+  etat.planning = JSON.parse(h.planning);
+  etat.agents   = JSON.parse(h.agents);
+  sauver(); toutRedessiner();
+  toast('Annulé : ' + h.lib);
+  const b = document.getElementById('btnUndo');
+  if(b) b.disabled = historique.length === 0;
+}
+function majBadgeSauvegarde(){
+  const el = document.getElementById('saveBadge');
+  if(!el || !etat.majLe) return;
+  const d = new Date(etat.majLe);
+  el.textContent = 'enregistré à ' + d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+}
+
+/* ==========================================================================
+   2. OUTILS — dates, semaines, jours fériés
+   ========================================================================== */
+
+const MS_JOUR = 86400000;
+
+function iso(d){
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0')
+       + '-' + String(d.getUTCDate()).padStart(2,'0');
+}
+function dateDe(s){ return new Date(s + 'T00:00:00Z'); }
+/* index absolu du jour (jours depuis le 1er janvier 1970) — base des calculs d'heures */
+function idxJour(s){ return Math.round(Date.parse(s + 'T00:00:00Z') / MS_JOUR); }
+function jourPlus(s, n){ return iso(new Date((idxJour(s) + n) * MS_JOUR)); }
+/* 0 = lundi … 6 = dimanche */
+function jourSemaine(s){ return (idxJour(s) + 3) % 7; }
+function estWeekend(s){ return jourSemaine(s) >= 5; }
+/* rang de la semaine, continu depuis le lundi 5 janvier 1970 (index 4) :
+   c'est lui qui fait alterner les groupes de week-end A et B */
+function numSemaine(s){ return (idxJour(s) - jourSemaine(s) - 4) / 7; }
+function lundiDe(s){ return jourPlus(s, -jourSemaine(s)); }
+function aujourdhui(){ return iso(new Date(Date.now() - new Date().getTimezoneOffset()*60000)); }
+
+function joursEntre(debut, fin){
+  const out = [];
+  let d = debut;
+  let garde = 0;
+  while(d <= fin && garde++ < 2000){ out.push(d); d = jourPlus(d, 1); }
+  return out;
+}
+function joursDuMois(moisISO){
+  const [y, m] = moisISO.split('-').map(Number);
+  const dernier = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return joursEntre(moisISO + '-01', moisISO + '-' + String(dernier).padStart(2,'0'));
+}
+function fmtJour(s){
+  const d = dateDe(s);
+  return JOURS_FR[jourSemaine(s)] + ' ' + d.getUTCDate() + ' ' + MOIS_FR[d.getUTCMonth()];
+}
+function fmtJourCourt(s){
+  const d = dateDe(s);
+  return String(d.getUTCDate()).padStart(2,'0') + '/' + String(d.getUTCMonth()+1).padStart(2,'0');
+}
+function libelleMois(moisISO){
+  const [y, m] = moisISO.split('-').map(Number);
+  return MOIS_FR[m-1] + ' ' + y;
+}
+/* numéro de semaine ISO 8601 (affiché dans l'en-tête, comme sur le planning papier) */
+function semaineISO(s){
+  const jeudi = jourPlus(s, 3 - jourSemaine(s));
+  const an = dateDe(jeudi).getUTCFullYear();
+  const premJan = an + '-01-01';
+  return Math.floor((idxJour(jeudi) - idxJour(premJan)) / 7) + 1;
+}
+
+/* jours fériés français (métropole), calculés année par année */
+const _cacheFeries = {};
+function feriesAnnee(an){
+  if(_cacheFeries[an]) return _cacheFeries[an];
+  // Pâques — algorithme de Meeus/Jones/Butcher
+  const a = an % 19, b = Math.floor(an/100), c = an % 100;
+  const d = Math.floor(b/4), e = b % 4, f = Math.floor((b+8)/25);
+  const g = Math.floor((b-f+1)/3), h = (19*a + b - d - g + 15) % 30;
+  const i = Math.floor(c/4), k = c % 4;
+  const l = (32 + 2*e + 2*i - h - k) % 7;
+  const m = Math.floor((a + 11*h + 22*l) / 451);
+  const mois = Math.floor((h + l - 7*m + 114) / 31);
+  const jour = ((h + l - 7*m + 114) % 31) + 1;
+  const paques = iso(new Date(Date.UTC(an, mois-1, jour)));
+  const set = {};
+  set[an+'-01-01'] = 'Jour de l’an';
+  set[an+'-05-01'] = 'Fête du travail';
+  set[an+'-05-08'] = 'Victoire 1945';
+  set[an+'-07-14'] = 'Fête nationale';
+  set[an+'-08-15'] = 'Assomption';
+  set[an+'-11-01'] = 'Toussaint';
+  set[an+'-11-11'] = 'Armistice';
+  set[an+'-12-25'] = 'Noël';
+  set[jourPlus(paques, 1)]  = 'Lundi de Pâques';
+  set[jourPlus(paques, 39)] = 'Ascension';
+  set[jourPlus(paques, 50)] = 'Lundi de Pentecôte';
+  _cacheFeries[an] = set;
+  return set;
+}
+function estFerie(s){
+  const set = feriesAnnee(Number(s.slice(0,4)));
+  return set[s] || null;
+}
+
+/* petits utilitaires */
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function esc(s){
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function toast(msg, erreur){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.toggle('err', !!erreur);
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('show'), 2600);
+}
+/* générateur pseudo-aléatoire déterministe : deux générations identiques
+   donnent exactement le même planning */
+function prng(graine){
+  let h = 1779033703 ^ graine.length;
+  for(let i = 0; i < graine.length; i++){
+    h = Math.imul(h ^ graine.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  let a = h >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ==========================================================================
+   3. ACCÈS AU PLANNING
+   ========================================================================== */
+
+function cle(agentId, jour){ return agentId + '|' + jour; }
+function cellule(agentId, jour){ return etat.planning[cle(agentId, jour)] || null; }
+function codeDe(agentId, jour){ const c = cellule(agentId, jour); return c ? c.c : ''; }
+function poserCellule(agentId, jour, code, opts){
+  opts = opts || {};
+  const k = cle(agentId, jour);
+  const ancien = etat.planning[k] || {};
+  if(!code && !opts.note && !opts.verrou){ delete etat.planning[k]; return; }
+  const c = {c: code || ''};
+  const note = opts.note !== undefined ? opts.note : ancien.n;
+  if(note) c.n = note;
+  const verrou = opts.verrou !== undefined ? opts.verrou : ancien.v;
+  if(verrou) c.v = 1;
+  if(opts.depannage) c.d = 1;
+  const manuel = opts.manuel !== undefined ? opts.manuel : ancien.m;
+  if(manuel) c.m = 1;
+  if(!c.c && !c.n && !c.v){ delete etat.planning[k]; return; }
+  etat.planning[k] = c;
+}
+function agentParId(id){ return etat.agents.find(a => a.id === id) || null; }
+function nomAgent(a){ return a ? (a.nom + (a.prenom ? ' ' + a.prenom : '')) : '?'; }
+function agentsActifs(){ return etat.agents.filter(a => a.actif && !a.remplacant); }
+function agentsAffichables(){ return etat.agents.filter(a => a.actif); }
+
+/* Le groupe A travaille les week-ends de rang pair, le groupe B les impairs. */
+function weekendTravaille(agent, jour){
+  if(!etat.config.weekendAlterne) return true;
+  const pair = numSemaine(jour) % 2 === 0;
+  return (agent.groupeWE === 'A') === pair;
+}
+
+/* Repos réellement disponible entre deux codes posés à j1 et j2 (j1 < j2). */
+function reposEntre(code1, jour1, code2, jour2){
+  const c1 = CODES[code1], c2 = CODES[code2];
+  if(!c1 || !c2 || c1.type !== 'poste' || c2.type !== 'poste') return Infinity;
+  const fin   = idxJour(jour1) * 24 + c1.fin;
+  const debut = idxJour(jour2) * 24 + c2.debut;
+  return debut - fin;
+}
+
+/* Vérifie les 11 h de repos autour d'un code envisagé (regarde 3 jours de part et d'autre). */
+function reposOK(agentId, jour, code, mini){
+  if(!estPoste(code)) return true;
+  mini = mini || etat.config.reposMinHeures;
+  for(let d = 1; d <= 3; d++){
+    const av = jourPlus(jour, -d), ap = jourPlus(jour, d);
+    const cav = codeDe(agentId, av), cap = codeDe(agentId, ap);
+    if(estPoste(cav) && reposEntre(cav, av, code, jour) < mini) return false;
+    if(estPoste(cap) && reposEntre(code, jour, cap, ap) < mini) return false;
+  }
+  return true;
+}
+
+/* Nombre de jours travaillés consécutifs qui se terminent la veille de `jour`. */
+function consecutifsAvant(agentId, jour){
+  let n = 0, d = jourPlus(jour, -1);
+  for(let i = 0; i < 12; i++){
+    const c = codeDe(agentId, d);
+    if(estPoste(c)){ n++; d = jourPlus(d, -1); }
+    else break;   // toute case vide, repos ou absence arrête le décompte
+  }
+  return n;
+}
+/* Idem à partir du lendemain. */
+function consecutifsApres(agentId, jour){
+  let n = 0, d = jourPlus(jour, 1);
+  for(let i = 0; i < 12; i++){
+    const c = codeDe(agentId, d);
+    if(estPoste(c)){ n++; d = jourPlus(d, 1); }
+    else break;
+  }
+  return n;
+}
+/* Longueur de la série de travail si l'on pose `code` le `jour`. */
+function serieAvec(agentId, jour, code){
+  if(!estPoste(code)) return 0;
+  return consecutifsAvant(agentId, jour) + 1 + consecutifsApres(agentId, jour);
+}
+
+function joursTravaillesSemaine(agentId, jour){
+  const lundi = lundiDe(jour);
+  let n = 0;
+  for(let i = 0; i < 7; i++) if(estPoste(codeDe(agentId, jourPlus(lundi, i)))) n++;
+  return n;
+}
+function codesSemaine(agentId, jour){
+  const lundi = lundiDe(jour), out = [];
+  for(let i = 0; i < 7; i++) out.push(codeDe(agentId, jourPlus(lundi, i)));
+  return out;
+}
+function plafondSemaine(agent){
+  return agent.quotite >= 100 ? etat.config.joursMaxSemaine100 : etat.config.joursMaxSemaine80;
+}
+
+/* ==========================================================================
+   4. MOTEUR DE GÉNÉRATION
+   --------------------------------------------------------------------------
+   Déroulé :
+     a) on vide la période (en gardant CR, cases verrouillées, modifications
+        manuelles et annotations libres) ;
+     b) on pose les REC arrivés à échéance (compteur individuel de 6 semaines) ;
+     c) semaine par semaine, on constitue l'équipe de nuit ;
+     d) jour par jour, poste par poste, on choisit le meilleur agent disponible
+        (score d'équité + continuité) ; si personne ne passe les règles, on
+        élargit progressivement les tolérances et la case est marquée
+        « dépannage » ;
+     e) on étiquette les jours restants : 1 JA par semaine pour les 80 %, RH
+        pour le reste.
+   ========================================================================== */
+
+function celluleProtegee(c, preserverManuel){
+  if(!c) return false;
+  if(c.v) return true;                        // verrouillée
+  if(c.c === 'CR') return true;               // congé posé à l'avance
+  if(preserverManuel && c.m) return true;     // modifiée à la main
+  return false;
+}
+
+function viderPourGeneration(jours, preserverManuel){
+  jours.forEach(j => etat.agents.forEach(a => {
+    const k = cle(a.id, j);
+    const c = etat.planning[k];
+    if(!c || celluleProtegee(c, preserverManuel)) return;
+    if(c.n) etat.planning[k] = {c:'', n:c.n};  // l'annotation libre survit
+    else delete etat.planning[k];
+  }));
+}
+
+function libre(agentId, jour){
+  const c = cellule(agentId, jour);
+  return !c || !c.c;
+}
+
+/* --- REC : échéances calculées depuis l'ancre individuelle de chaque agent --- */
+function ancrerREC(rapport){
+  const base = aujourdhui();
+  let i = 0;
+  agentsActifs().forEach(a => {
+    if(!a.recAncre){
+      // on étale les ancres sur 6 semaines pour que les REC ne tombent pas tous le même jour
+      a.recAncre = jourPlus(lundiDe(base), -7 * (i % etat.config.recSemaines));
+      rapport.ancresPosees++;
+    }
+    i++;
+  });
+}
+function placerREC(debut, fin, rapport){
+  const pas = 7 * etat.config.recSemaines;
+  agentsActifs().forEach(a => {
+    if(!a.recAncre) return;
+    let ech = a.recAncre, garde = 0;
+    while(ech < fin && garde++ < 400){
+      ech = jourPlus(ech, pas);
+      if(ech < debut || ech > fin) continue;
+      // si l'échéance tombe sur un jour déjà occupé, on décale au plus près
+      let pose = null;
+      for(const d of [0,1,-1,2,-2,3,-3]){
+        const j = jourPlus(ech, d);
+        if(j < debut || j > fin) continue;
+        if(libre(a.id, j)){ pose = j; break; }
+      }
+      if(pose){ poserCellule(a.id, pose, 'REC'); rapport.rec++; }
+      else rapport.recNonPoses.push({agent:a.id, jour:ech});
+    }
+  });
+}
+
+/* --- équipe de nuit de la semaine --- */
+function derniereNuitIlYA(agentId, jour){
+  for(let d = 1; d <= 120; d++){
+    if(codeDe(agentId, jourPlus(jour, -d)) === 'N') return d;
+  }
+  return 999;
+}
+function equipeNuitSemaine(lundi, rnd){
+  const cfg = etat.config;
+  const nuitsAPourvoir = 7 * (cfg.besoins.N || 1);
+  const dispos = agentsActifs().filter(a => {
+    if(a.roulement === 'jour') return false;
+    // agent absent (CR) plus de 4 jours dans la semaine : inutile de le mettre en nuit
+    let abs = 0;
+    for(let i = 0; i < 7; i++){
+      const c = codeDe(a.id, jourPlus(lundi, i));
+      if(c && !estPoste(c)) abs++;
+    }
+    return abs <= 4;
+  });
+  const equipe = dispos.filter(a => a.roulement === 'nuit');
+  const mixtes = dispos.filter(a => a.roulement === 'mixte');
+  // priorité à ceux qui n'ont pas fait de nuit depuis le plus longtemps
+  mixtes.sort((x, y) => {
+    const dx = derniereNuitIlYA(x.id, lundi), dy = derniereNuitIlYA(y.id, lundi);
+    if(dy !== dx) return dy - dx;
+    return x.id < y.id ? -1 : 1;
+  });
+  let capacite = equipe.reduce((s, a) => s + plafondSemaine(a), 0);
+  for(const a of mixtes){
+    if(equipe.length >= cfg.equipeNuitTaille && capacite >= nuitsAPourvoir + 1) break;
+    equipe.push(a);
+    capacite += plafondSemaine(a);
+  }
+  // le week-end doit rester couvrable : il faut dans l'équipe au moins un agent
+  // dont c'est le tour de week-end, sinon les nuits du samedi et du dimanche
+  // tomberaient systématiquement en dépannage
+  if(cfg.weekendAlterne && nuitsAPourvoir > 0){
+    const samedi = jourPlus(lundi, 5);
+    if(!equipe.some(a => weekendTravaille(a, samedi))){
+      const renfort = mixtes.find(a => equipe.indexOf(a) < 0 && weekendTravaille(a, samedi));
+      if(renfort) equipe.push(renfort);
+    }
+  }
+  return new Set(equipe.map(a => a.id));
+}
+
+/* --- filtres et score --- */
+function candidatValide(a, jour, poste, equipeNuit, tolerance, autoriserRempl){
+  if(!a.actif) return false;
+  if(a.remplacant && !(autoriserRempl && tolerance >= 1)) return false;
+  if(!libre(a.id, jour)) return false;
+
+  // roulement jour / nuit — jamais mélangés sur une même semaine
+  if(tolerance < 4){
+    if(poste === 'N'){
+      if(a.roulement === 'jour') return false;
+      if(!a.remplacant && !equipeNuit.has(a.id)) return false;
+    }else{
+      if(a.roulement === 'nuit') return false;
+      if(!a.remplacant && equipeNuit.has(a.id)) return false;
+    }
+  }
+  // 11 h de repos : règle jamais franchie automatiquement
+  if(!reposOK(a.id, jour, poste)) return false;
+  // jours consécutifs
+  if(tolerance < 4 && serieAvec(a.id, jour, poste) > etat.config.maxJoursConsecutifs) return false;
+  // alternance des week-ends
+  if(tolerance < 3 && estWeekend(jour) && !a.remplacant && !weekendTravaille(a, jour)) return false;
+  // plafond hebdomadaire (laisse la place aux RH et à la JA)
+  if(tolerance < 2 && !a.remplacant && joursTravaillesSemaine(a.id, jour) >= plafondSemaine(a)) return false;
+  return true;
+}
+
+function nouveauxCompteurs(){
+  const c = {travailles:{}, we:{}, parPoste:{}, poids:{}, poidsTotal:0, total:0, totalWE:0};
+  POSTES.forEach(p => { c.parPoste[p] = {total:0}; });
+  agentsActifs().forEach(a => {
+    c.travailles[a.id] = 0; c.we[a.id] = 0;
+    c.poids[a.id] = a.quotite / 100;
+    c.poidsTotal += c.poids[a.id];
+  });
+  return c;
+}
+function enregistrer(cpt, a, jour, poste){
+  if(cpt.poids[a.id] === undefined) return;      // remplaçant : hors équilibrage
+  cpt.travailles[a.id]++; cpt.total++;
+  cpt.parPoste[poste][a.id] = (cpt.parPoste[poste][a.id] || 0) + 1;
+  cpt.parPoste[poste].total++;
+  if(estWeekend(jour)){ cpt.we[a.id]++; cpt.totalWE++; }
+}
+
+/* Score : plus il est élevé, plus l'agent est un bon choix pour ce poste ce jour-là. */
+function scoreCandidat(a, jour, poste, cpt, rnd){
+  const poids = cpt.poids[a.id] !== undefined ? cpt.poids[a.id] / cpt.poidsTotal : 0.5 / cpt.poidsTotal;
+  let s = 0;
+  // 1. équité globale : écart entre la charge théorique et la charge réelle
+  s += 70 * (cpt.total * poids - (cpt.travailles[a.id] || 0));
+  // 2. équité par poste : personne ne doit hériter de tous les soirs
+  s += 18 * (cpt.parPoste[poste].total * poids - (cpt.parPoste[poste][a.id] || 0));
+  // 3. équité des week-ends
+  if(estWeekend(jour)) s += 25 * (cpt.totalWE * poids - (cpt.we[a.id] || 0));
+  // 4. continuité : garder le même poste d'un jour sur l'autre (rythme du roulement).
+  //    On regarde la veille et le lendemain car le week-end est rempli en premier.
+  const hier = codeDe(a.id, jourPlus(jour, -1));
+  const demain = codeDe(a.id, jourPlus(jour, 1));
+  if(hier === poste || demain === poste)        s += (poste === 'N' ? 55 : 30);
+  else if(estPoste(hier) || estPoste(demain))   s += 6;
+  // 5. ne pas allonger inutilement les séries de travail
+  s -= 12 * (serieAvec(a.id, jour, poste) - 1);
+  // 6. un agent dont le roulement est « nuit » ne peut tenir que ce poste : l'équité
+  //    générale, calculée sur les 5 postes, le sous-évaluerait. On le remet en tête sur
+  //    la nuit — les autres agents du roulement prennent le reste (repos, week-ends).
+  if(a.roulement === 'nuit' && poste === 'N') s += 45;
+  // 7. les remplaçants restent le dernier recours
+  if(a.remplacant) s -= 500;
+  // 7. départage stable
+  s += rnd() * 2;
+  return s;
+}
+
+function choisirAgent(jour, poste, equipeNuit, cpt, rnd, tolerance, autoriserRempl){
+  let best = null, bestScore = -Infinity;
+  for(const a of etat.agents){
+    if(!candidatValide(a, jour, poste, equipeNuit, tolerance, autoriserRempl)) continue;
+    const sc = scoreCandidat(a, jour, poste, cpt, rnd);
+    if(sc > bestScore){ bestScore = sc; best = a; }
+  }
+  return best;
+}
+
+const MOTIFS_TOLERANCE = [
+  '', 'renfort remplaçant', 'plafond hebdomadaire dépassé (RH réduit)',
+  'alternance des week-ends non respectée', 'jours consécutifs / roulement dérogés'
+];
+
+/* --- étiquetage des jours non travaillés : JA puis RH --- */
+function poserJAetRH(jours, debut, fin, rapport){
+  const semaines = {};
+  jours.forEach(j => { semaines[lundiDe(j)] = true; });
+
+  // 1 JA par semaine pour chaque agent à 80 %
+  Object.keys(semaines).sort().forEach(lundi => {
+    const joursSem = [];
+    for(let i = 0; i < 7; i++){
+      const j = jourPlus(lundi, i);
+      if(j >= debut && j <= fin) joursSem.push(j);
+    }
+    if(joursSem.length < 5) return;      // semaine tronquée : pas de JA imposée
+    agentsActifs().forEach(a => {
+      if(a.quotite >= 100) return;
+      if(codesSemaine(a.id, lundi).indexOf('JA') >= 0) return;   // déjà posée à la main
+      let choix = null, meilleur = -Infinity;
+      joursSem.forEach(j => {
+        if(!libre(a.id, j)) return;
+        // on préfère une JA collée à des jours travaillés, pour garder les RH groupés
+        let sc = 0;
+        if(estPoste(codeDe(a.id, jourPlus(j, -1)))) sc += 3;
+        if(estPoste(codeDe(a.id, jourPlus(j,  1)))) sc += 3;
+        if(estWeekend(j)) sc -= 2;
+        sc -= jourSemaine(j) * 0.1;
+        if(sc > meilleur){ meilleur = sc; choix = j; }
+      });
+      if(choix){ poserCellule(a.id, choix, 'JA'); rapport.ja++; }
+      else rapport.jaNonPosees.push({agent:a.id, semaine:lundi});
+    });
+  });
+
+  // tout ce qui reste vide devient un repos hebdomadaire
+  jours.forEach(j => agentsActifs().forEach(a => {
+    if(libre(a.id, j)){ poserCellule(a.id, j, 'RH'); rapport.rh++; }
+  }));
+}
+
+/* --- point d'entrée --- */
+function genererPlanning(debut, fin, options){
+  const opts = options || {};
+  const jours = joursEntre(debut, fin);
+  if(!jours.length) return null;
+  const rnd = prng(debut + '|' + fin + '|' + etat.agents.map(a => a.id).join(','));
+  const rapport = {
+    debut, fin, jours:jours.length, postes:0, rh:0, ja:0, rec:0,
+    ancresPosees:0, depannages:[], nonCouverts:[], recNonPoses:[], jaNonPosees:[]
+  };
+
+  viderPourGeneration(jours, opts.preserverManuel !== false);
+  if(opts.resetWE) reequilibrerGroupesWE();
+  ancrerREC(rapport);
+  placerREC(debut, fin, rapport);
+
+  const cpt = nouveauxCompteurs();
+
+  // semaine par semaine, samedi et dimanche d'abord : le week-end est le moment
+  // le plus contraint (seule la moitié de l'effectif est de tour), il doit donc
+  // être servi avant que les jours de semaine n'épuisent les plafonds
+  const semaines = [];
+  const vues = {};
+  jours.forEach(j => { const l = lundiDe(j); if(!vues[l]){ vues[l] = 1; semaines.push(l); } });
+
+  for(const lundi of semaines){
+    const equipeNuit = equipeNuitSemaine(lundi, rnd);
+    const ordreJours = [5, 6, 0, 1, 2, 3, 4]
+      .map(i => jourPlus(lundi, i))
+      .filter(j => j >= debut && j <= fin);
+
+    for(const jour of ordreJours)
+    for(const poste of ORDRE_AFFECTATION){
+      const besoin = etat.config.besoins[poste] || 0;
+      let deja = 0;
+      etat.agents.forEach(a => { if(codeDe(a.id, jour) === poste) deja++; });
+
+      for(let n = deja; n < besoin; n++){
+        let agent = null, tol = 0;
+        for(tol = 0; tol <= 4; tol++){
+          agent = choisirAgent(jour, poste, equipeNuit, cpt, rnd, tol, !!opts.remplacants);
+          if(agent) break;
+        }
+        if(!agent){ rapport.nonCouverts.push({jour, poste}); continue; }
+        poserCellule(agent.id, jour, poste, {depannage: tol > 0});
+        enregistrer(cpt, agent, jour, poste);
+        rapport.postes++;
+        if(tol > 0) rapport.depannages.push({jour, poste, agent:agent.id, motif:MOTIFS_TOLERANCE[tol]});
+      }
+    }
+  }
+
+  poserJAetRH(jours, debut, fin, rapport);
+  return rapport;
+}
+
+/* Recalcule uniquement les semaines touchées par une modification (pose d'absence). */
+function reajusterAutour(debut, fin){
+  const d = lundiDe(debut);
+  const f = jourPlus(lundiDe(fin), 6);
+  return genererPlanning(d, f, {preserverManuel:true, remplacants:false});
+}
+
+function reequilibrerGroupesWE(){
+  // répartit les agents alternativement entre les groupes A et B, nuit exclue du comptage
+  let i = 0;
+  etat.agents.forEach(a => {
+    if(a.remplacant) return;
+    a.groupeWE = (i++ % 2 === 0) ? 'A' : 'B';
+  });
+}
+
+/* ==========================================================================
+   5. CONTRÔLE DES RÈGLES
+   ========================================================================== */
+
+function controler(debut, fin){
+  const jours = joursEntre(debut, fin);
+  const alertes = [];
+  const cfg = etat.config;
+  const add = (niveau, jour, agentId, msg, poste) =>
+    alertes.push({niveau, jour, agentId, msg, poste});
+
+  const actifs = agentsAffichables();
+
+  /* --- couverture des postes --- */
+  jours.forEach(j => {
+    const compte = {};
+    POSTES.forEach(p => compte[p] = []);
+    etat.agents.forEach(a => {
+      const c = codeDe(a.id, j);
+      if(estPoste(c)) compte[c].push(a.id);
+    });
+    POSTES.forEach(p => {
+      const besoin = cfg.besoins[p] || 0;
+      const n = compte[p].length;
+      if(n < besoin)
+        add('err', j, null, 'Poste ' + p + ' non couvert (' + n + '/' + besoin + ')', p);
+      else if(p === 'N' && n > 1)
+        add('err', j, compte[p][1], 'Deux agents sur la nuit : le poste N ne doit être tenu que par une seule personne', p);
+      else if(n > besoin)
+        add('warn', j, compte[p][n-1], 'Sureffectif sur le poste ' + p + ' (' + n + '/' + besoin + ')', p);
+    });
+  });
+
+  /* --- règles individuelles --- */
+  actifs.forEach(a => {
+    let serie = 0, debutSerie = null;
+    jours.forEach(j => {
+      const c = codeDe(a.id, j);
+
+      // 11 h de repos
+      if(estPoste(c)){
+        for(let d = 1; d <= 3; d++){
+          const av = jourPlus(j, -d), cav = codeDe(a.id, av);
+          if(estPoste(cav)){
+            const r = reposEntre(cav, av, c, j);
+            if(r < cfg.reposMinHeures)
+              add('err', j, a.id, 'Repos insuffisant : ' + r + ' h entre ' + cav + ' du ' +
+                  fmtJourCourt(av) + ' et ' + c + ' (minimum ' + cfg.reposMinHeures + ' h)');
+            break;
+          }
+        }
+      }
+
+      // jours consécutifs
+      if(estPoste(c)){
+        if(!serie) debutSerie = j;
+        serie++;
+        if(serie === cfg.maxJoursConsecutifs + 1)
+          add('err', j, a.id, (cfg.maxJoursConsecutifs + 1) + ' jours de travail consécutifs depuis le ' +
+              fmtJourCourt(debutSerie) + ' (maximum ' + cfg.maxJoursConsecutifs + ')');
+      }else if(estRepos(c) || (c === 'JA' && cfg.jaInterrompt)){
+        serie = 0;
+      }
+
+      // dépannage
+      const cel = cellule(a.id, j);
+      if(cel && cel.d)
+        add('info', j, a.id, 'Poste ' + cel.c + ' comblé en dépannage — à vérifier');
+    });
+  });
+
+  /* --- règles hebdomadaires --- */
+  const lundis = [...new Set(jours.map(lundiDe))].sort();
+  lundis.forEach(lundi => {
+    const complete = joursEntre(lundi, jourPlus(lundi, 6)).every(j => j >= debut && j <= fin);
+    actifs.forEach(a => {
+      if(a.remplacant) return;
+      const codes = codesSemaine(a.id, lundi);
+      const postes = codes.filter(estPoste);
+      const nuits = postes.filter(c => c === 'N').length;
+      const jourx = postes.length - nuits;
+
+      if(nuits > 0 && jourx > 0)
+        add('warn', lundi, a.id, 'Semaine ' + semaineISO(lundi) + ' : postes de jour et de nuit mélangés (' +
+            jourx + ' jour / ' + nuits + ' nuit)');
+
+      if(!complete) return;
+      const rh = codes.filter(c => c === 'RH').length;
+      if(rh < cfg.rhParSemaine)
+        add('info', lundi, a.id, 'Semaine ' + semaineISO(lundi) + ' : ' + rh + ' RH (moyenne visée : ' +
+            cfg.rhParSemaine + ' — l’écart peut se rattraper sur les semaines suivantes)');
+      if(a.quotite < 100 && codes.indexOf('JA') < 0 && codes.filter(c => c === 'CR').length < 5)
+        add('warn', lundi, a.id, 'Semaine ' + semaineISO(lundi) + ' : aucune journée aménagée (JA) posée');
+      if(postes.length > plafondSemaine(a))
+        add('warn', lundi, a.id, 'Semaine ' + semaineISO(lundi) + ' : ' + postes.length +
+            ' jours travaillés (plafond ' + plafondSemaine(a) + ' pour un ' + a.quotite + ' %)');
+    });
+  });
+
+  /* --- alternance des week-ends --- */
+  if(cfg.weekendAlterne){
+    const samedis = jours.filter(j => jourSemaine(j) === 5);
+    actifs.forEach(a => {
+      if(a.remplacant) return;
+      samedis.forEach(sam => {
+        const dim = jourPlus(sam, 1);
+        const travaille = estPoste(codeDe(a.id, sam)) || estPoste(codeDe(a.id, dim));
+        if(travaille && !weekendTravaille(a, sam))
+          add('warn', sam, a.id, 'Week-end travaillé hors de son tour (groupe ' + a.groupeWE + ')');
+        const samPrec = jourPlus(sam, -7);
+        const travaillePrec = estPoste(codeDe(a.id, samPrec)) || estPoste(codeDe(a.id, jourPlus(samPrec, 1)));
+        if(travaille && travaillePrec)
+          add('warn', sam, a.id, 'Deux week-ends travaillés d’affilée (règle : 1 week-end sur 2)');
+      });
+    });
+  }
+
+  /* --- compteur REC --- */
+  actifs.forEach(a => {
+    if(a.remplacant || !a.recAncre) return;
+    const limite = 7 * cfg.recSemaines;
+    let dernier = a.recAncre;
+    joursEntre(a.recAncre, fin).forEach(j => { if(codeDe(a.id, j) === 'REC') dernier = j; });
+    const ecart = idxJour(fin) - idxJour(dernier);
+    if(ecart > limite + 7)
+      add('warn', fin, a.id, 'Aucune récupération depuis le ' + fmtJourCourt(dernier) +
+          ' (' + Math.floor(ecart / 7) + ' semaines — échéance tous les ' + cfg.recSemaines + ')');
+  });
+
+  const rang = {err:0, warn:1, info:2};
+  alertes.sort((x, y) => (rang[x.niveau] - rang[y.niveau]) || (x.jour < y.jour ? -1 : 1));
+  return alertes;
+}
+
+/* Contrôle ciblé : ce qu'entraînerait la pose de `code` sur une case. */
+function controlerCase(agentId, jour, code){
+  const a = agentParId(agentId);
+  const msgs = [];
+  if(!a || !code) return msgs;
+  const cfg = etat.config;
+
+  if(estPoste(code)){
+    // repos de 11 h
+    for(let d = 1; d <= 3; d++){
+      const av = jourPlus(jour, -d), cav = codeDe(agentId, av);
+      if(estPoste(cav)){
+        const r = reposEntre(cav, av, code, jour);
+        if(r < cfg.reposMinHeures)
+          msgs.push({dur:true, t:'Repos de ' + r + ' h seulement après le ' + cav + ' du ' + fmtJourCourt(av) +
+                     ' (minimum ' + cfg.reposMinHeures + ' h)'});
+        break;
+      }
+    }
+    for(let d = 1; d <= 3; d++){
+      const ap = jourPlus(jour, d), cap = codeDe(agentId, ap);
+      if(estPoste(cap)){
+        const r = reposEntre(code, jour, cap, ap);
+        if(r < cfg.reposMinHeures)
+          msgs.push({dur:true, t:'Repos de ' + r + ' h seulement avant le ' + cap + ' du ' + fmtJourCourt(ap) +
+                     ' (minimum ' + cfg.reposMinHeures + ' h)'});
+        break;
+      }
+    }
+    // série de travail
+    const serie = serieAvec(agentId, jour, code);
+    if(serie > cfg.maxJoursConsecutifs)
+      msgs.push({dur:true, t:serie + ' jours de travail consécutifs (maximum ' + cfg.maxJoursConsecutifs + ')'});
+    // week-end
+    if(cfg.weekendAlterne && estWeekend(jour) && !a.remplacant && !weekendTravaille(a, jour))
+      msgs.push({dur:false, t:'Ce n’est pas le tour de week-end de cet agent (groupe ' + a.groupeWE + ')'});
+    // roulement
+    const codes = codesSemaine(agentId, jour).filter(estPoste);
+    const nuits = codes.filter(c => c === 'N').length;
+    if(code === 'N' && a.roulement === 'jour')
+      msgs.push({dur:false, t:'Cet agent est déclaré « roulement de jour »'});
+    if(code !== 'N' && a.roulement === 'nuit')
+      msgs.push({dur:false, t:'Cet agent est déclaré « roulement de nuit »'});
+    if(code === 'N' && codes.length - nuits > 0)
+      msgs.push({dur:false, t:'Jour et nuit mélangés sur la même semaine'});
+    if(code !== 'N' && nuits > 0)
+      msgs.push({dur:false, t:'Jour et nuit mélangés sur la même semaine'});
+    // plafond
+    const dejaCode = codeDe(agentId, jour);
+    const travailles = joursTravaillesSemaine(agentId, jour) + (estPoste(dejaCode) ? 0 : 1);
+    if(!a.remplacant && travailles > plafondSemaine(a))
+      msgs.push({dur:false, t:travailles + ' jours travaillés sur la semaine (plafond ' +
+                 plafondSemaine(a) + ' pour un ' + a.quotite + ' %)'});
+    // effectif du poste ce jour-là
+    let n = 0;
+    etat.agents.forEach(x => { if(x.id !== agentId && codeDe(x.id, jour) === code) n++; });
+    const besoin = cfg.besoins[code] || 0;
+    if(code === 'N' && n >= 1)
+      msgs.push({dur:true, t:'La nuit est déjà tenue par ' + nomAgent(etat.agents.find(x => x.id !== agentId && codeDe(x.id, jour) === 'N'))});
+    else if(n + 1 > besoin)
+      msgs.push({dur:false, t:'Sureffectif sur le poste ' + code + ' ce jour-là (' + (n+1) + '/' + besoin + ')'});
+  }
+
+  if(code === 'JA' && a.quotite >= 100)
+    msgs.push({dur:false, t:'La journée aménagée est réservée aux agents à temps partiel'});
+
+  // le poste libéré est-il encore couvert ?
+  const ancien = codeDe(agentId, jour);
+  if(estPoste(ancien) && ancien !== code){
+    let n = 0;
+    etat.agents.forEach(x => { if(x.id !== agentId && codeDe(x.id, jour) === ancien) n++; });
+    if(n < (cfg.besoins[ancien] || 0))
+      msgs.push({dur:false, t:'Le poste ' + ancien + ' ne sera plus couvert ce jour-là'});
+  }
+  return msgs;
+}
+
+/* Compteurs affichés dans l'onglet Contrôles et le résumé du mois. */
+function compteurs(debut, fin){
+  const jours = joursEntre(debut, fin);
+  const samedis = jours.filter(j => jourSemaine(j) === 5);
+  return agentsAffichables().map(a => {
+    const l = {agent:a, total:0, we:0, RH:0, CR:0, JA:0, REC:0, RF:0, vide:0};
+    POSTES.forEach(p => l[p] = 0);
+    jours.forEach(j => {
+      const c = codeDe(a.id, j);
+      if(!c){ l.vide++; return; }
+      if(l[c] !== undefined) l[c]++;
+      if(estPoste(c)){ l.total++; if(estWeekend(j)) l.we++; }
+    });
+    l.weekends = samedis.filter(s =>
+      estPoste(codeDe(a.id, s)) || estPoste(codeDe(a.id, jourPlus(s, 1)))).length;
+    return l;
+  });
+}
+
+/* ==========================================================================
+   6. AFFICHAGE
+   ========================================================================== */
+
+let alertesCourantes = [];
+let indexAlertes = {};        // "agentId|jour" -> 'err' | 'warn'
+let selection = null;         // {agentId, jour}
+
+function bornesMois(){
+  const jours = joursDuMois(etat.moisAffiche);
+  return {debut: jours[0], fin: jours[jours.length - 1], jours};
+}
+
+function recalculerAlertes(){
+  const b = bornesMois();
+  alertesCourantes = controler(b.debut, b.fin);
+  indexAlertes = {};
+  alertesCourantes.forEach(al => {
+    if(!al.agentId) return;
+    const k = cle(al.agentId, al.jour);
+    if(al.niveau === 'err') indexAlertes[k] = 'err';
+    else if(al.niveau === 'warn' && indexAlertes[k] !== 'err') indexAlertes[k] = 'warn';
+  });
+  const graves = alertesCourantes.filter(a => a.niveau !== 'info').length;
+  const pill = document.getElementById('pillAlertes');
+  pill.textContent = graves;
+  pill.classList.toggle('zero', graves === 0);
+}
+
+/* ------------------------------- la grille ------------------------------- */
+function dessinerGrille(){
+  const {jours} = bornesMois();
+  const agents = agentsAffichables();
+  const auj = aujourdhui();
+
+  // en-tête : semaines regroupées
+  let hWeeks = '<tr class="r-week"><th class="agent-col">' + esc(libelleMois(etat.moisAffiche)) + '</th>';
+  let i = 0;
+  while(i < jours.length){
+    const sem = semaineISO(jours[i]);
+    let span = 0;
+    while(i + span < jours.length && semaineISO(jours[i + span]) === sem) span++;
+    const dernier = jours[i + span - 1];
+    hWeeks += '<th colspan="' + span + '"' + (jourSemaine(dernier) === 6 ? ' class="we-sep"' : '') +
+              '>Sem. ' + sem + '</th>';
+    i += span;
+  }
+  hWeeks += '</tr>';
+
+  let hDow = '<tr class="r-dow"><th class="agent-col"></th>';
+  let hNum = '<tr class="r-num"><th class="agent-col">Nom Prénom</th>';
+  jours.forEach(j => {
+    const cls = [];
+    if(estWeekend(j)) cls.push('we');
+    if(estFerie(j)) cls.push('ferie');
+    if(jourSemaine(j) === 6) cls.push('we-sep');
+    const c = cls.length ? ' class="' + cls.join(' ') + '"' : '';
+    const fer = estFerie(j);
+    hDow += '<th' + c + ' title="' + (fer ? esc(fer) : '') + '">' + JOURS_FR[jourSemaine(j)] + '</th>';
+    hNum += '<th' + c + '>' + dateDe(j).getUTCDate() + (fer ? '<span style="color:#c02626">•</span>' : '') + '</th>';
+  });
+  hDow += '</tr>'; hNum += '</tr>';
+
+  // corps
+  let corps = '';
+  agents.forEach((a, idx) => {
+    const badge = a.remplacant
+      ? '<span class="q rempl">remp.</span>'
+      : '<span class="q' + (a.roulement === 'nuit' ? ' nuit' : '') + '">' + a.quotite + '%</span>' +
+        (etat.config.weekendAlterne ? '<span class="q we">' + a.groupeWE + '</span>' : '');
+    corps += '<tr' + (idx === agents.length - 1 ? ' class="sep-row"' : '') + '>' +
+             '<th class="agent-col"><div class="agent-cell"><span class="nm">' + esc(nomAgent(a)) +
+             '</span>' + badge + '</div></th>';
+    jours.forEach(j => {
+      const cel = cellule(a.id, j);
+      const code = cel ? cel.c : '';
+      const cls = ['day', 'c-' + (code || 'X')];
+      if(estWeekend(j)) cls.push('we');
+      else if(estFerie(j)) cls.push('ferie');
+      if(jourSemaine(j) === 6) cls.push('we-sep');
+      if(j === auj) cls.push('today');
+      if(cel && cel.d) cls.push('dep');
+      if(cel && cel.v) cls.push('lock');
+      if(cel && cel.n) cls.push('has-note');
+      const niv = indexAlertes[cle(a.id, j)];
+      if(niv === 'err') cls.push('alerte');
+      else if(niv === 'warn') cls.push('alerte-w');
+      if(selection && selection.agentId === a.id && selection.jour === j) cls.push('sel');
+      const titre = nomAgent(a) + ' — ' + fmtJour(j) +
+                    (code ? ' : ' + CODES[code].lib + (CODES[code].h ? ' (' + CODES[code].h + ')' : '') : '') +
+                    (cel && cel.n ? ' — ' + cel.n : '') +
+                    (cel && cel.d ? ' — dépannage' : '');
+      corps += '<td class="' + cls.join(' ') + '" data-a="' + a.id + '" data-j="' + j + '" title="' +
+               esc(titre) + '"><span class="code">' + esc(code) + '</span>' +
+               (cel && cel.n ? '<span class="note">' + esc(cel.n) + '</span>' : '') + '</td>';
+    });
+    corps += '</tr>';
+  });
+
+  // lignes de couverture
+  POSTES.forEach(p => {
+    const besoin = etat.config.besoins[p] || 0;
+    if(!besoin) return;
+    corps += '<tr class="cover"><th class="agent-col">Poste ' + p + ' <span style="font-weight:500;color:var(--muted)">' +
+             esc(CODES[p].h) + '</span></th>';
+    jours.forEach(j => {
+      let n = 0;
+      etat.agents.forEach(a => { if(codeDe(a.id, j) === p) n++; });
+      const cls = n < besoin ? 'ko' : (n > besoin ? 'ko' : 'ok');
+      corps += '<td class="' + cls + (jourSemaine(j) === 6 ? ' we-sep' : '') + '">' + n + '</td>';
+    });
+    corps += '</tr>';
+  });
+
+  document.getElementById('gridWrap').innerHTML =
+    '<table class="planning"><thead>' + hWeeks + hDow + hNum + '</thead><tbody>' + corps + '</tbody></table>';
+  document.getElementById('printTitle').textContent =
+    'Planning secrétaires — Urgences CH Mâcon — ' + libelleMois(etat.moisAffiche);
+}
+
+function dessinerLegende(){
+  const el = document.getElementById('legend');
+  let h = '';
+  Object.keys(CODES).forEach(c => {
+    h += '<span class="lg"><span class="sw c-' + c + '">' + c + '</span>' + esc(CODES[c].lib) +
+         (CODES[c].h ? ' <span class="hr">' + esc(CODES[c].h) + '</span>' : '') + '</span>';
+  });
+  h += '<span class="lg"><span class="sw" style="background:var(--orange);color:#fff">◤</span>Dépannage à vérifier</span>';
+  h += '<span class="lg"><span class="sw" style="background:#fff;box-shadow:inset 0 0 0 2px var(--red)">!</span>Règle non respectée</span>';
+  h += '<span class="lg"><span class="sw" style="background:#fff;border:1px solid var(--border2)">🔒</span>Case verrouillée</span>';
+  el.innerHTML = h;
+}
+
+/* ---------------------------- résumé du mois ---------------------------- */
+function dessinerResume(){
+  const b = bornesMois();
+  const lignes = compteurs(b.debut, b.fin);
+  let h = '<thead><tr><th>Agent</th>' + POSTES.map(p => '<th class="num">' + p + '</th>').join('') +
+          '<th class="num">Postes</th><th class="num">WE</th><th class="num">RH</th>' +
+          '<th class="num">JA</th><th class="num">CR</th><th class="num">REC</th></tr></thead><tbody>';
+  lignes.forEach(l => {
+    h += '<tr><td>' + esc(nomAgent(l.agent)) + '</td>' +
+         POSTES.map(p => '<td class="num">' + (l[p] || '') + '</td>').join('') +
+         '<td class="num"><b>' + l.total + '</b></td><td class="num">' + l.weekends + '</td><td class="num">' +
+         l.RH + '</td><td class="num">' + l.JA + '</td><td class="num">' + l.CR + '</td><td class="num">' +
+         l.REC + '</td></tr>';
+  });
+  const tot = lignes.reduce((s, l) => s + l.total, 0);
+  h += '</tbody>';
+  document.getElementById('tblResume').innerHTML = h;
+  document.getElementById('resumeHint').textContent =
+    tot + ' postes affectés sur ' + b.jours.length + ' jours';
+}
+
+/* ------------------------------ onglet équipe ------------------------------ */
+function dessinerEquipe(){
+  let h = '<thead><tr><th>Nom</th><th>Prénom</th><th>Quotité</th><th>Roulement</th>' +
+          '<th>Groupe WE</th><th>Dernier REC (ancre)</th><th>Actif</th><th></th></tr></thead><tbody>';
+  etat.agents.forEach(a => {
+    h += '<tr data-id="' + a.id + '">' +
+      '<td><input data-f="nom" value="' + esc(a.nom) + '" style="width:130px"></td>' +
+      '<td><input data-f="prenom" value="' + esc(a.prenom) + '" style="width:110px"></td>' +
+      '<td><select data-f="quotite"' + (a.remplacant ? ' disabled' : '') + '>' +
+        [100, 90, 80, 70, 60, 50].map(q => '<option value="' + q + '"' + (a.quotite === q ? ' selected' : '') +
+        '>' + q + ' %</option>').join('') + '</select></td>' +
+      '<td><select data-f="roulement"' + (a.remplacant ? ' disabled' : '') + '>' +
+        ['jour', 'nuit', 'mixte'].map(r => '<option value="' + r + '"' + (a.roulement === r ? ' selected' : '') +
+        '>' + r + '</option>').join('') + '</select></td>' +
+      '<td><select data-f="groupeWE"' + (a.remplacant ? ' disabled' : '') + '>' +
+        ['A', 'B'].map(g => '<option value="' + g + '"' + (a.groupeWE === g ? ' selected' : '') +
+        '>' + g + '</option>').join('') + '</select></td>' +
+      '<td><input type="date" data-f="recAncre" value="' + esc(a.recAncre || '') + '"' +
+        (a.remplacant ? ' disabled' : '') + '></td>' +
+      '<td style="text-align:center"><input type="checkbox" data-f="actif"' + (a.actif ? ' checked' : '') +
+        ' style="width:16px;height:16px;accent-color:var(--accent)"></td>' +
+      '<td><button class="btn-danger btn-sm" data-sup="' + a.id + '">Suppr.</button></td></tr>';
+  });
+  h += '</tbody>';
+  document.getElementById('tblEquipe').innerHTML = h;
+}
+
+/* ---------------------------- onglet absences ---------------------------- */
+function remplirSelectAgents(){
+  const opts = etat.agents.filter(a => a.actif)
+    .map(a => '<option value="' + a.id + '">' + esc(nomAgent(a)) + '</option>').join('');
+  ['absAgent', 'rnAgent'].forEach(id => {
+    const el = document.getElementById(id);
+    const v = el.value;
+    el.innerHTML = opts;
+    if(v) el.value = v;
+  });
+  const rmp = document.getElementById('rmpSlot');
+  const vr = rmp.value;
+  rmp.innerHTML = etat.agents.filter(a => a.remplacant)
+    .map(a => '<option value="' + a.id + '">' + esc(nomAgent(a)) + '</option>').join('');
+  if(vr) rmp.value = vr;
+}
+function remplirSelectCodes(){
+  document.getElementById('absCode').innerHTML = ['CR', 'REC', 'RF', 'RH', 'JA']
+    .map(c => '<option value="' + c + '">' + c + ' — ' + esc(CODES[c].lib) + '</option>').join('');
+  document.getElementById('rmpCode').innerHTML = POSTES
+    .map(c => '<option value="' + c + '">' + c + ' — ' + esc(CODES[c].h) + '</option>').join('');
+}
+function dessinerAbsences(){
+  const lignes = [];
+  Object.keys(etat.planning).forEach(k => {
+    const c = etat.planning[k];
+    if(!c || (c.c !== 'CR' && c.c !== 'RF' && !(c.v && c.c))) return;
+    if(c.c === 'RH' || c.c === 'JA') return;
+    const [aid, j] = k.split('|');
+    lignes.push({aid, j, c:c.c, n:c.n || '', v:c.v});
+  });
+  lignes.sort((x, y) => x.j < y.j ? -1 : (x.j > y.j ? 1 : (x.aid < y.aid ? -1 : 1)));
+  // regroupement des jours consécutifs d'un même agent avec le même code
+  const groupes = [];
+  lignes.forEach(l => {
+    const p = groupes[groupes.length - 1];
+    if(p && p.aid === l.aid && p.c === l.c && p.n === l.n && jourPlus(p.fin, 1) === l.j) p.fin = l.j;
+    else groupes.push({aid:l.aid, c:l.c, n:l.n, debut:l.j, fin:l.j});
+  });
+  groupes.sort((x, y) => x.debut < y.debut ? 1 : -1);
+  let h = '<thead><tr><th>Agent</th><th>Motif</th><th>Du</th><th>Au</th><th>Jours</th>' +
+          '<th>Annotation</th><th></th></tr></thead><tbody>';
+  if(!groupes.length) h += '<tr><td colspan="7" class="empty">Aucune absence enregistrée.</td></tr>';
+  groupes.slice(0, 120).forEach(g => {
+    const n = idxJour(g.fin) - idxJour(g.debut) + 1;
+    h += '<tr><td>' + esc(nomAgent(agentParId(g.aid))) + '</td>' +
+         '<td><span class="tag" style="background:var(--c-' + g.c + ');color:var(--c-' + g.c + '-t)">' + g.c + '</span></td>' +
+         '<td>' + fmtJourCourt(g.debut) + '</td><td>' + fmtJourCourt(g.fin) + '</td>' +
+         '<td class="num">' + n + '</td><td>' + esc(g.n) + '</td>' +
+         '<td><button class="btn-danger btn-sm" data-delabs="' + g.aid + '~' + g.debut + '~' + g.fin +
+         '">Retirer</button></td></tr>';
+  });
+  h += '</tbody>';
+  document.getElementById('tblAbsences').innerHTML = h;
+  document.getElementById('absHint').textContent = groupes.length + ' période(s)';
+}
+
+/* ---------------------------- onglet contrôles ---------------------------- */
+function dessinerControles(){
+  const d = document.getElementById('ctrlDebut').value || bornesMois().debut;
+  const f = document.getElementById('ctrlFin').value || bornesMois().fin;
+  const niveau = document.getElementById('ctrlNiveau').value;
+  const al = controler(d, f);
+  document.getElementById('ctrlPeriode').textContent = 'du ' + fmtJourCourt(d) + ' au ' + fmtJourCourt(f);
+
+  const nErr = al.filter(a => a.niveau === 'err').length;
+  const nWarn = al.filter(a => a.niveau === 'warn').length;
+  const nInfo = al.filter(a => a.niveau === 'info').length;
+  const jours = joursEntre(d, f);
+  let manquants = 0;
+  jours.forEach(j => POSTES.forEach(p => {
+    let n = 0;
+    etat.agents.forEach(a => { if(codeDe(a.id, j) === p) n++; });
+    if(n < (etat.config.besoins[p] || 0)) manquants += (etat.config.besoins[p] || 0) - n;
+  }));
+  document.getElementById('kpisControles').innerHTML =
+    kpi('Erreurs', nErr, nErr ? 'red' : 'green') +
+    kpi('Avertissements', nWarn, nWarn ? 'orange' : 'green') +
+    kpi('Dépannages', nInfo, nInfo ? 'orange' : 'green') +
+    kpi('Postes non couverts', manquants, manquants ? 'red' : 'green') +
+    kpi('Jours contrôlés', jours.length, '');
+
+  const filtre = niveau === 'err' ? ['err'] : (niveau === 'warn' ? ['err', 'warn'] : ['err', 'warn', 'info']);
+  const vus = al.filter(a => filtre.indexOf(a.niveau) >= 0);
+  const ic = {err:'⛔', warn:'⚠️', info:'🛟'};
+  const cl = {err:'err', warn:'warn', info:'info'};
+  let h = '';
+  if(!vus.length) h = '<div class="empty">✅ Aucun point à signaler sur cette période.</div>';
+  vus.slice(0, 400).forEach(a => {
+    const who = a.agentId ? nomAgent(agentParId(a.agentId)) : 'Service';
+    h += '<div class="alert-item ' + cl[a.niveau] + '" data-goto="' + esc(a.jour) + '"><span class="ic">' +
+         ic[a.niveau] + '</span><div class="bd"><div class="who">' + esc(who) + ' — ' + fmtJour(a.jour) +
+         '</div><div class="msg">' + esc(a.msg) + '</div></div></div>';
+  });
+  if(vus.length > 400) h += '<div class="empty">… et ' + (vus.length - 400) + ' autres.</div>';
+  document.getElementById('listeAlertes').innerHTML = h;
+
+  // compteurs par agent
+  const lignes = compteurs(d, f);
+  const nbSem = Math.max(1, Math.round(jours.length / 7));
+  let t = '<thead><tr><th>Agent</th><th>Quot.</th>' + POSTES.map(p => '<th class="num">' + p + '</th>').join('') +
+          '<th class="num">Postes</th><th class="num">WE</th><th class="num">RH</th><th class="num">RH/sem.</th>' +
+          '<th class="num">JA</th><th class="num">CR</th><th class="num">REC</th></tr></thead><tbody>';
+  lignes.forEach(l => {
+    const rhSem = (l.RH / nbSem);
+    const ko = rhSem < etat.config.rhParSemaine - 0.35;
+    t += '<tr><td>' + esc(nomAgent(l.agent)) + '</td><td>' + (l.agent.remplacant ? '—' : l.agent.quotite + ' %') + '</td>' +
+         POSTES.map(p => '<td class="num">' + (l[p] || '') + '</td>').join('') +
+         '<td class="num"><b>' + l.total + '</b></td><td class="num">' + l.weekends + '</td>' +
+         '<td class="num">' + l.RH + '</td><td class="num"' + (ko ? ' style="color:var(--orange);font-weight:700"' : '') +
+         '>' + rhSem.toFixed(1) + '</td><td class="num">' + l.JA + '</td><td class="num">' + l.CR +
+         '</td><td class="num">' + l.REC + '</td></tr>';
+  });
+  t += '</tbody>';
+  document.getElementById('tblCompteurs').innerHTML = t;
+}
+function kpi(lbl, val, cls){
+  return '<div class="kpi"><div class="lbl">' + esc(lbl) + '</div><div class="val ' + cls + '">' + val + '</div></div>';
+}
+
+/* ---------------------------- onglet réglages ---------------------------- */
+function dessinerReglages(){
+  let h = '<thead><tr><th>Poste</th><th>Horaires</th><th>Agents / jour</th></tr></thead><tbody>';
+  POSTES.forEach(p => {
+    h += '<tr><td><span class="tag" style="background:var(--c-' + p + ');color:var(--c-' + p + '-t)">' + p +
+         '</span> ' + esc(CODES[p].lib) + '</td><td>' + esc(CODES[p].h) + '</td>' +
+         '<td><input type="number" min="0" max="6" step="1" data-besoin="' + p + '" value="' +
+         (etat.config.besoins[p] || 0) + '" style="width:66px"' + (p === 'N' ? ' max="1"' : '') + '></td></tr>';
+  });
+  h += '</tbody>';
+  document.getElementById('tblBesoins').innerHTML = h;
+
+  const R = [
+    ['rhParSemaine',        'RH par semaine (moyenne visée)',        1, 5,  ''],
+    ['recSemaines',         'REC : échéance en semaines',            2, 20, ''],
+    ['reposMinHeures',      'Repos minimum entre deux postes (h)',   8, 16, ''],
+    ['maxJoursConsecutifs', 'Jours travaillés consécutifs maximum',  2, 7,  ''],
+    ['joursMaxSemaine100',  'Jours travaillés / semaine à 100 %',    3, 7,  ''],
+    ['joursMaxSemaine80',   'Jours travaillés / semaine à 80 %',     2, 7,  ''],
+    ['equipeNuitTaille',    'Agents dans le roulement de nuit / semaine', 1, 8, ''],
+  ];
+  let t = '<thead><tr><th>Règle</th><th style="width:100px">Valeur</th></tr></thead><tbody>';
+  R.forEach(r => {
+    t += '<tr><td>' + esc(r[1]) + '</td><td><input type="number" min="' + r[2] + '" max="' + r[3] +
+         '" data-regle="' + r[0] + '" value="' + etat.config[r[0]] + '" style="width:80px"></td></tr>';
+  });
+  t += '<tr><td>Alternance stricte des week-ends (1 sur 2)</td><td><input type="checkbox" data-regle-b="weekendAlterne"' +
+       (etat.config.weekendAlterne ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:var(--accent)"></td></tr>';
+  t += '<tr><td>La JA interrompt le décompte des jours consécutifs</td><td><input type="checkbox" data-regle-b="jaInterrompt"' +
+       (etat.config.jaInterrompt ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:var(--accent)"></td></tr>';
+  t += '</tbody>';
+  document.getElementById('tblRegles').innerHTML = t;
+}
+
+function toutRedessiner(){
+  recalculerAlertes();
+  dessinerGrille();
+  dessinerResume();
+  dessinerEquipe();
+  dessinerAbsences();
+  remplirSelectAgents();
+  majBadgeSauvegarde();
+  const vc = document.getElementById('view-controles');
+  if(vc.classList.contains('active')) dessinerControles();
+}
+
+/* ==========================================================================
+   7. ÉDITION D'UNE CASE
+   ========================================================================== */
+
+let edCode = '', edCible = null;
+
+function ouvrirEditeur(agentId, jour, td){
+  const a = agentParId(agentId);
+  if(!a) return;
+  const cel = cellule(agentId, jour);
+  edCible = {agentId, jour};
+  edCode = cel ? cel.c : '';
+  selection = {agentId, jour};
+
+  document.getElementById('edTitre').textContent = nomAgent(a);
+  const fer = estFerie(jour);
+  document.getElementById('edSousTitre').textContent =
+    fmtJour(jour) + ' · sem. ' + semaineISO(jour) + (fer ? ' · ' + fer : '') +
+    (cel && cel.d ? ' · comblé en dépannage' : '');
+  document.getElementById('edNote').value = cel && cel.n ? cel.n : '';
+  document.getElementById('edVerrou').checked = !!(cel && cel.v);
+
+  dessinerChips();
+  majAvertissementsEditeur();
+
+  const ed = document.getElementById('editor');
+  ed.classList.add('show');
+  document.getElementById('backdrop').classList.add('show');
+  // positionnement près de la case, sans sortir de l'écran
+  const r = td.getBoundingClientRect();
+  const w = 308, h = ed.offsetHeight || 420;
+  let left = r.left + r.width / 2 - w / 2;
+  let top = r.bottom + 6;
+  if(top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+  left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+  ed.style.left = left + 'px';
+  ed.style.top = top + 'px';
+  dessinerGrille();
+}
+function fermerEditeur(){
+  document.getElementById('editor').classList.remove('show');
+  document.getElementById('backdrop').classList.remove('show');
+  edCible = null; selection = null;
+  dessinerGrille();
+}
+function dessinerChips(){
+  const chip = c =>
+    '<button class="code-chip c-' + c + (edCode === c ? ' on' : '') + '" data-code="' + c + '" title="' +
+    esc(CODES[c].lib + (CODES[c].h ? ' — ' + CODES[c].h : '')) + '">' + c +
+    (CODES[c].h ? '<small>' + esc(CODES[c].h.replace(/\s/g, '')) + '</small>' : '') + '</button>';
+  document.getElementById('edPostes').innerHTML = POSTES.map(chip).join('');
+  document.getElementById('edAbsences').innerHTML = ABSENCES.map(chip).join('');
+}
+function majAvertissementsEditeur(){
+  const box = document.getElementById('edWarn');
+  if(!edCible || !edCode){ box.innerHTML = ''; return; }
+  const msgs = controlerCase(edCible.agentId, edCible.jour, edCode);
+  if(!msgs.length){ box.innerHTML = ''; return; }
+  const dur = msgs.some(m => m.dur);
+  box.innerHTML = '<div class="warn' + (dur ? '' : ' soft') + '"><b>' +
+    (dur ? '⛔ Règle non respectée' : '⚠️ À vérifier') + '</b><ul>' +
+    msgs.map(m => '<li>' + esc(m.t) + '</li>').join('') + '</ul></div>';
+}
+function validerEditeur(){
+  if(!edCible) return;
+  snapshot('modification d’une case');
+  const note = document.getElementById('edNote').value.trim();
+  const verrou = document.getElementById('edVerrou').checked;
+  const k = cle(edCible.agentId, edCible.jour);
+  delete etat.planning[k];
+  poserCellule(edCible.agentId, edCible.jour, edCode, {note, verrou, manuel:true});
+  sauver();
+  const j = edCible.jour;
+  fermerEditeur();
+  toutRedessiner();
+  toast('Case du ' + fmtJourCourt(j) + ' mise à jour');
+}
+
+/* ==========================================================================
+   8. EXPORTS
+   ========================================================================== */
+
+const COULEURS = {
+  M:['#d6f0e2','#0d5c3c'], J:['#d9e8fb','#0b4a80'], DJ:['#e4dcfa','#4527a0'],
+  S:['#ffe3c7','#8a4b06'], N:['#39406e','#ffffff'], CR:['#ffe14d','#5c4700'],
+  JA:['#fff6b0','#6b5800'], REC:['#ffd7a8','#7a3f04'], RF:['#ffd0e4','#8c1f52'],
+  RH:['#e2e8f0','#475569'], '':['#ffffff','#334155']
+};
+
+function telecharger(nom, contenu, type){
+  const blob = new Blob([contenu], {type});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = nom;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function exporterExcel(){
+  const {jours} = bornesMois();
+  const agents = agentsAffichables();
+  const bord = 'border:0.5pt solid #b8c4d4;';
+  let h = '<tr><th style="' + bord + 'background:#eaf3fb;text-align:left">Nom Prénom</th>';
+  jours.forEach(j => {
+    h += '<th style="' + bord + 'background:' + (estWeekend(j) ? '#d8dee7' : '#eaf3fb') +
+         ';text-align:center">' + JOURS_FR[jourSemaine(j)].slice(0,2) + ' ' + dateDe(j).getUTCDate() + '</th>';
+  });
+  h += '</tr>';
+  agents.forEach(a => {
+    h += '<tr><td style="' + bord + 'font-weight:bold">' + esc(nomAgent(a)) +
+         (a.remplacant ? '' : ' (' + a.quotite + '%)') + '</td>';
+    jours.forEach(j => {
+      const cel = cellule(a.id, j);
+      const c = cel ? cel.c : '';
+      const col = COULEURS[c] || COULEURS[''];
+      h += '<td style="' + bord + 'background:' + col[0] + ';color:' + col[1] +
+           ';text-align:center;font-weight:bold">' + esc(c + (cel && cel.n ? ' *' : '')) + '</td>';
+    });
+    h += '</tr>';
+  });
+  POSTES.forEach(p => {
+    if(!(etat.config.besoins[p] || 0)) return;
+    h += '<tr><td style="' + bord + 'background:#f4f9fd">Poste ' + p + '</td>';
+    jours.forEach(j => {
+      let n = 0;
+      etat.agents.forEach(a => { if(codeDe(a.id, j) === p) n++; });
+      const ko = n !== (etat.config.besoins[p] || 0);
+      h += '<td style="' + bord + 'background:' + (ko ? '#fdeaea' : '#f4f9fd') + ';text-align:center">' + n + '</td>';
+    });
+    h += '</tr>';
+  });
+  // annotations libres, reprises sous le tableau
+  const notes = [];
+  agents.forEach(a => jours.forEach(j => {
+    const cel = cellule(a.id, j);
+    if(cel && cel.n) notes.push([nomAgent(a), fmtJourCourt(j), cel.n]);
+  }));
+  let bloc = '';
+  if(notes.length){
+    bloc = '<tr><td colspan="3" style="font-weight:bold;padding-top:10px">Annotations</td></tr>' +
+      notes.map(n => '<tr><td style="' + bord + '">' + esc(n[0]) + '</td><td style="' + bord + '">' +
+      esc(n[1]) + '</td><td style="' + bord + '">' + esc(n[2]) + '</td></tr>').join('');
+  }
+  const doc = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">' +
+    '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>' +
+    '<x:Name>' + libelleMois(etat.moisAffiche).replace(/[^\wéûà ]/g, '') + '</x:Name>' +
+    '<x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet>' +
+    '</x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>' +
+    '<table style="border-collapse:collapse;font-family:Calibri;font-size:11px">' +
+    '<tr><td colspan="' + (jours.length + 1) + '" style="font-size:14px;font-weight:bold">' +
+    'Planning secrétaires — Urgences CH Mâcon — ' + libelleMois(etat.moisAffiche) + '</td></tr>' +
+    h + '</table><br><table style="border-collapse:collapse;font-family:Calibri;font-size:11px">' +
+    bloc + '</table></body></html>';
+  telecharger('planning-' + etat.moisAffiche + '.xls', '﻿' + doc, 'application/vnd.ms-excel;charset=utf-8');
+  toast('Fichier Excel exporté');
+}
+
+function exporterJson(){
+  telecharger('sauvegarde-planning-' + aujourdhui() + '.json',
+              JSON.stringify(etat, null, 1), 'application/json');
+  toast('Sauvegarde exportée');
+}
+function importerJson(fichier){
+  const fr = new FileReader();
+  fr.onload = () => {
+    try{
+      const s = JSON.parse(fr.result);
+      if(!s.agents || !s.planning) throw new Error('format');
+      snapshot('restauration d’une sauvegarde');
+      etat = Object.assign(etatDefaut(), s);
+      etat.config = Object.assign(configDefaut(), s.config || {});
+      etat.config.besoins = Object.assign({M:1,J:1,DJ:1,S:1,N:1}, (s.config || {}).besoins || {});
+      sauver(); initChamps(); toutRedessiner(); dessinerReglages();
+      toast('Sauvegarde restaurée');
+    }catch(e){
+      toast('Fichier illisible : ce n’est pas une sauvegarde valide', true);
+    }
+  };
+  fr.readAsText(fichier);
+}
+
+/* ==========================================================================
+   9. ÉVÉNEMENTS
+   ========================================================================== */
+
+function allerAuMois(moisISO){
+  etat.moisAffiche = moisISO;
+  document.getElementById('moisPicker').value = moisISO;
+  sauver(); toutRedessiner();
+}
+function decalerMois(n){
+  const [y, m] = etat.moisAffiche.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  allerAuMois(d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0'));
+}
+function activerVue(nom){
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === nom));
+  document.getElementById('view-' + nom).classList.add('active');
+  if(nom === 'controles') dessinerControles();
+  if(nom === 'reglages') dessinerReglages();
+  if(nom === 'equipe'){ dessinerEquipe(); remplirSelectAgents(); }
+  if(nom === 'absences'){ dessinerAbsences(); remplirSelectAgents(); }
+  window.scrollTo(0, 0);
+}
+
+function afficherRapport(r){
+  const box = document.getElementById('genRapport');
+  if(!r){ box.innerHTML = ''; return; }
+  const l = [];
+  l.push(['✅', r.postes + ' postes affectés sur ' + r.jours + ' jours', 'info']);
+  l.push(['🛌', r.rh + ' repos hebdomadaires · ' + r.ja + ' journées aménagées · ' + r.rec + ' récupérations', 'info']);
+  if(r.ancresPosees) l.push(['🕐', r.ancresPosees + ' compteur(s) REC initialisé(s) — modifiables dans l’onglet Équipe', 'info']);
+  if(r.depannages.length){
+    const par = {};
+    r.depannages.forEach(d => { par[d.motif] = (par[d.motif] || 0) + 1; });
+    l.push(['🛟', r.depannages.length + ' poste(s) comblé(s) en dépannage (repérés par un coin orange) — ' +
+            Object.keys(par).map(m => par[m] + ' × ' + m).join(', '), 'warn']);
+  }
+  if(r.nonCouverts.length){
+    const d = r.nonCouverts.slice(0, 8).map(x => x.poste + ' du ' + fmtJourCourt(x.jour)).join(', ');
+    l.push(['⛔', r.nonCouverts.length + ' poste(s) impossible(s) à couvrir : ' + d +
+            (r.nonCouverts.length > 8 ? '…' : ''), 'err']);
+  }
+  if(r.jaNonPosees.length) l.push(['⚠️', r.jaNonPosees.length + ' journée(s) aménagée(s) non plaçable(s) (semaine trop chargée)', 'warn']);
+  if(r.recNonPoses.length) l.push(['⚠️', r.recNonPoses.length + ' récupération(s) non plaçable(s) à l’échéance', 'warn']);
+  box.innerHTML = l.map(x =>
+    '<div class="alert-item ' + x[2] + '"><span class="ic">' + x[0] + '</span><div class="bd"><div class="msg">' +
+    esc(x[1]) + '</div></div></div>').join('');
+}
+
+function lancerGeneration(debut, fin){
+  if(!debut || !fin || debut > fin){ toast('Période invalide', true); return; }
+  if(idxJour(fin) - idxJour(debut) > 400){ toast('Période trop longue (400 jours maximum)', true); return; }
+  snapshot('génération du ' + fmtJourCourt(debut) + ' au ' + fmtJourCourt(fin));
+  const r = genererPlanning(debut, fin, {
+    preserverManuel: document.getElementById('optPreserverManuel').checked,
+    remplacants:     document.getElementById('optRemplacants').checked,
+    resetWE:         document.getElementById('optResetWE').checked,
+  });
+  document.getElementById('optResetWE').checked = false;
+  sauver(); toutRedessiner(); afficherRapport(r);
+  toast(r.postes + ' postes affectés' + (r.nonCouverts.length ? ' — ' + r.nonCouverts.length + ' non couvert(s)' : ''));
+  return r;
+}
+
+function poserAbsence(){
+  const aid = document.getElementById('absAgent').value;
+  const code = document.getElementById('absCode').value;
+  const d = document.getElementById('absDebut').value;
+  const f = document.getElementById('absFin').value || d;
+  const note = document.getElementById('absNote').value.trim();
+  if(!aid || !d){ toast('Choisissez un agent et une date', true); return; }
+  if(f < d){ toast('La date de fin précède la date de début', true); return; }
+  if(idxJour(f) - idxJour(d) > 200){ toast('Période trop longue', true); return; }
+  snapshot('absence ' + code + ' pour ' + nomAgent(agentParId(aid)));
+  joursEntre(d, f).forEach(j => {
+    delete etat.planning[cle(aid, j)];
+    poserCellule(aid, j, code, {verrou:true, manuel:true, note});
+  });
+  if(document.getElementById('absReajuster').checked) reajusterAutour(d, f);
+  sauver(); toutRedessiner();
+  document.getElementById('absNote').value = '';
+  toast(code + ' posé du ' + fmtJourCourt(d) + ' au ' + fmtJourCourt(f));
+}
+
+function affecterRenfort(){
+  const aid = document.getElementById('rmpSlot').value;
+  const nom = document.getElementById('rmpNom').value.trim();
+  const code = document.getElementById('rmpCode').value;
+  const d = document.getElementById('rmpDebut').value;
+  const f = document.getElementById('rmpFin').value || d;
+  if(!aid || !d){ toast('Choisissez un emplacement et une date', true); return; }
+  if(f < d){ toast('La date de fin précède la date de début', true); return; }
+  snapshot('renfort ' + code);
+  const a = agentParId(aid);
+  if(nom){
+    const bout = nom.trim().split(/\s+/);
+    a.prenom = bout.length > 1 ? bout.pop() : '';
+    a.nom = bout.join(' ');
+  }
+  joursEntre(d, f).forEach(j => {
+    delete etat.planning[cle(aid, j)];
+    poserCellule(aid, j, code, {verrou:true, manuel:true});
+  });
+  sauver(); toutRedessiner();
+  toast('Renfort affecté du ' + fmtJourCourt(d) + ' au ' + fmtJourCourt(f));
+}
+
+function renommerAgent(){
+  const aid = document.getElementById('rnAgent').value;
+  const nom = document.getElementById('rnNom').value.trim();
+  const prenom = document.getElementById('rnPrenom').value.trim();
+  const date = document.getElementById('rnDate').value;
+  const a = agentParId(aid);
+  if(!a || !nom){ toast('Indiquez au moins le nouveau nom', true); return; }
+  snapshot('remplacement de ' + nomAgent(a));
+  a.nom = nom; a.prenom = prenom;
+  if(document.getElementById('rnResetRec').checked) a.recAncre = date || aujourdhui();
+  sauver(); toutRedessiner();
+  document.getElementById('rnNom').value = ''; document.getElementById('rnPrenom').value = '';
+  toast('Agent renommé — planning et compteurs conservés');
+}
+
+function initChamps(){
+  const b = bornesMois();
+  document.getElementById('moisPicker').value = etat.moisAffiche;
+  const suivant = (() => {
+    const [y, m] = etat.moisAffiche.split('-').map(Number);
+    const d = new Date(Date.UTC(y, m, 1));
+    return joursDuMois(d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0'));
+  })();
+  const set = (id, v) => { const e = document.getElementById(id); if(e && !e.value) e.value = v; };
+  set('genDebut', suivant[0]); set('genFin', suivant[suivant.length - 1]);
+  set('clrDebut', b.debut);   set('clrFin', b.fin);
+  set('absDebut', aujourdhui());
+  set('rmpDebut', aujourdhui());
+  set('rnDate', aujourdhui());
+  document.getElementById('ctrlDebut').value = b.debut;
+  document.getElementById('ctrlFin').value = b.fin;
+  remplirSelectCodes();
+  remplirSelectAgents();
+}
+
+function brancherEvenements(){
+  document.getElementById('nav').addEventListener('click', e => {
+    const b = e.target.closest('.tab-btn');
+    if(b) activerVue(b.dataset.view);
+  });
+
+  // --- navigation dans les mois
+  document.getElementById('moisPrev').onclick = () => decalerMois(-1);
+  document.getElementById('moisNext').onclick = () => decalerMois(1);
+  document.getElementById('moisToday').onclick = () => allerAuMois(moisCourantISO());
+  document.getElementById('moisPicker').onchange = e => { if(e.target.value) allerAuMois(e.target.value); };
+
+  // --- clic sur une case du planning
+  document.getElementById('gridWrap').addEventListener('click', e => {
+    const td = e.target.closest('td.day');
+    if(!td) return;
+    ouvrirEditeur(td.dataset.a, td.dataset.j, td);
+  });
+
+  // --- éditeur de case
+  document.getElementById('backdrop').onclick = fermerEditeur;
+  document.getElementById('edAnnuler').onclick = fermerEditeur;
+  document.getElementById('edValider').onclick = validerEditeur;
+  document.getElementById('edVider').onclick = () => { edCode = ''; dessinerChips(); majAvertissementsEditeur(); };
+  document.getElementById('editor').addEventListener('click', e => {
+    const c = e.target.closest('.code-chip');
+    if(!c) return;
+    // un clic sélectionne toujours le code ; pour vider, on utilise « Vider la case »
+    edCode = c.dataset.code;
+    dessinerChips(); majAvertissementsEditeur();
+  });
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape' && edCible) fermerEditeur();
+    else if(e.key === 'Enter' && edCible && e.target.id !== 'edNote') validerEditeur();
+    else if(e.key === 'Enter' && e.target.id === 'edNote') validerEditeur();
+  });
+
+  // --- génération
+  document.getElementById('btnGenMois').onclick = () => {
+    const b = bornesMois();
+    lancerGeneration(b.debut, b.fin);
+  };
+  document.getElementById('btnGenerer').onclick = () =>
+    lancerGeneration(document.getElementById('genDebut').value, document.getElementById('genFin').value);
+  document.getElementById('genRaccourci').onchange = e => {
+    const v = e.target.value; if(!v) return;
+    let js;
+    if(v === 'mois-courant') js = joursDuMois(etat.moisAffiche);
+    else if(v === 'mois-suivant'){
+      const [y, m] = etat.moisAffiche.split('-').map(Number);
+      const d = new Date(Date.UTC(y, m, 1));
+      js = joursDuMois(d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0'));
+    }else{
+      const j0 = joursDuMois(etat.moisAffiche);
+      const [y, m] = etat.moisAffiche.split('-').map(Number);
+      const d = new Date(Date.UTC(y, m + 2, 1));
+      const fin = joursDuMois(d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0'));
+      js = [j0[0], fin[fin.length - 1]];
+    }
+    document.getElementById('genDebut').value = js[0];
+    document.getElementById('genFin').value = js[js.length - 1];
+    e.target.value = '';
+  };
+  document.getElementById('btnEffacer').onclick = () => {
+    const d = document.getElementById('clrDebut').value, f = document.getElementById('clrFin').value;
+    if(!d || !f || d > f){ toast('Période invalide', true); return; }
+    if(!confirm('Effacer le planning du ' + fmtJourCourt(d) + ' au ' + fmtJourCourt(f) + ' ?')) return;
+    snapshot('effacement de période');
+    const garder = document.getElementById('clrGarderCR').checked;
+    joursEntre(d, f).forEach(j => etat.agents.forEach(a => {
+      const c = etat.planning[cle(a.id, j)];
+      if(!c) return;
+      if(garder && celluleProtegee(c, false)) return;
+      delete etat.planning[cle(a.id, j)];
+    }));
+    sauver(); toutRedessiner(); afficherRapport(null);
+    toast('Période effacée');
+  };
+
+  // --- annuler
+  document.getElementById('btnUndo').onclick = annuler;
+
+  // --- absences / renfort / renommage
+  document.getElementById('btnPoserAbsence').onclick = poserAbsence;
+  document.getElementById('btnRenfort').onclick = affecterRenfort;
+  document.getElementById('btnRenommer').onclick = renommerAgent;
+  document.getElementById('tblAbsences').addEventListener('click', e => {
+    const b = e.target.closest('[data-delabs]');
+    if(!b) return;
+    const [aid, d, f] = b.dataset.delabs.split('~');
+    snapshot('retrait d’une absence');
+    joursEntre(d, f).forEach(j => delete etat.planning[cle(aid, j)]);
+    reajusterAutour(d, f);
+    sauver(); toutRedessiner();
+    toast('Absence retirée et planning réajusté');
+  });
+
+  // --- équipe
+  document.getElementById('tblEquipe').addEventListener('change', e => {
+    const tr = e.target.closest('tr'); if(!tr) return;
+    const a = agentParId(tr.dataset.id); if(!a) return;
+    const f = e.target.dataset.f; if(!f) return;
+    if(f === 'actif') a.actif = e.target.checked;
+    else if(f === 'quotite') a.quotite = Number(e.target.value);
+    else a[f] = e.target.value;
+    sauver(); toutRedessiner();
+  });
+  document.getElementById('tblEquipe').addEventListener('click', e => {
+    const b = e.target.closest('[data-sup]'); if(!b) return;
+    const a = agentParId(b.dataset.sup); if(!a) return;
+    if(!confirm('Supprimer ' + nomAgent(a) + ' et toutes ses cases du planning ?\n\n' +
+                'Pour un départ remplacé par une nouvelle recrue, utilisez plutôt « Remplacer un agent » : ' +
+                'le planning est conservé.')) return;
+    snapshot('suppression de ' + nomAgent(a));
+    Object.keys(etat.planning).forEach(k => { if(k.split('|')[0] === a.id) delete etat.planning[k]; });
+    etat.agents = etat.agents.filter(x => x.id !== a.id);
+    sauver(); toutRedessiner();
+    toast('Agent supprimé');
+  });
+  document.getElementById('btnAddAgent').onclick = () => {
+    snapshot('ajout d’un agent');
+    const nA = etat.agents.filter(a => !a.remplacant && a.groupeWE === 'A').length;
+    const nB = etat.agents.filter(a => !a.remplacant && a.groupeWE === 'B').length;
+    etat.agents.splice(etat.agents.findIndex(a => a.remplacant) >= 0
+      ? etat.agents.findIndex(a => a.remplacant) : etat.agents.length, 0, {
+      id:'a' + uid(), nom:'NOUVEL AGENT', prenom:'', quotite:80, roulement:'mixte',
+      groupeWE: nA <= nB ? 'A' : 'B', recAncre:'', actif:true, remplacant:false
+    });
+    sauver(); dessinerEquipe(); toutRedessiner();
+    toast('Agent ajouté — renseignez son nom');
+  };
+  document.getElementById('btnAddRempl').onclick = () => {
+    snapshot('ajout d’un emplacement de remplacement');
+    const n = etat.agents.filter(a => a.remplacant).length + 1;
+    etat.agents.push({id:'r' + uid(), nom:'Remplaçant ' + n, prenom:'', quotite:100,
+                      roulement:'mixte', groupeWE:'A', recAncre:'', actif:true, remplacant:true});
+    sauver(); dessinerEquipe(); toutRedessiner();
+    toast('Emplacement de remplacement ajouté');
+  };
+  document.getElementById('btnEquilibrerWE').onclick = () => {
+    snapshot('rééquilibrage des groupes de week-end');
+    reequilibrerGroupesWE();
+    sauver(); dessinerEquipe(); toutRedessiner();
+    toast('Groupes A / B rééquilibrés');
+  };
+
+  // --- contrôles
+  document.getElementById('btnRecontroler').onclick = dessinerControles;
+  document.getElementById('ctrlNiveau').onchange = dessinerControles;
+  document.getElementById('listeAlertes').addEventListener('click', e => {
+    const it = e.target.closest('[data-goto]'); if(!it) return;
+    allerAuMois(it.dataset.goto.slice(0, 7));
+    activerVue('planning');
+  });
+
+  // --- réglages
+  document.getElementById('tblBesoins').addEventListener('change', e => {
+    const p = e.target.dataset.besoin; if(!p) return;
+    let v = Math.max(0, Math.min(6, Number(e.target.value) || 0));
+    if(p === 'N') v = Math.min(1, v);          // la nuit n'a jamais plus d'un titulaire
+    etat.config.besoins[p] = v; e.target.value = v;
+    sauver(); toutRedessiner();
+  });
+  document.getElementById('tblRegles').addEventListener('change', e => {
+    const r = e.target.dataset.regle, rb = e.target.dataset.regleB;
+    if(r) etat.config[r] = Number(e.target.value) || etat.config[r];
+    else if(rb) etat.config[rb] = e.target.checked;
+    else return;
+    sauver(); toutRedessiner();
+  });
+
+  // --- exports
+  document.getElementById('btnPrint').onclick = () => { activerVue('planning'); setTimeout(() => window.print(), 60); };
+  document.getElementById('btnXls').onclick = exporterExcel;
+  document.getElementById('btnExportJson').onclick = exporterJson;
+  document.getElementById('btnImportJson').onclick = () => document.getElementById('fileImport').click();
+  document.getElementById('fileImport').onchange = e => {
+    if(e.target.files[0]) importerJson(e.target.files[0]);
+    e.target.value = '';
+  };
+  document.getElementById('btnReset').onclick = () => {
+    if(!confirm('Effacer TOUTES les données (effectif, planning, réglages) et repartir de zéro ?')) return;
+    if(!confirm('Cette action est définitive. Avez-vous exporté une sauvegarde ?')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    etat = etatDefaut(); historique = [];
+    sauver(); initChamps(); toutRedessiner(); dessinerReglages();
+    toast('Application réinitialisée');
+  };
+}
+
+/* installation PWA */
+let promptInstall = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); promptInstall = e;
+  document.getElementById('installBtn').style.display = 'inline-block';
+});
+document.getElementById('installBtn').onclick = async () => {
+  if(!promptInstall) return;
+  promptInstall.prompt(); await promptInstall.userChoice;
+  promptInstall = null;
+  document.getElementById('installBtn').style.display = 'none';
+};
+
+/* ==========================================================================
+   10. AIDE
+   ========================================================================== */
+function dessinerAide(){
+  document.getElementById('aideContenu').innerHTML = `
+  <h2 style="font-size:16px;margin-bottom:10px">📖 Mode d’emploi</h2>
+  <div style="font-size:13.5px;line-height:1.65;color:var(--text)">
+    <h3 style="margin:14px 0 5px">1. Préparer l’effectif</h3>
+    <p>Onglet <b>Équipe</b> : vérifiez la quotité, le roulement (jour / nuit / mixte), le groupe de
+    week-end (A ou B, un week-end sur deux) et la date du dernier REC de chaque agent.
+    Cette date est l’<b>ancre</b> du compteur : le REC suivant est posé automatiquement 6 semaines après,
+    puis toutes les 6 semaines.</p>
+
+    <h3 style="margin:14px 0 5px">2. Poser les congés connus</h3>
+    <p>Onglet <b>Absences</b> : posez les CR à l’avance. Ils sont verrouillés 🔒 et la génération
+    automatique ne les écrasera jamais.</p>
+
+    <h3 style="margin:14px 0 5px">3. Générer</h3>
+    <p>Onglet <b>Génération</b> (ou le bouton « Générer ce mois »). L’application affecte les postes
+    M, J, DJ, S et N, puis complète avec les JA et les RH. Le rapport indique ce qui n’a pas pu être
+    couvert normalement.</p>
+
+    <h3 style="margin:14px 0 5px">4. Ajuster à la main</h3>
+    <p><b>Cliquez sur une case</b> pour changer le code, ajouter une annotation libre (formation,
+    réunion…) ou verrouiller la case. Si la modification enfreint une règle, l’avertissement s’affiche
+    <i>avant</i> validation — vous restez libre de valider quand même. Le bouton <b>↶ Annuler</b>
+    revient en arrière (12 dernières actions).</p>
+
+    <h3 style="margin:14px 0 5px">5. Vérifier et diffuser</h3>
+    <p>Onglet <b>Contrôles</b> : la liste de tout ce qui cloche sur la période, cliquable pour aller
+    directement au mois concerné. Puis <b>PDF / Imprimer</b> (paysage) ou <b>Excel</b>.</p>
+
+    <h3 style="margin:16px 0 5px">Repères visuels sur la grille</h3>
+    <ul style="padding-left:20px">
+      <li><b>Coin orange ◤</b> : poste comblé en dépannage, à vérifier.</li>
+      <li><b>Contour rouge</b> : règle non respectée · <b>contour orange</b> : point à vérifier.</li>
+      <li><b>Point bleu</b> en haut à gauche : case verrouillée 🔒.</li>
+      <li><b>Petit texte sous le code</b> : annotation libre.</li>
+      <li><b>Colonnes grisées</b> : samedi et dimanche · <b>point rouge</b> sur le numéro : jour férié.</li>
+      <li><b>Lignes du bas</b> : nombre d’agents réellement affectés à chaque poste, en rouge si l’effectif ne correspond pas.</li>
+    </ul>
+
+    <h3 style="margin:16px 0 5px">Règles appliquées automatiquement</h3>
+    <ul style="padding-left:20px">
+      <li>Couverture identique 7 jours sur 7, week-ends compris (réglable dans <b>Réglages</b>).</li>
+      <li>Le poste de nuit N n’est jamais tenu par plus d’une personne.</li>
+      <li>11 h de repos minimum entre deux postes — <b>jamais franchi</b> par la génération automatique
+          (un poste S suivi d’un M le lendemain ne laisserait que 7 h).</li>
+      <li>4 jours travaillés consécutifs au maximum ; RH, CR, REC et RF remettent le compteur à zéro.</li>
+      <li>Jour et nuit ne se mélangent pas sur une même semaine pour un même agent.</li>
+      <li>Un week-end sur deux (groupes A et B).</li>
+      <li>1 JA par semaine pour chaque agent à temps partiel, 2 RH par semaine en moyenne.</li>
+      <li>REC automatique toutes les 6 semaines, compteur individuel.</li>
+    </ul>
+
+    <h3 style="margin:16px 0 5px">Sauvegarde</h3>
+    <p>Les données sont enregistrées <b>sur cet appareil</b> (mémoire du navigateur), sans serveur ni
+    compte. Exportez régulièrement une sauvegarde depuis l’onglet <b>Réglages</b> : c’est aussi le
+    moyen de transporter le planning sur un autre ordinateur.</p>
+  </div>`;
+}
+
+/* ==========================================================================
+   11. DÉMARRAGE
+   ========================================================================== */
+initChamps();
+brancherEvenements();
+dessinerLegende();
+dessinerAide();
+toutRedessiner();
+dessinerReglages();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
