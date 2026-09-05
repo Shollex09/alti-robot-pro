@@ -1695,6 +1695,129 @@ absence de collision d'ids en DOM réel, couleur appliquée, réseau coupé),
 `browser14.js` les circuits (tracé réel vs stylisé, badge, recoloration CSS
 en direct).
 
+## Refonte visuelle : thème sombre gris-bleu, accent turquoise
+
+Demandé avec un brief de direction artistique détaillé et une photo de
+référence (probablement un autre jeu du même genre — traité comme une
+référence de niveau de finition, pas comme un gabarit à reproduire à
+l'identique : je n'ai copié ni ses noms d'onglets ni sa mise en page exacte,
+pour rester dans notre propre langage visuel et ne pas cloner l'habillage
+d'un produit tiers).
+
+### Ce qui existait déjà et qu'il a juste fallu recolorer
+
+Une bonne partie du brief décrivait des choses **déjà en place** dans le
+jeu, sous d'autres couleurs : le petit trait diagonal rouge/corail devant
+chaque titre de section (`.card>h2::before`), les cartes à coins arrondis
+avec ombre, la barre du haut avec réputation et trésorerie toujours
+visibles, la barre d'onglets avec soulignement de l'onglet actif. Le travail
+réel n'était donc pas de recréer ce système, mais de :
+
+1. **Remapper la palette** : fond `#1c222b`, cartes `#252c37`, un nouvel
+   accent turquoise (`--accent:#5fc9c0`) dédié aux actions principales, en
+   gardant `--red` pour le repère de section et les états négatifs (pertes,
+   dangers, ruptures). Comme le reste du CSS passait déjà par des variables,
+   ce remappage a suffi à toucher tout le jeu d'un coup — aucune règle CSS
+   par écran à changer une par une.
+2. **Séparer les deux rôles du rouge.** Avant, `--red` servait à la fois de
+   repère de section ET de couleur d'action (boutons, onglet actif, curseur
+   de slider, chip du pilote actif). Ces deux usages n'ont pas le même sens :
+   le premier est un motif graphique fixe, le second doit suivre ce qui est
+   *sélectionné maintenant*. Passés en turquoise : bouton `.btn`/`.btn-cta`
+   (texte sombre dessus, `--accent-ink`, pour le contraste — un bouton clair
+   avec du texte blanc dessus serait illisible), soulignement de l'onglet
+   actif, curseur de réglage, pastille du programme d'essais libres
+   conseillé, chip du pilote actif dans la barre multi-pilotes, étape en
+   cours de l'échelle de catégories. Restés en rouge : repère de section,
+   pastille de message non lu, valeurs négatives, bouton « Effacer la
+   partie » (une action destructrice n'a pas à devenir engageante).
+3. **Rayons de bordure** portés de 10px à 16px par défaut (20px pour les
+   éléments larges), plus proches des 16-20px demandés.
+
+### Barre d'onglets réduite à cinq, le reste depuis le Bureau
+
+Le brief voulait Bureau/Messagerie/Pilote/Transferts/Week-end en barre
+persistante, et Sponsors/Contrats/Staff/Championnat/Finances « accessibles
+depuis le Bureau ». Fait en retirant les six boutons correspondants du
+`<nav>` — aucun changement de logique nécessaire, `UI.tab` et `RENDERERS`
+ne connaissent pas la barre visible, ils répondent à n'importe quelle valeur
+de tab qu'on leur donne.
+
+**Le vrai risque de ce changement** : avant, Contrats, Finances et
+Sauvegarde n'avaient **aucun lien** ailleurs dans l'application — seule la
+barre d'onglets y menait. Les retirer de la barre sans rien ajouter les
+aurait rendus injoignables. Un bloc « Gérer l'écurie » a été ajouté au
+Bureau avec un accès direct vers les six écrans, et chacun est vérifié
+individuellement pour produire un rendu non vide (`browser15.js`).
+
+### Le hero du Bureau, et un doublon repéré à l'écran
+
+Le Bureau s'ouvre maintenant sur un bloc large : diagonale entre une zone de
+texte (année, catégorie, nom du manager et de son pilote) et une
+illustration de garage dessinée à plat (voiture stylisée aux couleurs de
+l'écurie, drapeau à damier, ligne de piste — pas une scène 3D, dans le même
+registre que le podium ou les portraits déjà dessinés à la main dans le
+jeu), puis un bouton turquoise pleine largeur.
+
+**Repéré en regardant le premier rendu, pas en le devinant** : le bouton du
+hero et la carte `ctaBureau()` juste en dessous affichaient tous les deux
+« Étudier les offres d'écuries » — deux fois le même bouton, l'un sous
+l'autre. Le bouton du hero est resté volontairement général (« Gérer mon
+pilote » / « Consulter le vivier ») plutôt que de dupliquer l'action
+précise du moment, qui a déjà sa propre carte détaillée juste après.
+
+Sous le hero, une rangée de quatre cartes de résumé (réputation, trésorerie,
+caisse de saison, image médiatique — le brief en visait deux à trois, mais
+retirer un chiffre que le joueur regarde chaque semaine aurait été une vraie
+perte d'information pour gagner une contrainte esthétique). Le reste du
+Bureau — carte pilote, saison en cours, tableau multi-pilotes, aperçu de
+messagerie — n'a pas changé : seule sa présentation en amont change.
+
+### Ce qui n'est PAS fait
+
+Le brief demandait la même direction sur **tous** les écrans (Week-end,
+Sponsors, Contrats, Staff, Championnat, Finances). Seuls le Bureau (hero +
+cartes de résumé) et la palette globale (qui, elle, touche vraiment tout
+l'écran par les variables CSS) ont reçu ce traitement complet. Les autres
+écrans héritent déjà de la nouvelle palette (turquoise, fond, rayons) parce
+qu'ils utilisent les mêmes variables et les mêmes classes `.card`/`.btn`,
+mais aucun n'a encore de bloc hero ni de rangée de cartes de résumé dédiée
+— ce sera la suite si demandé.
+
+### Test
+
+`unit8.js` corrigé : le test de vieillissement comparait les SVG rendus, ce
+qui échouait environ une fois sur douze sur un pilote tiré au hasard — un
+des huit styles de cheveux de Micah est chauve (« mrClean »), et sur ce
+style-là aucune teinte de cheveux n'apparaît jamais dans le rendu, quelle
+que soit l'option envoyée. Remplacé par une interception des options
+transmises (comme dans unit23.js), qui ne dépend pas de quel style de
+cheveux tombe sur tel pilote. `browser15.js` vérifie l'absence de doublon
+dans le hero, que les six écrans du bloc « Gérer l'écurie » rendent
+effectivement du contenu, et que la barre d'onglets ne montre plus que les
+cinq écrans principaux.
+
+Retirer six boutons de la barre a cassé trois anciens tests navigateur qui
+cliquaient dessus directement (`browser.js`, `browser2.js`, `browser3.js`) :
+corrigés pour passer par le Bureau puis le hub, comme le fait maintenant un
+vrai joueur.
+
+**Un vrai bug trouvé en corrigeant ces tests, sans rapport avec la refonte
+visuelle** : `browser2.js` charge le fichier unique exporté par
+`build-artifact.py` (celui donné aux joueurs pour tester hors ligne), pas
+`index.html` directement. Son `ACTIONS.importConfirm` — réécrit spécialement
+pour cette version texte-à-copier plutôt que fichier — n'acceptait que
+`o.v===1`. Toute sauvegarde exportée depuis une partie récente est en
+`v:2` depuis l'introduction du multi-pilotes (§15) : **l'import de sa propre
+sauvegarde échouait silencieusement** (un toast « Ce n'est pas une
+sauvegarde valide », sans autre explication) dans le fichier unique donné
+aux joueurs, alors que l'import par fichier de l'onglet Sauvegarde normal
+fonctionnait très bien, lui, depuis longtemps. Corrigé pour accepter v1 et
+v2 et passer par `migrerPartie()` + `completerMonde()`, exactement comme le
+fait l'import normal — `build-artifact.py` régénère maintenant un
+`importConfirm` équivalent en substance à celui d'`index.html`, pas une
+version parallèle qui peut diverger silencieusement.
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - Le §22.3 (devenir Team Principal en F1), le seul point du GDD encore ouvert,

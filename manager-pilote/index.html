@@ -18,16 +18,20 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0d1117; --bg2:#0a0e14; --card:#161b22; --card2:#1c232d;
-  --border:#252c37; --border2:#333c4a;
-  --text:#e6edf3; --text2:#9aa7b5; --muted:#66727f;
-  --red:#ff2f2f; --red-d:#c81e1e; --red-bg:#2a1214;
+  /* Fond gris-bleu très foncé, cartes un cran plus claires — palette refondue
+     sur ce retour : un seul accent turquoise pour l'action, le rouge/corail
+     ne reste que comme repère visuel devant les titres de section. */
+  --bg:#1c222b; --bg2:#161b22; --card:#252c37; --card2:#2c3444;
+  --border:#333c4a; --border2:#414c5e;
+  --text:#e9edf3; --text2:#9aa7b5; --muted:#6b7686;
+  --accent:#5fc9c0; --accent-d:#49a89f; --accent-ink:#0a2b28;
+  --red:#ff5c5c; --red-d:#e04545; --red-bg:#2a1c1c;
   --amber:#f5b700; --amber-bg:#2a2210;
-  --green:#2ecc71; --green-bg:#0f2419;
-  --blue:#3d9bff; --blue-bg:#0f1d2e;
+  --green:#3ddc84; --green-bg:#0f2419;
+  --blue:#5b9dff; --blue-bg:#0f1d2e;
   --purple:#a970ff; --purple-bg:#1c1430;
   --gold:#ffd257; --silver:#c8d2dc; --bronze:#cd8b52;
-  --r:10px; --r-sm:7px; --r-lg:16px;
+  --r:16px; --r-sm:9px; --r-lg:20px;
   --shadow:0 4px 22px rgba(0,0,0,.4);
   --cond:'Barlow Condensed','Barlow',sans-serif;
 }
@@ -41,19 +45,19 @@ body{
 }
 button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
 input,select,textarea{background:var(--bg2);border:1.5px solid var(--border2);border-radius:var(--r-sm);padding:8px 10px;outline:none;transition:border-color .15s;width:100%}
-input:focus,select:focus,textarea:focus{border-color:var(--red)}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 button{cursor:pointer;border:none;border-radius:var(--r-sm);padding:10px 16px;font-weight:600;transition:all .15s}
 button:disabled{opacity:.4;cursor:not-allowed}
-.btn{background:var(--red);color:#fff}
-.btn:hover:not(:disabled){background:var(--red-d)}
+.btn{background:var(--accent);color:var(--accent-ink)}
+.btn:hover:not(:disabled){background:var(--accent-d)}
 .btn-ghost{background:var(--card2);color:var(--text);border:1px solid var(--border2)}
-.btn-ghost:hover:not(:disabled){border-color:var(--red);color:#fff}
+.btn-ghost:hover:not(:disabled){border-color:var(--accent);color:#fff}
 .btn-ok{background:var(--green);color:#062012}
 .btn-warn{background:var(--amber);color:#241c00}
 .btn-sm{padding:6px 11px;font-size:12.5px;border-radius:6px}
 .btn-xs{padding:4px 9px;font-size:11.5px;border-radius:5px;font-weight:600}
 .btn-block{width:100%;display:block}
-.btn-cta{background:linear-gradient(135deg,#ff2f2f,#c81e1e);color:#fff;font-family:var(--cond);font-size:19px;letter-spacing:.03em;text-transform:uppercase;padding:15px;border-radius:var(--r)}
+.btn-cta{background:linear-gradient(135deg,#6fd6cd,#4fb0a7);color:var(--accent-ink);font-family:var(--cond);font-size:19px;letter-spacing:.03em;text-transform:uppercase;padding:15px;border-radius:var(--r)}
 .btn-cta:hover:not(:disabled){filter:brightness(1.12)}
 a{color:var(--blue)}
 h1,h2,h3,h4{font-family:var(--cond);letter-spacing:.01em;line-height:1.15}
@@ -86,7 +90,7 @@ h1,h2,h3,h4{font-family:var(--cond);letter-spacing:.01em;line-height:1.15}
 .tab-btn{background:transparent;color:var(--text2);font-weight:600;font-size:12.5px;padding:11px 12px;border-radius:0;
   white-space:nowrap;border-bottom:2.5px solid transparent;position:relative}
 .tab-btn:has(.dot:not([hidden])){padding-right:24px}
-.tab-btn.active{color:#fff;border-bottom-color:var(--red)}
+.tab-btn.active{color:#fff;border-bottom-color:var(--accent)}
 .tab-btn:hover:not(.active){color:var(--text)}
 .tab-btn .dot{position:absolute;top:6px;right:3px;min-width:15px;height:15px;padding:0 4px;border-radius:9px;background:var(--red);
   color:#fff;font-size:9.5px;font-weight:700;display:grid;place-items:center;line-height:1}
@@ -124,6 +128,38 @@ main{max-width:1080px;margin:0 auto;padding:14px 12px calc(40px + env(safe-area-
   opacity:.10;pointer-events:none}
 .card.accent{border-color:var(--red-d);background:linear-gradient(180deg,#1d1418,var(--card))}
 .card.flat{background:var(--card2)}
+
+/* ---- hero d'accueil : bloc large, texte + illustration séparés par une
+   diagonale, CTA turquoise pleine largeur en bas ---- */
+.hero-bureau{padding:0;overflow:hidden}
+.hero-bureau .split{display:flex;min-height:148px}
+.hero-bureau .txt{flex:1 1 56%;padding:18px 14px 16px 16px;display:flex;flex-direction:column;justify-content:center}
+.hero-bureau .eyebrow{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--text2);font-weight:700}
+.hero-bureau .titre{font-family:var(--cond);font-size:23px;font-weight:700;margin:2px 0 5px;line-height:1.08}
+.hero-bureau .sous{font-size:12.5px;color:var(--text2);line-height:1.4}
+.hero-bureau .art{flex:1 1 44%;position:relative;background:linear-gradient(155deg,#2c3546,#1a212d);
+  clip-path:polygon(16% 0,100% 0,100% 100%,0 100%);display:flex;align-items:center;justify-content:center;padding:6px 4px 6px 20px}
+.hero-bureau .art svg{width:100%;height:auto;max-height:132px}
+.hero-bureau .cta{margin:0;border-radius:0;text-align:center}
+@media(min-width:520px){.hero-bureau .titre{font-size:27px}}
+
+/* ---- rangée de cartes de résumé : picto, chiffres, bouton optionnel ---- */
+.sumrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-bottom:12px}
+.sumcard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:13px}
+.sumcard .ico{width:30px;height:30px;border-radius:9px;background:var(--card2);display:grid;place-items:center;
+  font-size:15px;margin-bottom:8px}
+.sumcard .val{font-family:var(--cond);font-size:22px;font-weight:700;line-height:1}
+.sumcard .val+.val{margin-top:1px}
+.sumcard .lab{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.sumcard .btn-ghost{margin-top:10px;width:100%;text-align:center;padding:7px;font-size:12px}
+
+/* ---- accès aux écrans secondaires (Sponsors/Contrats/Staff/Championnat/
+   Finances/Sauvegarde), tous accessibles depuis le Bureau ---- */
+.hubgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.hubgrid a, .hubgrid button{background:var(--card2);border:1px solid var(--border);border-radius:var(--r-sm);
+  padding:12px 6px;text-align:center;color:var(--text2);font-size:11.5px;font-weight:600;cursor:pointer}
+.hubgrid button:hover{border-color:var(--accent);color:var(--text)}
+.hubgrid .hi{font-size:19px;display:block;margin-bottom:5px}
 .sect-title{font-family:var(--cond);font-size:19px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:16px 0 9px}
 .sect-title:first-child{margin-top:0}
 
@@ -213,9 +249,9 @@ td.wrap{white-space:normal;min-width:130px}
 input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;padding:0;border:none;height:22px;width:100%}
 input[type=range]::-webkit-slider-runnable-track{height:5px;background:var(--bg2);border-radius:3px;border:1px solid var(--border2)}
 input[type=range]::-moz-range-track{height:5px;background:var(--bg2);border-radius:3px;border:1px solid var(--border2)}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--red);
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);
   margin-top:-8.5px;border:2px solid #fff2}
-input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--red);border:2px solid #fff2}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid #fff2}
 
 /* ---- feedback quotes ---- */
 .quote{background:var(--bg2);border-left:3px solid var(--amber);border-radius:0 var(--r-sm) var(--r-sm) 0;
@@ -240,7 +276,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
 /* ---- choice list ---- */
 .choice{display:block;width:100%;text-align:left;background:var(--card2);border:1.5px solid var(--border);
   border-radius:var(--r-sm);padding:11px 13px;margin-bottom:8px;font-weight:500}
-.choice:hover:not(:disabled){border-color:var(--red);background:#20262f}
+.choice:hover:not(:disabled){border-color:var(--accent);background:#20262f}
 .choice b{display:block;font-size:14px;font-weight:700;margin-bottom:2px}
 .choice small{color:var(--text2);font-size:12px;line-height:1.4;display:block}
 
@@ -248,7 +284,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
 .pills{display:flex;gap:6px;flex-wrap:wrap}
 .pill{background:var(--card2);border:1.5px solid var(--border);color:var(--text2);border-radius:20px;
   padding:6px 13px;font-size:12.5px;font-weight:600}
-.pill.on{background:var(--red-bg);border-color:var(--red);color:#ff9a9a}
+.pill.on{background:rgba(95,201,192,.14);border-color:var(--accent);color:#8fe0d8}
 
 /* ---- progress / gauges ---- */
 .gauge{height:8px;background:var(--bg2);border-radius:5px;overflow:hidden;border:1px solid var(--border)}
@@ -320,7 +356,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
   background:var(--card);border:1.5px solid var(--border);border-radius:999px;
   padding:4px 12px 4px 4px;transition:border-color .15s,background .15s}
 .chip-pil:hover{border-color:var(--border2)}
-.chip-pil.actif{border-color:var(--red);background:var(--red-bg)}
+.chip-pil.actif{border-color:var(--accent);background:rgba(95,201,192,.14)}
 .chip-pil .av{width:28px;height:28px;border-radius:50%;overflow:hidden;flex:0 0 28px;background:var(--card2)}
 .chip-pil .tx{line-height:1.15}
 .chip-pil .nm{font-weight:600;font-size:13px;white-space:nowrap}
@@ -363,7 +399,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
   padding:5px 2px;text-align:center;font-size:9px;font-weight:700;color:var(--muted);line-height:1.15;
   text-transform:uppercase;letter-spacing:.02em}
 .ladder .st.done{background:var(--green-bg);color:#5ee397;border-color:#1e5a38}
-.ladder .st.now{background:var(--red-bg);color:#ff8a8a;border-color:var(--red-d)}
+.ladder .st.now{background:rgba(95,201,192,.14);color:#8fe0d8;border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -385,12 +421,6 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
   <button class="tab-btn" data-tab="pilote">Pilote</button>
   <button class="tab-btn" data-tab="transferts">Transferts</button>
   <button class="tab-btn" data-tab="weekend">Week-end</button>
-  <button class="tab-btn" data-tab="sponsors">Sponsors</button>
-  <button class="tab-btn" data-tab="contrats">Contrats</button>
-  <button class="tab-btn" data-tab="staff">Staff</button>
-  <button class="tab-btn" data-tab="champ">Championnat</button>
-  <button class="tab-btn" data-tab="finances">Finances</button>
-  <button class="tab-btn" data-tab="save">Sauvegarde</button>
 </nav>
 <div id="barrePilotes" hidden></div>
 
@@ -421,7 +451,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bac
 
 <div class="toast" id="toast"></div>
 
-<!-- DiceBear (style Personas, MIT + CC BY 4.0) vendé localement : voir
+<!-- DiceBear (style Micah, MIT + CC BY 4.0) vendé localement : voir
      vendor/README.md. Aucun appel réseau, aucune donnée dynamique. -->
 <script src="vendor/dicebear.bundle.js"></script>
 <script>
@@ -4713,7 +4743,7 @@ $('#modalX').onclick = closeModal;
 $('#overlay').addEventListener('click', e=>{ if(e.target.id==='overlay') closeModal(); });
 
 /* ================= PORTRAITS ET PODIUM (GDD §16) =================
-   Le visage est généré par DiceBear — style « Personas » (Draftbit,
+   Le visage est généré par DiceBear — style « Micah » (Micah Lanier,
    CC BY 4.0) — plutôt que dessiné à la main. La bibliothèque est vendée
    localement (vendor/dicebear.bundle.js, voir vendor/README.md) : aucun
    appel réseau, ça marche hors ligne. Le portrait reste déterministe — la
@@ -4864,6 +4894,32 @@ function scenePodium(pos, nomsTop3){
     ${trophee}
   </svg>
   <div class="podium-noms">${nomsTop3.map((n,i)=>`<span class="${i+1===pos?'moi':''}">${i+1}. ${escapeHtml(n)}</span>`).join('')}</div>`;
+}
+
+/* Illustration du hero d'accueil : garage stylisé (silhouette de voiture,
+   drapeau à damier, ligne de piste), dans les couleurs de l'écurie si le
+   pilote en a une. Pas une scène 3D — un aplat simple, cohérent avec le
+   reste des dessins SVG du jeu (portraits, podium). */
+function sceneGarage(){
+  const coul = coulPilote();
+  return `<svg viewBox="0 0 160 120" role="img" aria-label="Illustration de garage">
+    <rect x="0" y="92" width="160" height="4" fill="#0006"/>
+    <g opacity=".5">
+      ${[0,1,2,3,4,5].map(i=>`<rect x="${i*28-6}" y="88" width="14" height="6" fill="${i%2?'#fff':'#1a1a1a'}"/>`).join('')}
+    </g>
+    <g transform="translate(18,38)">
+      <rect x="0" y="30" width="118" height="26" rx="10" fill="${assombrir(coul,0.15)}"/>
+      <path d="M14 30 Q28 4 60 4 Q92 4 104 30 Z" fill="${coul}"/>
+      <path d="M30 28 Q40 12 60 12 Q80 12 88 28 Z" fill="#0d1117" opacity=".82"/>
+      <rect x="0" y="30" width="118" height="7" fill="#fff" opacity=".12"/>
+      <circle cx="26" cy="58" r="13" fill="#12161c"/><circle cx="26" cy="58" r="5.5" fill="#3a4552"/>
+      <circle cx="94" cy="58" r="13" fill="#12161c"/><circle cx="94" cy="58" r="5.5" fill="#3a4552"/>
+    </g>
+    <g transform="translate(120,14)" opacity=".9">
+      <rect x="0" y="0" width="2.5" height="34" fill="#8d98a5"/>
+      ${[0,1,2,3].map(r=>[0,1].map(c=>`<rect x="${2.5+c*6}" y="${r*6}" width="6" height="6" fill="${(r+c)%2?'#fff':'#1a1a1a'}"/>`).join('')).join('')}
+    </g>
+  </svg>`;
 }
 
 /* --- composants --- */
@@ -5098,12 +5154,59 @@ function renderBureau(){
     return;
   }
 
-  // ---- bandeau réputation / argent
-  h += `<div class="kpis">
-    ${kpi('Réputation', rp.p+'/10', rp.nom, '')}
-    ${kpi('Trésorerie', fmtEur(S.manager.budget), 'Manager', S.manager.budget<0?'red':S.manager.budget<20000?'amber':'green')}
-    ${sa?kpi('Caisse de saison', fmtEur(sa.caisse), 'Finance la saison', sa.caisse<0?'red':sa.caisse<Math.round(sa.coutTotal/CAT[sa.catId].courses)?'amber':'green'):kpi('Caisse de saison','—','Hors saison','')}
-    ${kpi('Image médiatique', Math.round(S.manager.image), 'Attractivité sponsors','blue')}
+  // ---- hero : identité + illustration de garage. Le bouton reste général
+  // (« gérer l'écurie ») à dessein : l'action précise du moment a déjà sa
+  // propre carte juste en dessous (ctaBureau()) — doublonner le même libellé
+  // aux deux endroits serait plus confus qu'utile.
+  const heroCta = p ? {lab:'Gérer mon pilote', tab:'pilote'} : {lab:'Consulter le vivier', tab:'pilote'};
+  h += `<div class="card hero-bureau">
+    <div class="split">
+      <div class="txt">
+        <div class="eyebrow">${S.annee}${p?' · '+CAT[p.catId].nom:''}</div>
+        <div class="titre">${escapeHtml(S.manager.nom||'Manager')}</div>
+        <div class="sous">${p?escapeHtml(p.nom)+' · '+rp.nom:'Aucun pilote sous contrat — '+rp.nom}</div>
+      </div>
+      <div class="art">${sceneGarage()}</div>
+    </div>
+    <button class="btn btn-cta hero-cta" data-act="tab" data-tab="${heroCta.tab}">${escapeHtml(heroCta.lab)}</button>
+  </div>`;
+
+  // ---- rangée de cartes de résumé
+  h += `<div class="sumrow">
+    <div class="sumcard">
+      <div class="ico">⭐</div>
+      <div class="val">${rp.p}/10</div>
+      <div class="lab">${escapeHtml(rp.nom)}</div>
+    </div>
+    <div class="sumcard">
+      <div class="ico">💰</div>
+      <div class="val ${S.manager.budget<0?'txt-red':S.manager.budget<20000?'txt-amber':'txt-green'}">${fmtEur(S.manager.budget)}</div>
+      <div class="lab">Trésorerie</div>
+    </div>
+    <div class="sumcard">
+      <div class="ico">🏁</div>
+      <div class="val ${!sa?'':sa.caisse<0?'txt-red':sa.caisse<Math.round(sa.coutTotal/CAT[sa.catId].courses)?'txt-amber':'txt-green'}">${sa?fmtEur(sa.caisse):'—'}</div>
+      <div class="lab">Caisse de saison</div>
+    </div>
+    <div class="sumcard">
+      <div class="ico">📣</div>
+      <div class="val txt-blue">${Math.round(S.manager.image)}</div>
+      <div class="lab">Image médiatique</div>
+      <button class="btn-ghost btn-sm" data-act="tab" data-tab="sponsors">Gérer sponsors</button>
+    </div>
+  </div>`;
+
+  // ---- accès aux écrans de gestion : plus dans la barre d'onglets du haut,
+  // regroupés ici pour que rien ne devienne injoignable.
+  h += `<div class="card flat"><h2>Gérer l’écurie<span class="hint">accessible depuis le Bureau</span></h2>
+    <div class="hubgrid">
+      <button data-act="tab" data-tab="sponsors"><span class="hi">💼</span>Sponsors</button>
+      <button data-act="tab" data-tab="contrats"><span class="hi">📄</span>Contrats</button>
+      <button data-act="tab" data-tab="staff"><span class="hi">🧑‍🔧</span>Staff</button>
+      <button data-act="tab" data-tab="champ"><span class="hi">🏆</span>Championnat</button>
+      <button data-act="tab" data-tab="finances"><span class="hi">📊</span>Finances</button>
+      <button data-act="tab" data-tab="save"><span class="hi">⚙️</span>Sauvegarde</button>
+    </div>
   </div>`;
 
   if(suiv){
@@ -7129,7 +7232,7 @@ function renderSave(){
       Circuits réels cités par leur nom, sans logo ni marque officielle. Écuries fictives.</div>
     </div>
     <div class="card flat"><h2>Crédits</h2>
-      <div class="note">Portraits générés par <b>Personas</b>, par Draftbit — <a href="https://personas.draftbit.com/" target="_blank" rel="noopener">personas.draftbit.com</a>,
+      <div class="note">Portraits générés par <b>Micah</b>, par Micah Lanier — <a href="https://www.figma.com/community/file/829741575478342595" target="_blank" rel="noopener">figma.com/community</a>,
       sous licence <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>,
       via la bibliothèque <a href="https://www.dicebear.com/" target="_blank" rel="noopener">DiceBear</a> (MIT).<br><br>
       Tracés de circuits d’après les données de <b>f1-circuits</b> par Tomislav Bacinger —
