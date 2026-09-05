@@ -576,6 +576,16 @@ table.data input,table.data select{padding:5px 7px;font-size:12.5px}
   </div>
 
   <div class="card">
+    <h2>🕐 Effectif présent heure par heure <span class="hint">déduit des besoins ci-dessus</span></h2>
+    <p class="help">
+      Vérifiez ici que la configuration correspond à la réalité du service : ce tableau indique
+      combien de secrétaires sont présentes à chaque moment de la journée, en tenant compte du
+      chevauchement des horaires. La nuit couvre aussi le début de matinée du lendemain.
+    </p>
+    <div class="table-wrap"><table class="data" id="tblEffectifHoraire"></table></div>
+  </div>
+
+  <div class="card">
     <h2>💾 Sauvegarde des données</h2>
     <p class="help">
       Les données sont enregistrées <b>sur cet appareil uniquement</b> (mémoire locale du navigateur).
@@ -1197,7 +1207,7 @@ function candidatValide(a, jour, poste, equipeNuit, tolerance, autoriserRempl){
   if(!libre(a.id, jour)) return false;
 
   // roulement jour / nuit — jamais mélangés sur une même semaine
-  if(tolerance < 4){
+  if(tolerance < 3){
     if(poste === 'N'){
       if(a.roulement === 'jour') return false;
       if(!a.remplacant && !equipeNuit.has(a.id)) return false;
@@ -1212,12 +1222,19 @@ function candidatValide(a, jour, poste, equipeNuit, tolerance, autoriserRempl){
   if(indisponible(a, jour, poste)) return false;
   // 11 h de repos : règle jamais franchie automatiquement
   if(!reposOK(a.id, jour, poste)) return false;
-  // jours consécutifs
-  if(tolerance < 4 && serieAvec(a.id, jour, poste) > etat.config.maxJoursConsecutifs) return false;
+  // jours consécutifs : règle de sécurité, jamais franchie non plus, même en dépannage.
+  // Combler un poste avec un agent sur son 5e jour d'affilée n'est pas un dépannage
+  // acceptable — mieux vaut signaler le poste non couvert et laisser arbitrer.
+  if(serieAvec(a.id, jour, poste) > etat.config.maxJoursConsecutifs) return false;
+  // Plafond hebdomadaire : jamais dépassé non plus. En semaine ordinaire les agents
+  // sont naturellement bien en dessous (2 à 3 jours pour un 80 %) ; c'est en période
+  // chargée que le planning les fait monter jusqu'au plafond — c'est là le « RH
+  // réduit ». Au-delà, le poste est signalé non couvert : la responsable arbitre
+  // (renfort, intérimaire, congé décalé) plutôt que de faire travailler un agent
+  // au-delà de ce que sa quotité autorise.
+  if(!a.remplacant && joursTravaillesSemaine(a.id, jour) >= plafondSemaine(a)) return false;
   // alternance des week-ends
-  if(tolerance < 3 && estWeekend(jour) && !a.remplacant && !weekendTravaille(a, jour)) return false;
-  // plafond hebdomadaire (laisse la place aux RH et à la JA)
-  if(tolerance < 2 && !a.remplacant && joursTravaillesSemaine(a.id, jour) >= plafondSemaine(a)) return false;
+  if(tolerance < 2 && estWeekend(jour) && !a.remplacant && !weekendTravaille(a, jour)) return false;
   return true;
 }
 
@@ -1281,9 +1298,12 @@ function choisirAgent(jour, poste, equipeNuit, cpt, rnd, tolerance, autoriserRem
   return best;
 }
 
+/* Paliers de dépannage, du plus anodin au plus dérogatoire. Ne figurent pas ici les
+   règles qui ne sont jamais relâchées : 11 h de repos, 4 jours consécutifs, plafond
+   hebdomadaire, disponibilités déclarées, unicité du poste de nuit. */
 const MOTIFS_TOLERANCE = [
-  '', 'renfort remplaçant', 'plafond hebdomadaire dépassé (RH réduit)',
-  'alternance des week-ends non respectée', 'jours consécutifs / roulement dérogés'
+  '', 'renfort remplaçant', 'alternance des week-ends non respectée',
+  'roulement jour/nuit dérogé'
 ];
 
 /* --- étiquetage des jours non travaillés : JA puis RH --- */
@@ -1384,7 +1404,7 @@ function genererPlanning(debut, fin, options){
 
       for(let n = deja; n < besoin; n++){
         let agent = null, tol = 0;
-        for(tol = 0; tol <= 4; tol++){
+        for(tol = 0; tol <= 3; tol++){
           agent = choisirAgent(jour, poste, equipeNuit, cpt, rnd, tol, !!opts.remplacants);
           if(agent) break;
         }
@@ -1638,6 +1658,34 @@ function controlerCase(agentId, jour, code){
       msgs.push({dur:false, t:'Le poste ' + ancien + ' ne sera plus couvert ce jour-là'});
   }
   return msgs;
+}
+
+/* Effectif réellement présent heure par heure, déduit des besoins et des horaires
+   de chaque poste. La nuit (19 h → 7 h) déborde sur le lendemain : les heures de 0 h
+   à 7 h sont donc couvertes par la nuit de la veille. */
+function courbeEffectif(){
+  const heures = [];
+  for(let h = 0; h < 24; h++){
+    const presents = [];
+    POSTES.forEach(p => {
+      const n = etat.config.besoins[p] || 0;
+      if(!n) return;
+      const c = CODES[p];
+      const surCeJour   = h >= c.debut && h < Math.min(c.fin, 24);
+      const surLeMatin  = c.fin > 24 && h < c.fin - 24;   // reste de la nuit de la veille
+      if(surCeJour || surLeMatin) for(let i = 0; i < n; i++) presents.push(p);
+    });
+    heures.push(presents);
+  }
+  // regroupe les heures consécutives ayant exactement la même composition
+  const plages = [];
+  heures.forEach((p, h) => {
+    const cle = p.join(',');
+    const prec = plages[plages.length - 1];
+    if(prec && prec.cle === cle) prec.fin = h + 1;
+    else plages.push({debut:h, fin:h + 1, cle, postes:p});
+  });
+  return plages;
 }
 
 /* Compteurs affichés dans l'onglet Contrôles et le résumé du mois. */
@@ -1999,6 +2047,27 @@ function dessinerReglages(){
        (etat.config.jaInterrompt ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:var(--accent)"></td></tr>';
   t += '</tbody>';
   document.getElementById('tblRegles').innerHTML = t;
+  dessinerEffectifHoraire();
+}
+
+function dessinerEffectifHoraire(){
+  const plages = courbeEffectif();
+  const max = Math.max(1, ...plages.map(p => p.postes.length));
+  let h = '<thead><tr><th>Tranche horaire</th><th class="num">Présentes</th>' +
+          '<th>Postes en place</th><th style="width:34%"></th></tr></thead><tbody>';
+  plages.forEach(p => {
+    const n = p.postes.length;
+    const hh = x => String(x).padStart(2, '0') + 'h';
+    const fin = p.fin === 24 ? '00h' : hh(p.fin);
+    const pastilles = p.postes.map(c =>
+      '<span class="tag" style="background:var(--c-' + c + ');color:var(--c-' + c + '-t)">' + c + '</span>').join(' ');
+    h += '<tr><td><b>' + hh(p.debut) + ' — ' + fin + '</b></td>' +
+         '<td class="num"><b>' + n + '</b></td><td>' + (pastilles || '<span style="color:var(--red)">aucun</span>') + '</td>' +
+         '<td><div style="height:14px;border-radius:4px;background:' +
+         (n ? 'var(--accent)' : 'var(--red)') + ';width:' + Math.round(100 * n / max) + '%"></div></td></tr>';
+  });
+  h += '</tbody>';
+  document.getElementById('tblEffectifHoraire').innerHTML = h;
 }
 
 function toutRedessiner(){
@@ -2634,7 +2703,7 @@ function brancherEvenements(){
     let v = Math.max(0, Math.min(6, Number(e.target.value) || 0));
     if(p === 'N') v = Math.min(1, v);          // la nuit n'a jamais plus d'un titulaire
     etat.config.besoins[p] = v; e.target.value = v;
-    sauver(); toutRedessiner();
+    sauver(); toutRedessiner(); dessinerEffectifHoraire();
   });
   document.getElementById('tblRegles').addEventListener('change', e => {
     const r = e.target.dataset.regle, rb = e.target.dataset.regleB;
@@ -2735,6 +2804,7 @@ function dessinerAide(){
       <li>11 h de repos minimum entre deux postes — <b>jamais franchi</b> par la génération automatique
           (un poste S suivi d’un M le lendemain ne laisserait que 7 h).</li>
       <li>4 jours travaillés consécutifs au maximum ; RH, CR, REC et RF remettent le compteur à zéro.</li>
+      <li>Plafond hebdomadaire lié à la quotité : 4 jours à 80 %, 5 jours à 100 %.</li>
       <li>Jour et nuit ne se mélangent pas sur une même semaine pour un même agent.</li>
       <li>Un week-end sur deux (groupes A et B).</li>
       <li>1 JA par semaine pour chaque agent à temps partiel, posée le jour souhaité quand
@@ -2742,6 +2812,14 @@ function dessinerAide(){
       <li>Disponibilités déclarées de chaque agent : jamais forcées automatiquement.</li>
       <li>REC automatique toutes les 6 semaines, compteur individuel.</li>
     </ul>
+    <p style="margin-top:10px">
+      En cas de manque, l'application élargit sa recherche par paliers — remplaçants, puis
+      alternance des week-ends, puis roulement jour/nuit — et signale la case d'un coin orange.
+      Mais elle ne franchit <b>jamais</b> les 11 h de repos, les 4 jours consécutifs, le plafond
+      hebdomadaire ni les indisponibilités déclarées : si personne ne peut tenir le poste, il
+      est marqué <b>non couvert</b> et c'est à vous d'arbitrer (renfort, intérimaire, congé
+      décalé). Le manque reste ainsi visible au lieu d'être absorbé en silence.
+    </p>
 
     <h3 style="margin:16px 0 5px">Sauvegarde</h3>
     <p>Les données sont enregistrées <b>sur cet appareil</b> (mémoire du navigateur), sans serveur ni

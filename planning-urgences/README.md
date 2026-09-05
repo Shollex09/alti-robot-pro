@@ -113,13 +113,23 @@ marquée « dépannage » (coin orange) avec le motif consigné dans le rapport 
 | Palier | Ce qui est relâché |
 |---|---|
 | 1 | appel aux remplaçants (si l'option est cochée) |
-| 2 | plafond hebdomadaire — c'est le « RH réduit » |
-| 3 | alternance des week-ends |
-| 4 | jours consécutifs et séparation jour/nuit |
+| 2 | alternance des week-ends |
+| 3 | séparation des roulements jour et nuit |
 
-**Jamais relâchés, à aucun palier** : les 11 h de repos et l'unicité du poste de nuit.
-Si même le palier 4 ne trouve personne, le poste reste vide et est signalé comme non
-couvert plutôt que d'être comblé au mépris du repos légal.
+**Jamais relâchés, à aucun palier :**
+
+- les 11 h de repos entre deux postes ;
+- la limite de 4 jours travaillés consécutifs ;
+- le plafond hebdomadaire lié à la quotité (4 jours à 80 %, 5 jours à 100 %) ;
+- les disponibilités déclarées de l'agent ;
+- l'unicité du poste de nuit.
+
+Le « RH réduit » évoqué dans le besoin initial se produit naturellement sans franchir
+ces limites : en semaine ordinaire un agent à 80 % travaille 2 à 3 jours, bien en dessous
+de son plafond de 4 ; c'est en période chargée que le planning le fait monter jusqu'à ce
+plafond. Au-delà, le poste est signalé **non couvert** plutôt que confié à quelqu'un
+au-delà de ce que sa quotité autorise : la responsable arbitre (renfort, intérimaire,
+congé décalé), et le manque lui saute aux yeux au lieu d'être absorbé en silence.
 
 ## 4. Règles implémentées
 
@@ -176,17 +186,34 @@ avec six agents sur le même jour.
 
 ## 5. Capacité du service
 
-Avec 14 agents (3 à 100 %, 11 à 80 %), la capacité contractuelle est de **59 postes par
-semaine**. Comportement mesuré sur 3 mois :
+La configuration livrée — 1 agent sur chacun des 5 postes — reproduit exactement
+l'effectif décrit par le service, heure par heure :
 
-| Besoins/jour | Postes/sem. | Dépannages | Postes non couverts | Jours travaillés /agent/sem. | RH/sem. |
+| Tranche | Présentes | Postes |
+|---|---|---|
+| 00h — 07h | 1 | N |
+| 07h — 09h | 1 | M |
+| 09h — 11h | 2 | M, J |
+| 11h — 14h | 3 | M, J, DJ |
+| 14h — 16h | 4 | M, J, DJ, S |
+| 16h — 17h | 3 | J, DJ, S |
+| 17h — 19h | 2 | DJ, S |
+| 19h — 00h | 2 | S, N |
+
+L'onglet Réglages affiche ce tableau en direct : il se recalcule dès que l'on modifie
+le nombre d'agents par poste, ce qui permet de vérifier la configuration dans les termes
+où le service se pense réellement.
+
+Comportement mesuré sur 3 mois, avec 14 agents (3 à 100 %, 11 à 80 %) :
+
+| Besoins/jour | Postes/sem. | Dépannages | Non couverts | Jours travaillés /80 %/sem. | RH/sem. |
 |---|---|---|---|---|---|
-| 5 | 35 | 0 | 0 | 2,5 | 3,5 |
-| 6 | 42 | 6 | 0 | 3,0 | 3,0 |
-| 7 | 49 | 22 | 0 | 3,5 | 2,5 |
-| 8 | 56 | 103 | 0 | 4,0 | 2,0 |
+| **5 (configuration réelle)** | 35 | 0 | 0 | **2,4** | 3,4 |
+| 6 | 42 | 6 | 0 | 2,9 | 2,9 |
+| 7 | 49 | 23 | 0 | 3,4 | 2,5 |
+| 8 | 56 | 68 | 24 | 3,7 | 2,1 |
 
-À 8 postes/jour le service tourne à 95 % de sa capacité contractuelle : les dépannages
-deviennent structurels (plafond hebdomadaire dépassé), c'est un signal d'effectif, pas un
-défaut de l'application. **Les 11 h de repos et la limite de 4 jours consécutifs tiennent
-à tous les niveaux.**
+À la configuration réelle, un agent à 80 % travaille 2,4 jours par semaine — ce que
+confirme le service (« 2 à 3 jours, jusqu'à 4 pendant les vacances scolaires »). Au-delà
+de 7 postes/jour l'équipe dépasse sa capacité contractuelle : le déficit apparaît alors
+en postes non couverts, ce qui est un signal d'effectif et non un défaut de l'application.
