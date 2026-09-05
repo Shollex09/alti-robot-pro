@@ -1818,6 +1818,174 @@ fait l'import normal — `build-artifact.py` régénère maintenant un
 `importConfirm` équivalent en substance à celui d'`index.html`, pas une
 version parallèle qui peut diverger silencieusement.
 
+## Thème clair et course animée sur photo de circuit
+
+Deux retours reçus ensemble : le thème sombre de la section précédente est
+remplacé par un **thème clair** (validé sur une maquette côté utilisateur),
+et un premier circuit obtient une **vue de course animée** sur une vraie
+photo aérienne, avec des véhicules qui se dépassent.
+
+### Thème clair
+
+Même architecture par variables CSS que le thème sombre — seuls les jetons
+`:root` et une poignée de règles qui codaient une couleur en dur (pensées
+pour un fond sombre) ont changé, pas la structure des écrans :
+
+- `--bg:#eef1f3`, cartes `--card:#ffffff`, ombre douce plutôt que portée ;
+- même accent turquoise `--accent:#5fc9c0` pour tous les boutons d'action ;
+- rouge/corail resserré sur `#d8402e`, qui ne sert plus qu'au repère
+  diagonal devant les titres de section (`.card>h2::before`) et au danger —
+  jamais de fond rouge plein ;
+- polices changées : **Archivo Black** pour les titres condensés (variable
+  `--cond`, avec repli sur Barlow Condensed), **Inter** pour le corps de
+  texte (remplace Barlow) ;
+- la barre d'en-tête (logo, réputation, trésorerie), sombre dans la version
+  précédente, passe claire elle aussi — un bandeau sombre isolé aurait
+  rompu la cohérence que demande justement « appliqué de façon identique
+  sur toutes les pages ».
+
+Ce qu'un simple remplacement des jetons ne suffisait pas à corriger : plusieurs
+règles portaient une couleur **codée en dur**, pensée pour un fond sombre,
+et devenaient illisibles ou simplement fausses sur fond clair une fois les
+jetons inversés. Trouvées par inspection visuelle (captures d'écran), pas
+par relecture du CSS — une bonne partie ne saute pas aux yeux sans regarder
+le rendu réel :
+
+- le badge de note globale (`.ovr .big`, pilote et vivier) gardait un
+  dégradé anthracite codé en dur : texte sombre sur fond sombre, illisible.
+  Passé à `var(--card2)` + texte `var(--text)` ;
+- trois dégradés « sombre vers `var(--card)` » (carte `.accent`, en-tête de
+  modale, carte podium) produisaient une bande sombre en haut d'une carte
+  par ailleurs blanche. Remplacés par un dégradé pâle-vers-blanc dans la
+  teinte du fond concerné (`--red-bg`, `--amber-bg`) ;
+- le survol des boutons `.choice` passait à un fond anthracite codé en dur ;
+  remplacé par une teinte turquoise très légère ;
+- les étiquettes `.t-*` (vert/rouge/bleu/violet) avaient un texte pastel
+  vif pensé pour se détacher sur un fond sombre — devenu trop clair sur un
+  fond pastel clair. Recalculées en couleur foncée de la même teinte, sur
+  le même principe « fond pâle + texte foncé » que le reste du thème clair ;
+- même correction pour le journal de course (`.log .li.bad/.good`) et
+  l'échelle de progression karting → F1 (`.ladder .st.done/.now`) ;
+- le fond du buste de portrait (rectangle SVG codé en dur, `#161b22`) est
+  repassé à un gris très clair du nouveau thème.
+
+Le podium (`scenePodium`, marches non actives en gris ardoise `#2a323d`) et
+le panneau sombre de l'illustration du Bureau (`sceneGarage`, volontairement
+à contraste inversé dans son diagonal) sont restés inchangés : ce sont des
+éléments graphiques autonomes pensés pour contraster avec n'importe quel
+fond de carte, pas des oublis du thème sombre.
+
+### Course animée sur une vraie photo de circuit
+
+Un circuit (Salbris) a maintenant, en plus de son tracé stylisé du §1.2bis,
+une **scène de course animée** construite sur une vraie photo aérienne avec
+sa ligne de trajectoire idéale dessinée dessus (fournie par l'utilisateur).
+Elle s'affiche à la place du débrief, juste après la résolution de la
+course (qui, elle, ne change pas : c'est une mise en scène du résultat déjà
+simulé par `resoudreCourse()`, jamais une resimulation).
+
+**Extraction du tracé (script Python ponctuel, hors exécution du jeu)** —
+la méthode suit celle indiquée par l'utilisateur, avec deux ajustements
+trouvés en pratique sur cette photo précise :
+
+1. Détection de la ligne de trajectoire par seuil de couleur (bleu net).
+2. Fermeture morphologique pour relier les tirets, squelettisation.
+3. **Ajustement 1** : sur cette photo, la ligne trace directement sur
+   l'asphalte gris de la piste, lui-même sans rupture (pas de pointillés,
+   pas de reflet). Le squelette de la **piste** plutôt que celui de la
+   ligne bleue s'est avéré beaucoup plus robuste — la ligne, elle,
+   disparaît par endroits sous un reflet trop clair pour passer le seuil de
+   couleur, et le rattrapage automatique de ces trous a plus souvent sauté
+   d'une portion de piste à une autre (deux morceaux de piste très proches
+   dans ce tracé serré) qu'il n'a réellement recollé la ligne.
+4. Parcours du squelette en un chemin continu, en préférant à chaque pas le
+   voisin le moins anguleux par rapport à la direction précédente — pour ne
+   pas sauter d'une portion de piste à une autre à un endroit où deux
+   segments passent à quelques pixels l'un de l'autre.
+5. **Ajustement 2** : sur ce tracé technique et très resserré (plusieurs
+   épingles où la piste repasse tout près d'elle-même), le parcours
+   automatique retrouve fidèlement l'essentiel du circuit mais bute deux
+   fois — une passerelle sombre qui traverse la piste, et une épingle si
+   serrée que les deux côtés se touchent sur la photo. Plutôt que de forcer
+   un raccord automatique risqué à ces deux endroits (déjà écarté une fois :
+   un essai avec un rayon de recollement plus généreux a bien franchi ces
+   trous, mais a aussi, ailleurs, fait sauter le tracé d'une ligne droite à
+   la ligne droite voisine), une dizaine de points de recollement ont été
+   posés à la main par inspection visuelle de la photo, en s'assurant
+   qu'ils restent sur l'asphalte (vérifié contre le masque de couleur).
+6. Lissage par spline périodique et rééchantillonnage à 140 points
+   régulièrement espacés.
+
+Le résultat n'est pas un relevé topographique : deux ou trois virages sont
+légèrement coupés au plus court plutôt que suivis au pixel près. Sans
+conséquence pour l'usage qui en est fait ici (positionner des icônes de
+véhicules à l'échelle d'une carte de téléphone), mais à savoir si la même
+méthode est reprise sur une photo au tracé plus embrouillé.
+
+**Dans le jeu** (`index.html`, section « 1.2ter ») :
+
+- `CIRCUIT_PHOTO` porte la photo (JPEG réencodé, logo du karting retiré par
+  souci de cohérence avec le reste du jeu — « circuits réels cités par leur
+  nom, sans logo ni marque officielle », §12 déjà cité en Sauvegarde) en
+  data URI, les dimensions, la largeur de piste mesurée en pixels sur la
+  ligne droite des stands, et les 140 points du tracé.
+- `pistePointAt(photo, t)` donne la position et le cap à l'abscisse
+  curviligne `t` (0..1, boucle).
+- `decalageLateral(photo, id, t)` : chaque pilote garde une position latérale
+  qui lui est propre, calculée perpendiculairement au cap, dans une fraction
+  fixe (~65 %) de la largeur mesurée — donc toujours sur l'asphalte tant
+  qu'aucun incident n'est déclenché — plus une légère oscillation
+  sinusoïdale pour un mouvement moins mécanique.
+- `iconeVehicule()` : SVG vu du dessus (châssis aux couleurs de l'écurie,
+  quatre roues, casque, aileron arrière), nez pointé vers +x pour que la
+  rotation appliquée corresponde directement au cap calculé.
+- `genererAnimationCourse()` / `progressionVehicule()` : chaque véhicule
+  reçoit un pas de base légèrement différent (meilleur classement = pas un
+  peu plus rapide) plus un bruit aléatoire par pas de temps, ce qui produit
+  des dépassements visibles sans que l'ordre final ne s'écarte du
+  classement réellement simulé — un abandon s'arrête et reste immobile à
+  l'instant de sa sortie plutôt que de continuer jusqu'à l'arrivée.
+- `demarrerBoucleAnimation()` anime via `requestAnimationFrame` pendant
+  `DUREE_ANIM_COURSE` (5,2 s), avec un bouton « Passer » pour l'écourter ;
+  `renderApresCourse()` est le point d'entrée commun aux deux façons de
+  conclure une course (résolution directe ou après arbitrage d'un
+  événement de mi-course), et ne déclenche la mise en scène que si le
+  circuit du jour est celui qui a une photo — tous les autres passent
+  directement au débrief, inchangé.
+
+**Ce qui est explicitement laissé de côté**, comme demandé :
+
+- la variation de rythme est aujourd'hui un bruit aléatoire simple ; la
+  faire venir des vraies formules de performance du §17.3 (voiture,
+  réglages, forme du pilote) reste à faire ;
+- aucune sortie de piste : un véhicule reste toujours sur l'asphalte tant
+  qu'aucun incident (accident, erreur de pilotage) n'est explicitement
+  déclenché par la simulation — cette mécanique-là n'existe pas encore.
+
+### Test
+
+`unit24.js` (43 assertions) : forme des données du circuit photographié,
+point/cap sur le tracé et rebouclage à `t=1`, perpendicularité du décalage
+latéral par rapport au cap, contenu de l'icône SVG, animation contrainte à
+l'ordre du classement réel (y compris le cas d'un abandon qui s'arrête et ne
+revient jamais à l'ordre normal), et `renderApresCourse()` qui ne programme
+l'animation que sur le bon circuit — jamais testé depuis l'onglet Week-end
+lui-même dans ce fichier, pour ne pas dépendre de `requestAnimationFrame`,
+absent hors navigateur.
+
+`browser16.js` : la scène apparaît avec une icône par voiture de la grille et
+la photo en fond, un véhicule bouge réellement entre deux relevés (la boucle
+d'animation tourne pour de vrai), la barre de progression avance, le bouton
+« Passer » comme la fin naturelle de l'animation amènent tous les deux au
+débrief, et aucune animation ne se déclenche sur un circuit sans photo.
+
+Au passage, régression trouvée par ces mêmes tests puis corrigée dans le
+filtre d'erreurs JS des scripts navigateur eux-mêmes (pas dans le jeu) :
+`Failed to load resource: net::ERR_CONNECTION_RESET`, provoqué par le blocage
+réseau des polices Google déjà documenté plus haut, ne contient pas l'URL de
+la ressource et n'était donc pas reconnu par le filtre existant
+(`/favicon|fonts\.g/`) — ajout de `ERR_CONNECTION_RESET` à ce filtre.
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - Le §22.3 (devenir Team Principal en F1), le seul point du GDD encore ouvert,
