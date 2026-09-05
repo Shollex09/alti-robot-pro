@@ -622,6 +622,7 @@ const ORDRE_AFFECTATION = ['N','S','M','J','DJ'];
 const ABSENCES = ['CR','JA','REC','RF','RH'];
 const CODES_REPOS = ['RH','CR','REC','RF'];   // interrompent les jours consécutifs
 const JOURS_FR = ['lun.','mar.','mer.','jeu.','ven.','sam.','dim.'];
+const JOURS_LONG = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
 const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août',
                  'septembre','octobre','novembre','décembre'];
 
@@ -630,21 +631,22 @@ function estRepos(code){ return CODES_REPOS.indexOf(code) >= 0; }
 
 /* --------------------------- état par défaut --------------------------- */
 
+/* nom, prénom, quotité, roulement, jour de JA souhaité (0 = lundi … 6 = dimanche, '' = indifférent) */
 const EFFECTIF_INITIAL = [
-  ['BESSON',   'Pauline',    100, 'jour'],
-  ['VANDROUX', 'Elodie',      80, 'mixte'],
-  ['DUPRAT',   'Sandra',     100, 'jour'],
-  ['ARTHUS',   'Emilie',      80, 'mixte'],
-  ['BERRY',    'Nathalie',    80, 'mixte'],
-  ['GOY',      'Olivia',      80, 'mixte'],
-  ['MERCIER',  'Cindy',       80, 'mixte'],
-  ['EN NACHI', 'Dounia',     100, 'nuit'],
-  ['REHILA',   'Selma',       80, 'mixte'],
-  ['LACHARME', 'Astrid',      80, 'mixte'],
-  ['GARDIN',   'Noemie',      80, 'mixte'],
-  ['PERRET',   'Regis',       80, 'mixte'],
-  ['LAFAURIE', 'Mélissa',     80, 'mixte'],
-  ['MARIAMON', 'Emmanuelle',  80, 'mixte'],
+  ['BESSON',   'Pauline',    100, 'jour',  ''],
+  ['VANDROUX', 'Elodie',      80, 'mixte',  2],
+  ['DUPRAT',   'Sandra',     100, 'jour',  ''],
+  ['ARTHUS',   'Emilie',      80, 'mixte',  2],
+  ['BERRY',    'Nathalie',    80, 'mixte',  2],
+  ['GOY',      'Olivia',      80, 'mixte', ''],
+  ['MERCIER',  'Cindy',       80, 'mixte', ''],
+  ['EN NACHI', 'Dounia',     100, 'nuit',  ''],
+  ['REHILA',   'Selma',       80, 'mixte', ''],
+  ['LACHARME', 'Astrid',      80, 'mixte', ''],
+  ['GARDIN',   'Noemie',      80, 'mixte', ''],
+  ['PERRET',   'Regis',       80, 'mixte', ''],
+  ['LAFAURIE', 'Mélissa',     80, 'mixte', ''],
+  ['MARIAMON', 'Emmanuelle',  80, 'mixte', ''],
 ];
 
 function configDefaut(){
@@ -668,12 +670,13 @@ function agentsDefaut(){
     id:'a'+(i+1),
     nom:e[0], prenom:e[1], quotite:e[2], roulement:e[3],
     groupeWE:(iA++ % 2 === 0) ? 'A' : 'B',
+    jourJA:e[4] === undefined ? '' : e[4],
     recAncre:'', actif:true, remplacant:false,
   }));
   list.push({id:'r1', nom:'Remplaçant 1', prenom:'', quotite:100, roulement:'mixte',
-             groupeWE:'A', recAncre:'', actif:true, remplacant:true});
+             groupeWE:'A', jourJA:'', recAncre:'', actif:true, remplacant:true});
   list.push({id:'r2', nom:'Remplaçant 2', prenom:'', quotite:100, roulement:'mixte',
-             groupeWE:'B', recAncre:'', actif:true, remplacant:true});
+             groupeWE:'B', jourJA:'', recAncre:'', actif:true, remplacant:true});
   return list;
 }
 
@@ -709,6 +712,7 @@ function chargerEtat(){
     etat.agents.forEach(a => {
       if(!a.groupeWE) a.groupeWE = 'A';
       if(!a.roulement) a.roulement = 'mixte';
+      if(a.jourJA === undefined) a.jourJA = '';
       if(a.actif === undefined) a.actif = true;
     });
     if(!etat.planning || typeof etat.planning !== 'object') etat.planning = {};
@@ -972,6 +976,13 @@ function codesSemaine(agentId, jour){
 function plafondSemaine(agent){
   return agent.quotite >= 100 ? etat.config.joursMaxSemaine100 : etat.config.joursMaxSemaine80;
 }
+/* Jour de JA souhaité par l'agent : 0 = lundi … 6 = dimanche, -1 si indifférent.
+   Attention : Number('') vaut 0, il faut donc écarter la chaîne vide explicitement. */
+function jourJAsouhaite(agent){
+  if(agent.jourJA === '' || agent.jourJA === undefined || agent.jourJA === null) return -1;
+  const n = Number(agent.jourJA);
+  return (n >= 0 && n <= 6) ? n : -1;
+}
 
 /* ==========================================================================
    4. MOTEUR DE GÉNÉRATION
@@ -1156,11 +1167,14 @@ function scoreCandidat(a, jour, poste, cpt, rnd){
   else if(estPoste(hier) || estPoste(demain))   s += 6;
   // 5. ne pas allonger inutilement les séries de travail
   s -= 12 * (serieAvec(a.id, jour, poste) - 1);
-  // 6. un agent dont le roulement est « nuit » ne peut tenir que ce poste : l'équité
+  // 6. jour de JA souhaité : on n'y affecte l'agent qu'en dernier recours, avant
+  //    toutefois de déranger un remplaçant (pénalité plus faible que la sienne)
+  if(jourSemaine(jour) === jourJAsouhaite(a)) s -= 400;
+  // 7. un agent dont le roulement est « nuit » ne peut tenir que ce poste : l'équité
   //    générale, calculée sur les 5 postes, le sous-évaluerait. On le remet en tête sur
   //    la nuit — les autres agents du roulement prennent le reste (repos, week-ends).
   if(a.roulement === 'nuit' && poste === 'N') s += 45;
-  // 7. les remplaçants restent le dernier recours
+  // 8. les remplaçants restent le dernier recours
   if(a.remplacant) s -= 500;
   // 7. départage stable
   s += rnd() * 2;
@@ -1199,6 +1213,17 @@ function poserJAetRH(jours, debut, fin, rapport){
       if(a.quotite >= 100) return;
       if(codesSemaine(a.id, lundi).indexOf('JA') >= 0) return;   // déjà posée à la main
       let choix = null, meilleur = -Infinity;
+      // 1) le jour souhaité par l'agent, s'il est libre cette semaine-là
+      const souhait = jourJAsouhaite(a);
+      if(souhait >= 0){
+        const j = jourPlus(lundi, souhait);
+        if(j >= debut && j <= fin && libre(a.id, j)){
+          poserCellule(a.id, j, 'JA'); rapport.ja++;
+          return;
+        }
+        rapport.jaHorsSouhait.push({agent:a.id, semaine:lundi});
+      }
+      // 2) sinon, le jour libre le plus adapté
       joursSem.forEach(j => {
         if(!libre(a.id, j)) return;
         // on préfère une JA collée à des jours travaillés, pour garder les RH groupés
@@ -1228,7 +1253,7 @@ function genererPlanning(debut, fin, options){
   const rnd = prng(debut + '|' + fin + '|' + etat.agents.map(a => a.id).join(','));
   const rapport = {
     debut, fin, jours:jours.length, postes:0, rh:0, ja:0, rec:0,
-    ancresPosees:0, depannages:[], nonCouverts:[], recNonPoses:[], jaNonPosees:[]
+    ancresPosees:0, depannages:[], nonCouverts:[], recNonPoses:[], jaNonPosees:[], jaHorsSouhait:[]
   };
 
   viderPourGeneration(jours, opts.preserverManuel !== false);
@@ -1385,6 +1410,10 @@ function controler(debut, fin){
             cfg.rhParSemaine + ' — l’écart peut se rattraper sur les semaines suivantes)');
       if(a.quotite < 100 && codes.indexOf('JA') < 0 && codes.filter(c => c === 'CR').length < 5)
         add('warn', lundi, a.id, 'Semaine ' + semaineISO(lundi) + ' : aucune journée aménagée (JA) posée');
+      const souhait = jourJAsouhaite(a);
+      if(souhait >= 0 && codes.indexOf('JA') >= 0 && codes[souhait] !== 'JA')
+        add('info', jourPlus(lundi, souhait), a.id, 'JA posée le ' + JOURS_LONG[codes.indexOf('JA')] +
+            ' au lieu du ' + JOURS_LONG[souhait] + ' souhaité');
       if(postes.length > plafondSemaine(a))
         add('warn', lundi, a.id, 'Semaine ' + semaineISO(lundi) + ' : ' + postes.length +
             ' jours travaillés (plafond ' + plafondSemaine(a) + ' pour un ' + a.quotite + ' %)');
@@ -1679,7 +1708,7 @@ function dessinerResume(){
 /* ------------------------------ onglet équipe ------------------------------ */
 function dessinerEquipe(){
   let h = '<thead><tr><th>Nom</th><th>Prénom</th><th>Quotité</th><th>Roulement</th>' +
-          '<th>Groupe WE</th><th>Dernier REC (ancre)</th><th>Actif</th><th></th></tr></thead><tbody>';
+          '<th>Groupe WE</th><th>JA souhaitée</th><th>Dernier REC (ancre)</th><th>Actif</th><th></th></tr></thead><tbody>';
   etat.agents.forEach(a => {
     h += '<tr data-id="' + a.id + '">' +
       '<td><input data-f="nom" value="' + esc(a.nom) + '" style="width:130px"></td>' +
@@ -1693,6 +1722,10 @@ function dessinerEquipe(){
       '<td><select data-f="groupeWE"' + (a.remplacant ? ' disabled' : '') + '>' +
         ['A', 'B'].map(g => '<option value="' + g + '"' + (a.groupeWE === g ? ' selected' : '') +
         '>' + g + '</option>').join('') + '</select></td>' +
+      '<td><select data-f="jourJA"' + (a.remplacant || a.quotite >= 100 ? ' disabled' : '') + '>' +
+        '<option value="">— indifférent —</option>' +
+        JOURS_LONG.map((d, i) => '<option value="' + i + '"' +
+        (jourJAsouhaite(a) === i ? ' selected' : '') + '>' + d + '</option>').join('') + '</select></td>' +
       '<td><input type="date" data-f="recAncre" value="' + esc(a.recAncre || '') + '"' +
         (a.remplacant ? ' disabled' : '') + '></td>' +
       '<td style="text-align:center"><input type="checkbox" data-f="actif"' + (a.actif ? ' checked' : '') +
@@ -2093,6 +2126,12 @@ function afficherRapport(r){
     l.push(['⛔', r.nonCouverts.length + ' poste(s) impossible(s) à couvrir : ' + d +
             (r.nonCouverts.length > 8 ? '…' : ''), 'err']);
   }
+  if(r.jaHorsSouhait.length){
+    const par = {};
+    r.jaHorsSouhait.forEach(x => { par[x.agent] = (par[x.agent] || 0) + 1; });
+    l.push(['📌', r.jaHorsSouhait.length + ' JA posée(s) hors du jour souhaité : ' +
+            Object.keys(par).map(id => nomAgent(agentParId(id)) + ' (' + par[id] + ')').join(', '), 'warn']);
+  }
   if(r.jaNonPosees.length) l.push(['⚠️', r.jaNonPosees.length + ' journée(s) aménagée(s) non plaçable(s) (semaine trop chargée)', 'warn']);
   if(r.recNonPoses.length) l.push(['⚠️', r.recNonPoses.length + ' récupération(s) non plaçable(s) à l’échéance', 'warn']);
   box.innerHTML = l.map(x =>
@@ -2405,7 +2444,10 @@ function dessinerAide(){
   <div style="font-size:13.5px;line-height:1.65;color:var(--text)">
     <h3 style="margin:14px 0 5px">1. Préparer l’effectif</h3>
     <p>Onglet <b>Équipe</b> : vérifiez la quotité, le roulement (jour / nuit / mixte), le groupe de
-    week-end (A ou B, un week-end sur deux) et la date du dernier REC de chaque agent.
+    week-end (A ou B, un week-end sur deux), le jour de <b>JA souhaité</b> et la date du dernier REC
+    de chaque agent. Le jour de JA souhaité est respecté chaque fois que c'est possible ; s'il faut
+    absolument cet agent ce jour-là pour couvrir un poste, sa JA glisse à un autre jour de la même
+    semaine et le rapport de génération vous le signale.
     Cette date est l’<b>ancre</b> du compteur : le REC suivant est posé automatiquement 6 semaines après,
     puis toutes les 6 semaines.</p>
 
@@ -2447,7 +2489,8 @@ function dessinerAide(){
       <li>4 jours travaillés consécutifs au maximum ; RH, CR, REC et RF remettent le compteur à zéro.</li>
       <li>Jour et nuit ne se mélangent pas sur une même semaine pour un même agent.</li>
       <li>Un week-end sur deux (groupes A et B).</li>
-      <li>1 JA par semaine pour chaque agent à temps partiel, 2 RH par semaine en moyenne.</li>
+      <li>1 JA par semaine pour chaque agent à temps partiel, posée le jour souhaité quand
+          l'effectif le permet ; 2 RH par semaine en moyenne.</li>
       <li>REC automatique toutes les 6 semaines, compteur individuel.</li>
     </ul>
 

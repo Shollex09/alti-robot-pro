@@ -59,7 +59,7 @@ planning-urgences/
 
 ```js
 etat = {
-  agents: [{ id, nom, prenom, quotite, roulement, groupeWE, recAncre, actif, remplacant }],
+  agents: [{ id, nom, prenom, quotite, roulement, groupeWE, jourJA, recAncre, actif, remplacant }],
   planning: { "<agentId>|<AAAA-MM-JJ>": { c:code, n:annotation, v:verrou, d:dépannage, m:manuel } },
   config: { besoins, rhParSemaine, recSemaines, reposMinHeures, maxJoursConsecutifs, … },
   moisAffiche: "AAAA-MM"
@@ -99,8 +99,8 @@ sur deux jours :
 5. **Choix de l'agent** : parmi ceux qui passent tous les filtres, celui qui obtient le
    meilleur score — équité de charge globale, équité par poste, équité des week-ends,
    continuité du roulement, série de travail la plus courte.
-6. **Étiquetage** : 1 JA par semaine pour chaque agent à temps partiel (placée de préférence
-   contre un jour travaillé, pour garder les RH groupés), RH pour tout le reste.
+6. **Étiquetage** : 1 JA par semaine pour chaque agent à temps partiel — sur le jour souhaité
+   s'il en a un, sinon contre un jour travaillé pour garder les RH groupés. RH pour tout le reste.
 
 Le tirage au sort de départage est **déterministe** : deux générations successives sur la
 même période produisent exactement le même planning.
@@ -133,11 +133,24 @@ couvert plutôt que d'être comblé au mépris du repos légal.
 | 1 week-end sur 2 | groupes A/B × rang de la semaine |
 | 2 RH par semaine en moyenne | plafond hebdomadaire (5 j à 100 %, 4 j à 80 %) |
 | 1 JA par semaine pour les agents à 80 % | `poserJAetRH` |
+| Jour de JA souhaité par l'agent | pénalité de score, non bloquante |
 | REC automatique toutes les 6 semaines | ancre individuelle `recAncre` |
 
 Toutes sont **également vérifiées après coup** par `controler()`, y compris sur un planning
 modifié à la main : l'onglet **Contrôles** liste chaque écart, et l'éditeur de case
 prévient *avant* validation.
+
+### Jour de JA souhaité
+
+Un agent à temps partiel peut demander sa JA un jour fixe (`jourJA`, colonne *JA souhaitée*
+de l'onglet Équipe). Ce souhait est appliqué par une **forte pénalité de score** et non par
+un filtre strict : l'agent n'est affecté ce jour-là qu'en tout dernier recours — avant
+toutefois de déranger un remplaçant. Si cela arrive, sa JA glisse simplement à un autre jour
+de la même semaine, sans marquer la case en dépannage, et le rapport de génération le signale.
+
+Mesuré sur 3 mois avec trois agents demandant le mercredi : **36 JA sur 36 posées le jour
+souhaité**, aucun dépannage, aucun mercredi en sous-effectif. Le comportement tient encore
+avec six agents sur le même jour.
 
 ## 5. Capacité du service
 
