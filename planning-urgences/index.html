@@ -504,8 +504,11 @@ table.data input,table.data select{padding:5px 7px;font-size:12.5px}
   <div class="card">
     <h2>👤 Effectif <span class="hint">Quotité · roulement · groupe de week-end · compteur REC</span></h2>
     <p class="help">
-      <b>Roulement</b> : <i>jour</i> = ne fait jamais de nuit · <i>nuit</i> = uniquement des nuits ·
-      <i>mixte</i> = alterne des semaines de jour et des semaines de nuit (jamais les deux la même semaine).<br>
+      <b>Roulement</b> : <i>jour uniquement</i> = ne fait jamais de nuit ·
+      <i>équipe de nuit</i> = fait partie du groupe habilité à la nuit ; les semaines où il n'est pas
+      au roulement de nuit, il tient des postes de jour · <i>nuit uniquement</i> = référent de nuit,
+      présent à chaque roulement et sur aucun poste de jour.
+      Jour et nuit ne se mélangent jamais sur une même semaine.<br>
       <b>Groupe WE</b> : les groupes A et B travaillent un week-end sur deux, en alternance.<br>
       <b>Ancre REC</b> : date du dernier jour de récupération ; le suivant est posé automatiquement 6 semaines après.
     </p>
@@ -681,7 +684,7 @@ const CODES = {
   RS: {type:'repos',  lib:'Repos sécurité',    h:'après un poste de nuit'},
 };
 const POSTES = ['M','J','DJ','S','N'];
-const POSTES_JOUR = ['M','J','DJ','S'];
+const POSTES_JOUR = ['S','M','J','DJ'];   // du plus contraignant au moins contraignant
 /* Ordre d'affectation : les postes les plus contraignants d'abord
    (la nuit n'a qu'un seul titulaire, le soir bloque le lendemain matin). */
 const ORDRE_AFFECTATION = ['N','S','M','J','DJ'];
@@ -693,25 +696,35 @@ const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','ao�
                  'septembre','octobre','novembre','décembre'];
 
 function estPoste(code){ return !!code && CODES[code] && CODES[code].type === 'poste'; }
+/* Durée d'un poste en heures. Une nuit dure 12 h contre 8 à 10 h le jour : compter les
+   postes fait croire à un déséquilibre là où les heures sont, elles, équilibrées. */
+function heuresDe(code){
+  const c = CODES[code];
+  return (c && c.type === 'poste') ? c.fin - c.debut : 0;
+}
 function estRepos(code){ return CODES_REPOS.indexOf(code) >= 0; }
 
 /* --------------------------- état par défaut --------------------------- */
 
-/* nom, prénom, quotité, roulement, jour de JA souhaité (0 = lundi … 6 = dimanche, '' = indifférent) */
+/* nom, prénom, quotité, roulement, jour de JA souhaité (0 = lundi … 6 = dimanche, '' = indifférent)
+   Les roulements sont fixes : ce sont toujours les mêmes agents qui tiennent la nuit.
+   Relevé sur les plannings d'août et septembre 2026 — les lignes MERCIER, EN NACHI,
+   REHILA, LACHARME et LAFAURIE portent les codes N et RS, les autres n'en ont aucun.
+   MARIAMON alterne soirs et nuits : elle reste en « mixte ». */
 const EFFECTIF_INITIAL = [
   ['BESSON',   'Pauline',    100, 'jour',  ''],
-  ['VANDROUX', 'Elodie',      80, 'mixte',  2],
+  ['VANDROUX', 'Elodie',      80, 'jour',   2],
   ['DUPRAT',   'Sandra',     100, 'jour',  ''],
-  ['ARTHUS',   'Emilie',      80, 'mixte',  2],
-  ['BERRY',    'Nathalie',    80, 'mixte',  2],
-  ['GOY',      'Olivia',      80, 'mixte', ''],
-  ['MERCIER',  'Cindy',       80, 'mixte', ''],
-  ['EN NACHI', 'Dounia',     100, 'nuit',  ''],
-  ['REHILA',   'Selma',       80, 'mixte', ''],
-  ['LACHARME', 'Astrid',      80, 'mixte', ''],
-  ['GARDIN',   'Noemie',      80, 'mixte', ''],
-  ['PERRET',   'Regis',       80, 'mixte', ''],
-  ['LAFAURIE', 'Mélissa',     80, 'mixte', ''],
+  ['ARTHUS',   'Emilie',      80, 'jour',   2],
+  ['BERRY',    'Nathalie',    80, 'jour',   2],
+  ['GOY',      'Olivia',      80, 'jour',  ''],
+  ['MERCIER',  'Cindy',       80, 'nuit',  ''],
+  ['EN NACHI', 'Dounia',     100, 'nuit-seule', ''],
+  ['REHILA',   'Selma',       80, 'nuit',  ''],
+  ['LACHARME', 'Astrid',      80, 'nuit',  ''],
+  ['GARDIN',   'Noemie',      80, 'jour',  ''],
+  ['PERRET',   'Regis',       80, 'jour',  ''],
+  ['LAFAURIE', 'Mélissa',     80, 'nuit',  ''],
   ['MARIAMON', 'Emmanuelle',  80, 'mixte', ''],
 ];
 
@@ -725,7 +738,9 @@ function configDefaut(){
     maxNuitsConsecutives:2,  // 1 ou 2 nuits, puis un repos sécurité
     weekendAlterne:     true,
     jaInterrompt:       true,   // JA casse-t-il le décompte des jours consécutifs ?
-    equipeNuitTaille:   4,      // agents affectés au roulement de nuit chaque semaine
+    equipeNuitTaille:   4,      // agents au roulement de nuit chaque semaine :
+                                // la référente plus trois, le repos sécurité et la
+                                // limite de 2 nuits d'affilée bridant chacun
                                 // (le repos sécurité limite chacun à ~2 nuits)
     joursMaxSemaine100: 5,
     joursMaxSemaine80:  4,
@@ -733,15 +748,21 @@ function configDefaut(){
 }
 
 function agentsDefaut(){
-  let iA = 0;
-  const list = EFFECTIF_INITIAL.map((e, i) => ({
-    id:'a'+(i+1),
-    nom:e[0], prenom:e[1], quotite:e[2], roulement:e[3],
-    groupeWE:(iA++ % 2 === 0) ? 'A' : 'B',
-    jourJA:e[4] === undefined ? '' : e[4],
-    bloque:[],
-    recAncre:'', actif:true, remplacant:false,
-  }));
+  // L'alternance A/B est répartie séparément dans chaque roulement : sans cela une
+  // équipe de nuit pourrait se retrouver entièrement du même groupe et aucune de ses
+  // membres ne serait de tour le week-end.
+  const rang = {};
+  const list = EFFECTIF_INITIAL.map((e, i) => {
+    rang[e[3]] = (rang[e[3]] || 0) + 1;
+    return {
+      id:'a'+(i+1),
+      nom:e[0], prenom:e[1], quotite:e[2], roulement:e[3],
+      groupeWE:(rang[e[3]] % 2 === 1) ? 'A' : 'B',
+      jourJA:e[4] === undefined ? '' : e[4],
+      bloque:[],
+      recAncre:'', actif:true, remplacant:false,
+    };
+  });
   list.push({id:'r1', nom:'Remplaçant 1', prenom:'', quotite:100, roulement:'mixte',
              groupeWE:'A', jourJA:'', bloque:[], recAncre:'', actif:true, remplacant:true});
   list.push({id:'r2', nom:'Remplaçant 2', prenom:'', quotite:100, roulement:'mixte',
@@ -972,6 +993,19 @@ function poserCellule(agentId, jour, code, opts){
   if(!c.c && !c.n && !c.v){ delete etat.planning[k]; return; }
   etat.planning[k] = c;
 }
+/* « Équipe de nuit » = ensemble stable d'agents habilités à la nuit. Ils ne font pas
+   que des nuits : les semaines où ils ne sont pas au roulement de nuit, ils tiennent
+   des postes de jour — c'est ce que montrent les plannings de référence, où les lignes
+   MERCIER et EN NACHI portent aussi des S, DJ et J. Les agents « jour » ne font jamais
+   de nuit. */
+function faitDesNuits(agent){
+  return agent.roulement === 'nuit' || agent.roulement === 'nuit-seule' || agent.roulement === 'mixte';
+}
+/* Référente de nuit : ne tient que ce poste et figure dans le roulement chaque semaine.
+   C'est ce que montre le planning de référence, où sa ligne est presque exclusivement
+   faite de N et de RS. */
+function nuitSeule(agent){ return agent.roulement === 'nuit-seule'; }
+
 function agentParId(id){ return etat.agents.find(a => a.id === id) || null; }
 function nomAgent(a){ return a ? (a.nom + (a.prenom ? ' ' + a.prenom : '')) : '?'; }
 function agentsActifs(){ return etat.agents.filter(a => a.actif && !a.remplacant); }
@@ -1224,36 +1258,38 @@ function equipeNuitSemaine(lundi, rnd){
   const cfg = etat.config;
   const nuitsAPourvoir = 7 * (cfg.besoins.N || 1);
   const dispos = agentsActifs().filter(a => {
-    if(a.roulement === 'jour') return false;
-    // agent absent (CR) plus de 4 jours dans la semaine : inutile de le mettre en nuit
+    if(!faitDesNuits(a)) return false;
+    if(nuitSeule(a)) return true;            // référente de nuit : de tous les roulements
+    // agent réellement absent plus de 4 jours dans la semaine : inutile de le mettre
+    // en nuit. On ne compte que les absences (congé, récupération), pas les repos :
+    // sur un planning déjà rempli, RH et RS feraient sortir tout le monde.
     let abs = 0;
     for(let i = 0; i < 7; i++){
       const c = codeDe(a.id, jourPlus(lundi, i));
-      if(c && !estPoste(c)) abs++;
+      if(c === 'CR' || c === 'REC' || c === 'RF') abs++;
     }
     return abs <= 4;
   });
-  const equipe = dispos.filter(a => a.roulement === 'nuit');
-  const mixtes = dispos.filter(a => a.roulement === 'mixte');
-  // priorité à ceux qui n'ont pas fait de nuit depuis le plus longtemps
-  mixtes.sort((x, y) => {
+  // On tourne à l'intérieur de l'équipe : priorité à ceux qui n'ont pas fait de nuit
+  // depuis le plus longtemps. Ceux qui ne sont pas retenus cette semaine-là restent
+  // disponibles pour les postes de jour.
+  const candidats = dispos.slice().sort((x, y) => {
     const dx = derniereNuitIlYA(x.id, lundi), dy = derniereNuitIlYA(y.id, lundi);
     if(dy !== dx) return dy - dx;
     return x.id < y.id ? -1 : 1;
   });
-  let capacite = equipe.reduce((s, a) => s + plafondSemaine(a), 0);
-  for(const a of mixtes){
-    if(equipe.length >= cfg.equipeNuitTaille && capacite >= nuitsAPourvoir + 1) break;
-    equipe.push(a);
-    capacite += plafondSemaine(a);
-  }
+  // les agents « uniquement de nuit » sont de tous les roulements ; les autres tournent
+  const equipe = candidats.filter(nuitSeule);
+  candidats.forEach(a => {
+    if(equipe.length < cfg.equipeNuitTaille && !nuitSeule(a)) equipe.push(a);
+  });
   // le week-end doit rester couvrable : il faut dans l'équipe au moins un agent
   // dont c'est le tour de week-end, sinon les nuits du samedi et du dimanche
   // tomberaient systématiquement en dépannage
   if(cfg.weekendAlterne && nuitsAPourvoir > 0){
     const samedi = jourPlus(lundi, 5);
     if(!equipe.some(a => weekendTravaille(a, samedi))){
-      const renfort = mixtes.find(a => equipe.indexOf(a) < 0 && weekendTravaille(a, samedi));
+      const renfort = candidats.find(a => equipe.indexOf(a) < 0 && weekendTravaille(a, samedi));
       if(renfort) equipe.push(renfort);
     }
   }
@@ -1261,7 +1297,7 @@ function equipeNuitSemaine(lundi, rnd){
 }
 
 /* --- filtres et score --- */
-function candidatValide(a, jour, poste, equipeNuit, tolerance, autoriserRempl){
+function candidatValide(a, jour, poste, tolerance, autoriserRempl){
   if(!a.actif) return false;
   if(a.remplacant && !(autoriserRempl && tolerance >= 2)) return false;
   if(!libre(a.id, jour)) return false;
@@ -1277,15 +1313,17 @@ function candidatValide(a, jour, poste, equipeNuit, tolerance, autoriserRempl){
       if(poste === 'N' && jourSemaine(jourPlus(jour, 1)) === souhait) return false;
     }
   }
-  // roulement jour / nuit — jamais mélangés sur une même semaine
-  if(tolerance < 4){
-    if(poste === 'N'){
-      if(a.roulement === 'jour') return false;
-      if(!a.remplacant && !equipeNuit.has(a.id)) return false;
-    }else{
-      if(a.roulement === 'nuit') return false;
-      if(!a.remplacant && equipeNuit.has(a.id)) return false;
-    }
+  // Le roulement déclaré de l'agent ne cède jamais, même en dépannage : un agent de
+  // jour ne fera pas de nuit, une référente de nuit ne tiendra pas de poste de jour.
+  if(poste === 'N' && !faitDesNuits(a)) return false;
+  if(poste !== 'N' && nuitSeule(a)) return false;
+  // Jour et nuit ne se mélangent pas sur une même semaine. La règle se lit sur ce que
+  // l'agent a effectivement dans sa semaine — et non sur une équipe de nuit désignée
+  // d'avance, qui privait de week-end ceux qui n'obtenaient finalement aucune nuit.
+  if(tolerance < 4 && !a.remplacant){
+    const semaine = codesSemaine(a.id, jour).filter(estPoste);
+    if(poste === 'N'){ if(semaine.some(c => c !== 'N')) return false; }
+    else if(semaine.some(c => c === 'N')) return false;
   }
   // disponibilités déclarées de l'agent : au même rang qu'un congé posé, jamais
   // forcées automatiquement — si plus personne n'est disponible, le poste est
@@ -1316,19 +1354,23 @@ function candidatValide(a, jour, poste, equipeNuit, tolerance, autoriserRempl){
 }
 
 function nouveauxCompteurs(){
-  const c = {travailles:{}, we:{}, parPoste:{}, poids:{}, poidsTotal:0, total:0, totalWE:0,
+  const c = {travailles:{}, heures:{}, we:{}, parPoste:{}, poids:{}, poidsTotal:0,
+             total:0, totalHeures:0, totalWE:0,
              parSemaine: 7 * POSTES.reduce((n, p) => n + (etat.config.besoins[p] || 0), 0)};
   POSTES.forEach(p => { c.parPoste[p] = {total:0}; });
+  c.poidsNuit = 0;
   agentsActifs().forEach(a => {
-    c.travailles[a.id] = 0; c.we[a.id] = 0;
+    c.travailles[a.id] = 0; c.heures[a.id] = 0; c.we[a.id] = 0;
     c.poids[a.id] = a.quotite / 100;
     c.poidsTotal += c.poids[a.id];
+    if(faitDesNuits(a)) c.poidsNuit += c.poids[a.id];
   });
   return c;
 }
 function enregistrer(cpt, a, jour, poste){
   if(cpt.poids[a.id] === undefined) return;      // remplaçant : hors équilibrage
   cpt.travailles[a.id]++; cpt.total++;
+  cpt.heures[a.id] += heuresDe(poste); cpt.totalHeures += heuresDe(poste);
   cpt.parPoste[poste][a.id] = (cpt.parPoste[poste][a.id] || 0) + 1;
   cpt.parPoste[poste].total++;
   if(estWeekend(jour)){ cpt.we[a.id]++; cpt.totalWE++; }
@@ -1338,10 +1380,18 @@ function enregistrer(cpt, a, jour, poste){
 function scoreCandidat(a, jour, poste, cpt, rnd){
   const poids = cpt.poids[a.id] !== undefined ? cpt.poids[a.id] / cpt.poidsTotal : 0.5 / cpt.poidsTotal;
   let s = 0;
-  // 1. équité globale : écart entre la charge théorique et la charge réelle
-  s += 70 * (cpt.total * poids - (cpt.travailles[a.id] || 0));
-  // 2. équité par poste : personne ne doit hériter de tous les soirs
-  s += 18 * (cpt.parPoste[poste].total * poids - (cpt.parPoste[poste][a.id] || 0));
+  // 1. Équité globale, mesurée en HEURES et non en nombre de postes : une nuit dure
+  //    12 h contre 8 à 10 h le jour, si bien qu'équilibrer les postes déséquilibre
+  //    le temps de travail réel entre l'équipe de nuit et celle de jour.
+  s += 9 * (cpt.totalHeures * poids - (cpt.heures[a.id] || 0));
+  // 2. Équité par poste : personne ne doit hériter de tous les soirs. La nuit se
+  //    partage entre les seuls membres de l'équipe de nuit — la rapporter à l'effectif
+  //    entier sous-estimerait la part qui revient à chacun d'eux, et notamment à la
+  //    référente de nuit à temps plein.
+  const partPoste = (poste === 'N' && cpt.poidsNuit > 0)
+    ? (cpt.poids[a.id] !== undefined ? cpt.poids[a.id] / cpt.poidsNuit : 0)
+    : poids;
+  s += 18 * (cpt.parPoste[poste].total * partPoste - (cpt.parPoste[poste][a.id] || 0));
   // 3. équité des week-ends
   if(estWeekend(jour)) s += 25 * (cpt.totalWE * poids - (cpt.we[a.id] || 0));
   // 3 bis. équité de la semaine en cours : sans elle, l'équité globale se satisfait
@@ -1372,8 +1422,20 @@ function scoreCandidat(a, jour, poste, cpt, rnd){
   //    Une nuit consomme aussi le lendemain (repos sécurité) : elle ne doit pas venir
   //    occuper le jour que l'agent réserve à sa JA, ni son jour d'indisponibilité.
   if(poste === 'N'){
-    const lendemain = jourSemaine(jourPlus(jour, 1));
-    if(lendemain === jourJAsouhaite(a) || jourEntierBloque(a, lendemain)) s -= 400;
+    const demainSem = jourSemaine(jourPlus(jour, 1));
+    if(demainSem === jourJAsouhaite(a) || jourEntierBloque(a, demainSem)) s -= 400;
+    //    Si le lendemain porte déjà un congé ou une récupération, le repos sécurité
+    //    ne peut plus s'y poser : l'agent perdrait ce jour dû. On évite donc d'y
+    //    placer une nuit, sans l'interdire absolument.
+    const demain = codeDe(a.id, jourPlus(jour, 1));
+    if(demain === 'REC' || demain === 'CR' || demain === 'RF') s -= 300;
+    //    Prendre une nuit interdit tout poste de jour pour le reste de la semaine.
+    //    Mieux vaut donc concentrer les nuits par paires sur peu d'agents que d'en
+    //    immobiliser un de plus pour une seule nuit : celui qui en a déjà une passe
+    //    devant, et l'on n'engage un agent supplémentaire qu'à défaut.
+    const nuitsSemaine = codesSemaine(a.id, jour).filter(c => c === 'N').length;
+    if(nuitsSemaine >= 1) s += 120;
+    else                  s -= 60;
   }
   // 8. un agent dont le roulement est « nuit » ne peut tenir que ce poste : l'équité
   //    générale, calculée sur les 5 postes, le sous-évaluerait. On le remet en tête sur
@@ -1386,10 +1448,10 @@ function scoreCandidat(a, jour, poste, cpt, rnd){
   return s;
 }
 
-function choisirAgent(jour, poste, equipeNuit, cpt, rnd, tolerance, autoriserRempl){
+function choisirAgent(jour, poste, cpt, rnd, tolerance, autoriserRempl){
   let best = null, bestScore = -Infinity;
   for(const a of etat.agents){
-    if(!candidatValide(a, jour, poste, equipeNuit, tolerance, autoriserRempl)) continue;
+    if(!candidatValide(a, jour, poste, tolerance, autoriserRempl)) continue;
     const sc = scoreCandidat(a, jour, poste, cpt, rnd);
     if(sc > bestScore){ bestScore = sc; best = a; }
   }
@@ -1501,33 +1563,37 @@ function genererPlanning(debut, fin, options){
   const vues = {};
   jours.forEach(j => { const l = lundiDe(j); if(!vues[l]){ vues[l] = 1; semaines.push(l); } });
 
+  const remplir = (jour, poste) => {
+    const besoin = etat.config.besoins[poste] || 0;
+    let deja = 0;
+    etat.agents.forEach(a => { if(codeDe(a.id, jour) === poste) deja++; });
+
+    for(let n = deja; n < besoin; n++){
+      let agent = null, tol = 0;
+      for(tol = 0; tol <= 4; tol++){
+        agent = choisirAgent(jour, poste, cpt, rnd, tol, !!opts.remplacants);
+        if(agent) break;
+      }
+      if(!agent){ rapport.nonCouverts.push({jour, poste}); continue; }
+      // Le palier 1 ne déroge qu'à une préférence, déjà signalée dans jaHorsSouhait :
+      // inutile de marquer la case en dépannage, ce serait du bruit visuel.
+      poserCellule(agent.id, jour, poste, {depannage: tol > 1});
+      enregistrer(cpt, agent, jour, poste);
+      rapport.postes++;
+      if(tol > 1) rapport.depannages.push({jour, poste, agent:agent.id, motif:MOTIFS_TOLERANCE[tol]});
+    }
+  };
+
   for(const lundi of semaines){
-    const equipeNuit = equipeNuitSemaine(lundi, rnd);
     const ordreJours = [5, 6, 0, 1, 2, 3, 4]
       .map(i => jourPlus(lundi, i))
       .filter(j => j >= debut && j <= fin);
 
-    for(const jour of ordreJours)
-    for(const poste of ORDRE_AFFECTATION){
-      const besoin = etat.config.besoins[poste] || 0;
-      let deja = 0;
-      etat.agents.forEach(a => { if(codeDe(a.id, jour) === poste) deja++; });
-
-      for(let n = deja; n < besoin; n++){
-        let agent = null, tol = 0;
-        for(tol = 0; tol <= 4; tol++){
-          agent = choisirAgent(jour, poste, equipeNuit, cpt, rnd, tol, !!opts.remplacants);
-          if(agent) break;
-        }
-        if(!agent){ rapport.nonCouverts.push({jour, poste}); continue; }
-        // Le palier 1 ne déroge qu'à une préférence, déjà signalée dans jaHorsSouhait :
-        // inutile de marquer la case en dépannage, ce serait du bruit visuel.
-        poserCellule(agent.id, jour, poste, {depannage: tol > 1});
-        enregistrer(cpt, agent, jour, poste);
-        rapport.postes++;
-        if(tol > 1) rapport.depannages.push({jour, poste, agent:agent.id, motif:MOTIFS_TOLERANCE[tol]});
-      }
-    }
+    // Les nuits de la semaine d'abord : elles déterminent qui, dans l'équipe de nuit,
+    // reste disponible pour les postes de jour. Ceux qui n'obtiennent aucune nuit
+    // gardent ainsi leur week-end de tour au lieu d'être bloqués pour rien.
+    ordreJours.forEach(j => remplir(j, 'N'));
+    ordreJours.forEach(j => POSTES_JOUR.forEach(p => remplir(j, p)));
   }
 
   poserRS(jours, debut, fin, rapport);
@@ -1543,11 +1609,13 @@ function reajusterAutour(debut, fin){
 }
 
 function reequilibrerGroupesWE(){
-  // répartit les agents alternativement entre les groupes A et B, nuit exclue du comptage
-  let i = 0;
+  // Alternance A/B répartie séparément dans chaque roulement, pour que l'équipe de jour
+  // comme celle de nuit disposent toujours de titulaires de tour chaque week-end.
+  const rang = {};
   etat.agents.forEach(a => {
     if(a.remplacant) return;
-    a.groupeWE = (i++ % 2 === 0) ? 'A' : 'B';
+    rang[a.roulement] = (rang[a.roulement] || 0) + 1;
+    a.groupeWE = (rang[a.roulement] % 2 === 1) ? 'A' : 'B';
   });
 }
 
@@ -1733,10 +1801,8 @@ function controlerCase(agentId, jour, code){
     // roulement
     const codes = codesSemaine(agentId, jour).filter(estPoste);
     const nuits = codes.filter(c => c === 'N').length;
-    if(code === 'N' && a.roulement === 'jour')
-      msgs.push({dur:false, t:'Cet agent est déclaré « roulement de jour »'});
-    if(code !== 'N' && a.roulement === 'nuit')
-      msgs.push({dur:false, t:'Cet agent est déclaré « roulement de nuit »'});
+    if(code === 'N' && !faitDesNuits(a))
+      msgs.push({dur:false, t:'Cet agent ne fait pas partie de l’équipe de nuit'});
     if(code === 'N' && codes.length - nuits > 0)
       msgs.push({dur:false, t:'Jour et nuit mélangés sur la même semaine'});
     if(code !== 'N' && nuits > 0)
@@ -1807,13 +1873,13 @@ function compteurs(debut, fin){
   const jours = joursEntre(debut, fin);
   const samedis = jours.filter(j => jourSemaine(j) === 5);
   return agentsAffichables().map(a => {
-    const l = {agent:a, total:0, we:0, RH:0, CR:0, JA:0, REC:0, RF:0, vide:0};
+    const l = {agent:a, total:0, heures:0, we:0, RH:0, RS:0, CR:0, JA:0, REC:0, RF:0, vide:0};
     POSTES.forEach(p => l[p] = 0);
     jours.forEach(j => {
       const c = codeDe(a.id, j);
       if(!c){ l.vide++; return; }
       if(l[c] !== undefined) l[c]++;
-      if(estPoste(c)){ l.total++; if(estWeekend(j)) l.we++; }
+      if(estPoste(c)){ l.total++; l.heures += heuresDe(c); if(estWeekend(j)) l.we++; }
     });
     l.weekends = samedis.filter(s =>
       estPoste(codeDe(a.id, s)) || estPoste(codeDe(a.id, jourPlus(s, 1)))).length;
@@ -1959,13 +2025,15 @@ function dessinerResume(){
   const b = bornesMois();
   const lignes = compteurs(b.debut, b.fin);
   let h = '<thead><tr><th>Agent</th>' + POSTES.map(p => '<th class="num">' + p + '</th>').join('') +
-          '<th class="num">Postes</th><th class="num">WE</th><th class="num">RH</th>' +
-          '<th class="num">JA</th><th class="num">CR</th><th class="num">REC</th></tr></thead><tbody>';
+          '<th class="num">Postes</th><th class="num">Heures</th><th class="num">WE</th>' +
+          '<th class="num">RH</th><th class="num">RS</th><th class="num">JA</th>' +
+          '<th class="num">CR</th><th class="num">REC</th></tr></thead><tbody>';
   lignes.forEach(l => {
     h += '<tr><td>' + esc(nomAgent(l.agent)) + '</td>' +
          POSTES.map(p => '<td class="num">' + (l[p] || '') + '</td>').join('') +
-         '<td class="num"><b>' + l.total + '</b></td><td class="num">' + l.weekends + '</td><td class="num">' +
-         l.RH + '</td><td class="num">' + l.JA + '</td><td class="num">' + l.CR + '</td><td class="num">' +
+         '<td class="num"><b>' + l.total + '</b></td><td class="num">' + l.heures + ' h</td>' +
+         '<td class="num">' + l.weekends + '</td><td class="num">' + l.RH + '</td><td class="num">' +
+         l.RS + '</td><td class="num">' + l.JA + '</td><td class="num">' + l.CR + '</td><td class="num">' +
          l.REC + '</td></tr>';
   });
   const tot = lignes.reduce((s, l) => s + l.total, 0);
@@ -1987,8 +2055,9 @@ function dessinerEquipe(){
         [100, 90, 80, 70, 60, 50].map(q => '<option value="' + q + '"' + (a.quotite === q ? ' selected' : '') +
         '>' + q + ' %</option>').join('') + '</select></td>' +
       '<td><select data-f="roulement"' + (a.remplacant ? ' disabled' : '') + '>' +
-        ['jour', 'nuit', 'mixte'].map(r => '<option value="' + r + '"' + (a.roulement === r ? ' selected' : '') +
-        '>' + r + '</option>').join('') + '</select></td>' +
+        [['jour','jour uniquement'], ['nuit','équipe de nuit'], ['nuit-seule','nuit uniquement'],
+         ['mixte','mixte']].map(r => '<option value="' + r[0] + '"' +
+        (a.roulement === r[0] ? ' selected' : '') + '>' + r[1] + '</option>').join('') + '</select></td>' +
       '<td><select data-f="groupeWE"' + (a.remplacant ? ' disabled' : '') + '>' +
         ['A', 'B'].map(g => '<option value="' + g + '"' + (a.groupeWE === g ? ' selected' : '') +
         '>' + g + '</option>').join('') + '</select></td>' +
@@ -2110,15 +2179,19 @@ function dessinerControles(){
   const lignes = compteurs(d, f);
   const nbSem = Math.max(1, Math.round(jours.length / 7));
   let t = '<thead><tr><th>Agent</th><th>Quot.</th>' + POSTES.map(p => '<th class="num">' + p + '</th>').join('') +
-          '<th class="num">Postes</th><th class="num">WE</th><th class="num">RH</th><th class="num">RH/sem.</th>' +
+          '<th class="num">Postes</th><th class="num">Heures</th><th class="num">h/sem.</th>' +
+          '<th class="num">WE</th><th class="num">RH</th><th class="num">RS</th><th class="num">RH/sem.</th>' +
           '<th class="num">JA</th><th class="num">CR</th><th class="num">REC</th></tr></thead><tbody>';
   lignes.forEach(l => {
     const rhSem = (l.RH / nbSem);
     const ko = rhSem < etat.config.rhParSemaine - 0.35;
     t += '<tr><td>' + esc(nomAgent(l.agent)) + '</td><td>' + (l.agent.remplacant ? '—' : l.agent.quotite + ' %') + '</td>' +
          POSTES.map(p => '<td class="num">' + (l[p] || '') + '</td>').join('') +
-         '<td class="num"><b>' + l.total + '</b></td><td class="num">' + l.weekends + '</td>' +
-         '<td class="num">' + l.RH + '</td><td class="num"' + (ko ? ' style="color:var(--orange);font-weight:700"' : '') +
+         '<td class="num"><b>' + l.total + '</b></td><td class="num">' + l.heures + ' h</td>' +
+         '<td class="num">' + (l.heures / nbSem).toFixed(1) + ' h</td>' +
+         '<td class="num">' + l.weekends + '</td>' +
+         '<td class="num">' + l.RH + '</td><td class="num">' + l.RS + '</td>' +
+         '<td class="num"' + (ko ? ' style="color:var(--orange);font-weight:700"' : '') +
          '>' + rhSem.toFixed(1) + '</td><td class="num">' + l.JA + '</td><td class="num">' + l.CR +
          '</td><td class="num">' + l.REC + '</td></tr>';
   });
@@ -2376,7 +2449,25 @@ const COULEURS = {
   RH:['#e2e8f0','#475569'], RS:['#cfe1ea','#17505f'], '':['#ffffff','#334155']
 };
 
+/* Enregistrement d'un fichier. En local, un lien de téléchargement suffit. Consultée
+   en ligne, la page n'a pas le droit de déclencher un téléchargement elle-même : elle
+   passe par l'hôte, qui demande confirmation à l'utilisatrice. On sonde cette
+   possibilité au démarrage pour que le bouton réponde tout de suite. */
+let _enregistreur = null;
+if(typeof window !== 'undefined' && window.claude && typeof window.claude.use === 'function'){
+  window.claude.use('downloads').then(d => { _enregistreur = d; }).catch(() => {});
+}
+
 function telecharger(nom, contenu, type){
+  if(_enregistreur){
+    _enregistreur.save({filename:nom, data:contenu})
+      .then(() => toast('Fichier enregistré'))
+      .catch(e => {
+        if(e && e.code === 'declined') return;               // l'utilisatrice a refusé
+        toast('Enregistrement impossible : ' + ((e && e.message) || 'erreur'), true);
+      });
+    return;
+  }
   const blob = new Blob([contenu], {type});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2385,7 +2476,38 @@ function telecharger(nom, contenu, type){
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
+/* Le tableur mis en forme est un fichier .xls, format qu'Excel ouvre mais que
+   l'hébergement en ligne n'accepte pas. On y bascule donc sur un CSV, qu'Excel ouvre
+   tout aussi bien — sans les couleurs. */
+function exporterCSV(){
+  const {jours} = bornesMois();
+  const sep = ';';
+  const ech = v => /[;"\n]/.test(v) ? '"' + String(v).replace(/"/g, '""') + '"' : v;
+  const lignes = [];
+  lignes.push(['Planning secrétaires — Urgences CH Mâcon — ' + libelleMois(etat.moisAffiche)].join(sep));
+  lignes.push(['Nom Prénom', 'Quotité'].concat(
+    jours.map(j => JOURS_FR[jourSemaine(j)] + ' ' + dateDe(j).getUTCDate())).map(ech).join(sep));
+  agentsAffichables().forEach(a => {
+    lignes.push([nomAgent(a), a.remplacant ? '' : a.quotite + ' %'].concat(
+      jours.map(j => {
+        const c = cellule(a.id, j);
+        return (c && c.c ? c.c : '') + (c && c.n ? ' (' + c.n + ')' : '');
+      })).map(ech).join(sep));
+  });
+  POSTES.forEach(p => {
+    if(!(etat.config.besoins[p] || 0)) return;
+    lignes.push(['Poste ' + p, CODES[p].h].concat(jours.map(j => {
+      let n = 0;
+      etat.agents.forEach(a => { if(codeDe(a.id, j) === p) n++; });
+      return String(n);
+    })).map(ech).join(sep));
+  });
+  telecharger('planning-' + etat.moisAffiche + '.csv', '\ufeff' + lignes.join('\r\n'),
+              'text/csv;charset=utf-8');
+}
+
 function exporterExcel(){
+  if(_enregistreur) return exporterCSV();   // le .xls n'est pas accepté en ligne
   const {jours} = bornesMois();
   const agents = agentsAffichables();
   const bord = 'border:0.5pt solid #b8c4d4;';
@@ -2447,7 +2569,6 @@ function exporterExcel(){
 function exporterJson(){
   telecharger('sauvegarde-planning-' + aujourdhui() + '.json',
               JSON.stringify(etat, null, 1), 'application/json');
-  toast('Sauvegarde exportée');
 }
 function importerJson(fichier){
   const fr = new FileReader();
@@ -2955,6 +3076,17 @@ initChamps();
 brancherEvenements();
 dessinerLegende();
 dessinerAide();
+
+// Premier lancement : on remplit le mois affiché pour ouvrir sur un planning réel
+// plutôt que sur une grille vide. Tout est modifiable ou effaçable ensuite.
+if(!Object.keys(etat.planning).length){
+  const b = bornesMois();
+  genererPlanning(b.debut, b.fin, {preserverManuel:false, remplacants:false});
+  sauver();
+  setTimeout(() => toast('Planning de ' + libelleMois(etat.moisAffiche) +
+    ' généré pour la découverte — modifiez ou régénérez à votre convenance'), 400);
+}
+
 toutRedessiner();
 dessinerReglages();
 
