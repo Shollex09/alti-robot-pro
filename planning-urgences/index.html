@@ -110,6 +110,13 @@ h2,h3{font-weight:700}
 }
 .tab-btn .pill.zero{display:none}
 
+#bandeauLecture{
+  display:none;background:var(--accent-soft);color:var(--accent-dark);
+  border-bottom:1px solid #cfe1f2;padding:9px 18px;font-size:13px;line-height:1.5;
+}
+body.lecture-seule #bandeauLecture{display:block}
+body.lecture-seule .si-modif{display:none!important}
+
 main{max-width:1800px;margin:0 auto;padding:14px 14px 70px}
 .view{display:none}
 .view.active{display:block}
@@ -370,13 +377,19 @@ table.data input,table.data select{padding:5px 7px;font-size:12.5px}
 
 <nav id="nav">
   <button class="tab-btn active" data-view="planning">Planning</button>
-  <button class="tab-btn" data-view="generer">Génération</button>
-  <button class="tab-btn" data-view="absences">Absences</button>
-  <button class="tab-btn" data-view="equipe">Équipe</button>
+  <button class="tab-btn si-modif" data-view="generer">Génération</button>
+  <button class="tab-btn si-modif" data-view="absences">Absences</button>
+  <button class="tab-btn si-modif" data-view="equipe">Équipe</button>
   <button class="tab-btn" data-view="controles">Contrôles<span class="pill zero" id="pillAlertes">0</span></button>
-  <button class="tab-btn" data-view="reglages">Réglages</button>
+  <button class="tab-btn si-modif" data-view="reglages">Réglages</button>
+  <button class="tab-btn" data-view="acces" id="tabAcces" style="display:none">Accès</button>
   <button class="tab-btn" data-view="aide">Aide</button>
 </nav>
+
+<div id="bandeauLecture">
+  👁️ <b>Consultation</b> — vous voyez le planning de la responsable, en lecture seule.
+  Les modifications sont réservées aux personnes à qui elle a donné le droit de modifier.
+</div>
 
 <main>
 
@@ -391,10 +404,10 @@ table.data input,table.data select{padding:5px 7px;font-size:12.5px}
     <button class="btn-outline btn-sm" id="moisNext">Mois suivant ›</button>
     <button class="btn-ghost btn-sm" id="moisToday">Aujourd'hui</button>
     <span class="spacer"></span>
-    <button class="btn btn-sm" id="btnGenMois">⚙️ Générer ce mois</button>
+    <button class="btn btn-sm si-modif" id="btnGenMois">⚙️ Générer ce mois</button>
     <button class="btn-outline btn-sm" id="btnPrint">🖨️ PDF / Imprimer</button>
     <button class="btn-outline btn-sm" id="btnXls">📊 Excel</button>
-    <button class="btn-outline btn-sm" id="btnUndo" disabled>↶ Annuler</button>
+    <button class="btn-outline btn-sm si-modif" id="btnUndo" disabled>↶ Annuler</button>
   </div>
 
   <div class="card">
@@ -604,6 +617,52 @@ table.data input,table.data select{padding:5px 7px;font-size:12.5px}
       <div style="flex:1"></div>
       <button class="btn-danger" id="btnReset">Tout réinitialiser</button>
     </div>
+  </div>
+</section>
+
+<!-- ============ ACCÈS (visible de la seule propriétaire) ============ -->
+<section class="view" id="view-acces">
+  <div class="card">
+    <h2>🔑 Donner accès à une collègue</h2>
+    <p class="help">
+      L'accès se donne par <b>adresse e-mail</b>, depuis le menu <b>Partager</b> de cette page
+      (en haut à droite de la fenêtre). Deux niveaux existent :
+    </p>
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>Niveau à choisir</th><th>Ce que la personne peut faire</th></tr></thead>
+      <tbody>
+        <tr><td><b>Peut consulter</b></td><td>Voir le planning, changer de mois, imprimer, exporter.
+          Aucune modification possible — les boutons ne s'affichent même pas.</td></tr>
+        <tr><td><b>Peut modifier</b></td><td>Tout ce qui précède, plus générer et modifier le planning.
+          À réserver à qui vous remplace.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="help" style="margin-top:12px">
+      <b>Cet onglet n'est visible que de vous.</b> Personne d'autre ne le voit, même en cherchant :
+      le registre ci-dessous est enregistré dans un espace réservé à la propriétaire de la page.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>📇 Registre des accès <span class="hint" id="accesHint"></span></h2>
+    <p class="help">
+      Notez ici qui vous avez autorisé, pour vous y retrouver. Ce registre est votre mémoire :
+      c'est le menu <b>Partager</b> qui donne réellement l'accès, pas ce tableau.
+    </p>
+    <div class="form-row">
+      <div class="field grow"><label for="acNom">Nom</label><input type="text" id="acNom" placeholder="ex : Cindy MERCIER"></div>
+      <div class="field grow"><label for="acMail">Adresse e-mail</label><input type="email" id="acMail" placeholder="prenom.nom@ch-macon.fr"></div>
+      <div class="field"><label for="acRole">Niveau donné</label>
+        <select id="acRole">
+          <option value="lecture">Peut consulter</option>
+          <option value="modif">Peut modifier</option>
+        </select>
+      </div>
+      <div class="field grow"><label for="acNote">Note</label><input type="text" id="acNote" placeholder="ex : remplaçante congés d'été"></div>
+      <div style="flex:1"></div>
+      <button class="btn" id="btnAcAjouter">Ajouter au registre</button>
+    </div>
+    <div class="table-wrap" style="margin-top:14px"><table class="data" id="tblAcces"></table></div>
   </div>
 </section>
 
@@ -826,6 +885,7 @@ function sauver(){
     return;
   }
   majBadgeSauvegarde();
+  if(typeof planifierEnvoi === 'function') planifierEnvoi();
 }
 function snapshot(libelle){
   historique.push({lib:libelle, planning:JSON.stringify(etat.planning), agents:JSON.stringify(etat.agents)});
@@ -2276,6 +2336,10 @@ function toutRedessiner(){
 let edCode = '', edCible = null;
 
 function ouvrirEditeur(agentId, jour, td){
+  if(!peutModifier){
+    toast('Planning en consultation seule — vous ne pouvez pas le modifier');
+    return;
+  }
   const a = agentParId(agentId);
   if(!a) return;
   const cel = cellule(agentId, jour);
@@ -2597,6 +2661,9 @@ function allerAuMois(moisISO){
   etat.moisAffiche = moisISO;
   document.getElementById('moisPicker').value = moisISO;
   sauver(); toutRedessiner();
+  if(bdd){
+    lireDuPartage(moisISO).then(() => { suivreMois(moisISO); toutRedessiner(); }).catch(() => {});
+  }
 }
 function decalerMois(n){
   const [y, m] = etat.moisAffiche.split('-').map(Number);
@@ -2611,6 +2678,7 @@ function activerVue(nom){
   if(nom === 'reglages') dessinerReglages();
   if(nom === 'equipe'){ dessinerEquipe(); remplirSelectAgents(); }
   if(nom === 'absences'){ dessinerAbsences(); remplirSelectAgents(); }
+  if(nom === 'acces') dessinerAcces();
   window.scrollTo(0, 0);
 }
 
@@ -2950,6 +3018,36 @@ function brancherEvenements(){
     sauver(); toutRedessiner();
   });
 
+  // --- registre des accès
+  document.getElementById('btnAcAjouter').onclick = async () => {
+    const nom = document.getElementById('acNom').value.trim();
+    const email = document.getElementById('acMail').value.trim();
+    if(!nom && !email){ toast('Indiquez au moins un nom ou une adresse', true); return; }
+    if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      toast('Cette adresse e-mail ne semble pas valide', true); return;
+    }
+    if(!bdd || !estProprietaire){ toast('Registre indisponible', true); return; }
+    try{
+      await bdd.collection('acces').add({
+        nom, email,
+        role: document.getElementById('acRole').value,
+        note: document.getElementById('acNote').value.trim(),
+        ajouteLe: aujourdhui()
+      });
+      ['acNom','acMail','acNote'].forEach(id => document.getElementById(id).value = '');
+      dessinerAcces();
+      toast('Ajouté au registre — pensez à donner l’accès depuis le menu Partager');
+    }catch(e){ toast('Enregistrement impossible', true); }
+  };
+  document.getElementById('tblAcces').addEventListener('click', async e => {
+    const b = e.target.closest('[data-delacces]');
+    if(!b || !bdd) return;
+    if(!confirm('Retirer cette personne du registre ?\n\nCela ne lui retire pas l’accès : ' +
+                'faites-le aussi depuis le menu Partager.')) return;
+    try{ await bdd.doc('acces/' + b.dataset.delacces).delete(); dessinerAcces(); toast('Retiré du registre'); }
+    catch(err){ toast('Suppression impossible', true); }
+  });
+
   // --- exports
   document.getElementById('btnPrint').onclick = () => { activerVue('planning'); setTimeout(() => window.print(), 60); };
   document.getElementById('btnXls').onclick = exporterExcel;
@@ -3070,7 +3168,182 @@ function dessinerAide(){
 }
 
 /* ==========================================================================
-   11. DÉMARRAGE
+   11. PARTAGE — planning commun et registre des accès
+   --------------------------------------------------------------------------
+   Ouverte depuis un fichier local, l'application travaille en mémoire du
+   navigateur et rien ne change. Consultée en ligne, elle range le planning
+   dans un espace partagé afin que les collègues voient bien CELUI de la
+   responsable, et non une grille vide qui leur serait propre.
+
+   Qui peut quoi n'est pas décidé par cette page — elle ne fait qu'adapter
+   l'affichage. Le service applique les règles déclarées à la publication :
+   lecture pour qui peut consulter, écriture pour qui peut modifier, et le
+   registre des accès réservé à la seule propriétaire. Un contrôle écrit ici
+   serait décoratif : n'importe qui peut lire le code d'une page.
+   ========================================================================== */
+
+let bdd = null;              // espace partagé, ou null en local
+let peutModifier = true;     // droit d'écriture sur le planning
+let estProprietaire = false; // droit sur le registre des accès
+let ecouteMois = null;       // abonnement au mois affiché
+const dernierEcrit = {};     // mois -> contenu déjà envoyé, pour n'écrire que le neuf
+
+const DOC_CONFIG = 'config/general';
+
+function planningParMois(){
+  const parMois = {};
+  Object.keys(etat.planning).forEach(k => {
+    const mois = k.split('|')[1].slice(0, 7);
+    (parMois[mois] = parMois[mois] || {})[k] = etat.planning[k];
+  });
+  return parMois;
+}
+
+/* N'envoie que ce qui a changé depuis le dernier envoi, mois par mois : un
+   document par mois reste bien en deçà de la taille maximale, et changer un
+   mois ne réécrit pas toute l'année. */
+async function envoyerAuPartage(){
+  if(!bdd || !peutModifier) return;
+  try{
+    const cfg = JSON.stringify({agents:etat.agents, config:etat.config});
+    if(dernierEcrit.__config !== cfg){
+      await bdd.doc(DOC_CONFIG).set({agents:etat.agents, config:etat.config, maj:new Date().toISOString()});
+      dernierEcrit.__config = cfg;
+    }
+    const parMois = planningParMois();
+    for(const mois of Object.keys(parMois)){
+      const contenu = JSON.stringify(parMois[mois]);
+      if(dernierEcrit[mois] === contenu) continue;
+      await bdd.doc('planning/' + mois).set({cases:parMois[mois], maj:new Date().toISOString()});
+      dernierEcrit[mois] = contenu;
+    }
+    for(const mois of Object.keys(dernierEcrit)){
+      if(mois === '__config' || parMois[mois] || dernierEcrit[mois] === '{}') continue;
+      await bdd.doc('planning/' + mois).set({cases:{}, maj:new Date().toISOString()});
+      dernierEcrit[mois] = '{}';
+    }
+  }catch(e){
+    if(e && e.code === 'revoked'){ peutModifier = false; appliquerDroits(); return; }
+    console.error('Partage indisponible', e);
+  }
+}
+let _minuteurPartage = null;
+function planifierEnvoi(){
+  if(!bdd || !peutModifier) return;
+  clearTimeout(_minuteurPartage);
+  _minuteurPartage = setTimeout(envoyerAuPartage, 700);   // on groupe les rafales
+}
+
+async function lireDuPartage(mois){
+  if(!bdd) return;
+  const cfg = await bdd.doc(DOC_CONFIG).get();
+  if(cfg.exists && cfg.data){
+    if(Array.isArray(cfg.data.agents) && cfg.data.agents.length) etat.agents = cfg.data.agents;
+    if(cfg.data.config) etat.config = Object.assign(configDefaut(), cfg.data.config);
+    etat.agents.forEach(a => {
+      if(!a.groupeWE) a.groupeWE = 'A';
+      if(!a.roulement) a.roulement = 'mixte';
+      if(a.jourJA === undefined) a.jourJA = '';
+      if(!Array.isArray(a.bloque)) a.bloque = [];
+      if(a.actif === undefined) a.actif = true;
+    });
+    dernierEcrit.__config = JSON.stringify({agents:etat.agents, config:etat.config});
+  }
+  const d = await bdd.doc('planning/' + mois).get();
+  const cases = (d.exists && d.data && d.data.cases) || {};
+  Object.keys(etat.planning).forEach(k => {
+    if(k.split('|')[1].slice(0, 7) === mois) delete etat.planning[k];
+  });
+  Object.assign(etat.planning, cases);
+  dernierEcrit[mois] = JSON.stringify(cases);
+}
+
+/* Le mois affiché est suivi en direct : ce qu'écrit la responsable apparaît
+   chez les personnes qui consultent, sans qu'elles rechargent. */
+function suivreMois(mois){
+  if(!bdd) return;
+  if(ecouteMois){ ecouteMois(); ecouteMois = null; }
+  ecouteMois = bdd.doc('planning/' + mois).onSnapshot(snap => {
+    if(snap.hasPendingWrites) return;                 // notre propre écriture
+    const cases = (snap.exists && snap.data && snap.data.cases) || {};
+    const actuel = JSON.stringify(cases);
+    if(dernierEcrit[mois] === actuel) return;
+    Object.keys(etat.planning).forEach(k => {
+      if(k.split('|')[1].slice(0, 7) === mois) delete etat.planning[k];
+    });
+    Object.assign(etat.planning, cases);
+    dernierEcrit[mois] = actuel;
+    toutRedessiner();
+  }, () => {});
+}
+
+/* Le droit d'écrire ne se devine pas : on l'établit en tentant une écriture
+   anodine. Un refus signifie « consultation seule », ce que l'affichage
+   traduit aussitôt. */
+async function etablirDroits(){
+  const essai = async (chemin) => {
+    try{ await bdd.doc(chemin).set({t:Date.now()}); return true; }
+    catch(e){ return false; }
+  };
+  peutModifier   = await essai('config/sonde');
+  estProprietaire = await essai('acces/_sonde');
+}
+
+function appliquerDroits(){
+  document.body.classList.toggle('lecture-seule', !peutModifier);
+  document.getElementById('tabAcces').style.display = estProprietaire ? '' : 'none';
+  if(!peutModifier && document.querySelector('.view.active') &&
+     !document.querySelector('#view-planning.active') &&
+     !document.querySelector('#view-controles.active') &&
+     !document.querySelector('#view-aide.active')) activerVue('planning');
+}
+
+/* ------------------------- registre des accès ------------------------- */
+async function chargerAcces(){
+  if(!bdd || !estProprietaire) return [];
+  try{
+    const snap = await bdd.collection('acces').get();
+    return snap.docs.filter(d => d.id !== '_sonde')
+      .map(d => Object.assign({id:d.id}, d.data));
+  }catch(e){ return []; }
+}
+async function dessinerAcces(){
+  const lignes = await chargerAcces();
+  lignes.sort((a, b) => (a.nom || '').localeCompare(b.nom || '', 'fr'));
+  let h = '<thead><tr><th>Nom</th><th>Adresse e-mail</th><th>Niveau</th>' +
+          '<th>Ajouté le</th><th>Note</th><th></th></tr></thead><tbody>';
+  if(!lignes.length)
+    h += '<tr><td colspan="6" class="empty">Personne pour l’instant.</td></tr>';
+  lignes.forEach(l => {
+    h += '<tr><td><b>' + esc(l.nom || '') + '</b></td><td>' + esc(l.email || '') + '</td>' +
+         '<td><span class="tag ' + (l.role === 'modif' ? 'b' : 'a') + '">' +
+         (l.role === 'modif' ? 'peut modifier' : 'peut consulter') + '</span></td>' +
+         '<td>' + esc(l.ajouteLe ? fmtJourCourt(l.ajouteLe) : '') + '</td>' +
+         '<td>' + esc(l.note || '') + '</td>' +
+         '<td><button class="btn-danger btn-sm" data-delacces="' + esc(l.id) + '">Retirer</button></td></tr>';
+  });
+  h += '</tbody>';
+  document.getElementById('tblAcces').innerHTML = h;
+  document.getElementById('accesHint').textContent =
+    lignes.length + ' personne(s) inscrite(s)';
+}
+
+async function demarrerPartage(){
+  if(!(window.claude && typeof window.claude.use === 'function')) return;
+  try{ bdd = await window.claude.use('db'); }catch(e){ bdd = null; }
+  if(!bdd) return;
+  await etablirDroits();
+  appliquerDroits();
+  await lireDuPartage(etat.moisAffiche);
+  // Premier partage : la responsable dépose son planning pour que les autres le voient.
+  if(peutModifier && Object.keys(etat.planning).length) await envoyerAuPartage();
+  suivreMois(etat.moisAffiche);
+  toutRedessiner();
+  if(estProprietaire) dessinerAcces();
+}
+
+/* ==========================================================================
+   12. DÉMARRAGE
    ========================================================================== */
 initChamps();
 brancherEvenements();
@@ -3079,16 +3352,23 @@ dessinerAide();
 
 // Premier lancement : on remplit le mois affiché pour ouvrir sur un planning réel
 // plutôt que sur une grille vide. Tout est modifiable ou effaçable ensuite.
-if(!Object.keys(etat.planning).length){
-  const b = bornesMois();
-  genererPlanning(b.debut, b.fin, {preserverManuel:false, remplacants:false});
-  sauver();
-  setTimeout(() => toast('Planning de ' + libelleMois(etat.moisAffiche) +
-    ' généré pour la découverte — modifiez ou régénérez à votre convenance'), 400);
-}
-
 toutRedessiner();
 dessinerReglages();
+
+// Le partage s'établit après le premier affichage : la page reste utilisable même
+// si l'espace commun est indisponible. On ne génère un planning de découverte
+// qu'une fois les droits connus, et jamais pour qui ne fait que consulter.
+demarrerPartage()
+  .catch(() => {})
+  .then(() => {
+    if(peutModifier && !Object.keys(etat.planning).length){
+      const b = bornesMois();
+      genererPlanning(b.debut, b.fin, {preserverManuel:false, remplacants:false});
+      sauver(); toutRedessiner();
+      toast('Planning de ' + libelleMois(etat.moisAffiche) +
+            ' généré pour la découverte — modifiez ou régénérez à votre convenance');
+    }
+  });
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

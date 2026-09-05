@@ -198,6 +198,34 @@ La pénalité a été calibrée par balayage sur 3 mois générés :
 Avant ce réglage, le score pénalisait au contraire tout regroupement et produisait
 58 % de journées de travail isolées.
 
+### Partage et droits d'accès
+
+Ouverte depuis le fichier local, l'application travaille en mémoire du navigateur et
+reste mono-utilisatrice. Publiée en ligne, elle range le planning dans un espace
+partagé (capacité `db`) pour que les collègues voient bien *celui de la responsable*
+et non une grille vide qui leur serait propre. Découpage : `config/general` pour
+l'effectif et les réglages, `planning/<AAAA-MM>` pour les cases d'un mois — un
+document par mois reste loin de la taille maximale et changer un mois ne réécrit pas
+toute l'année. Le mois affiché est suivi en direct.
+
+Les droits ne sont pas décidés par la page — un contrôle écrit en JavaScript serait
+décoratif, puisque n'importe qui peut lire le code d'une page. Ils sont déclarés à la
+publication et appliqués par le service :
+
+```js
+capabilities: { db: { rules: [
+  { path: "",      read: "interact", write: "admin" },   // consulter / modifier
+  { path: "acces", read: "owner",    write: "owner" },   // registre privé
+]}}
+```
+
+L'accès se donne par adresse e-mail depuis le menu *Partager* de la page, avec deux
+niveaux : « peut consulter » (lecture seule) et « peut modifier ». La page ne fait
+qu'adapter son affichage : elle établit ses droits en tentant une écriture anodine,
+masque les commandes de modification en consultation et n'affiche l'onglet *Accès*
+qu'à la propriétaire. Ce registre lui sert de mémoire — qui a été autorisé, à quel
+niveau, depuis quand — sans jamais être ce qui donne l'accès.
+
 > **Limite arithmétique connue.** Avec 5 postes par jour et 14 agents, un agent à 80 %
 > travaille 2,4 jours par semaine et se repose donc 4,6 jours. Des blocs de travail de
 > 2 à 3 jours impliquent mécaniquement des plages de repos de 3 à 5 jours : on ne peut
