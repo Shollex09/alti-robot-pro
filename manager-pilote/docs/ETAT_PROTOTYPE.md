@@ -1875,6 +1875,15 @@ le panneau sombre de l'illustration du Bureau (`sceneGarage`, volontairement
 éléments graphiques autonomes pensés pour contraster avec n'importe quel
 fond de carte, pas des oublis du thème sombre.
 
+Un oubli de cette même liste a échappé à cette relecture et n'a été vu
+qu'après coup, sur un vrai téléphone : les citations du pilote (`.quote`,
+utilisée pour le retour d'essais, les échanges avec le pilote, la presse,
+les sponsors, les négociations et les événements de mi-course) gardaient un
+texte `#dfe7ef` codé en dur — quasi invisible sur le fond clair `--bg2` de
+la carte qui le porte. Passé à `var(--text)`. Repéré et signalé par
+l'utilisateur avec une capture d'écran de la carte « Retour du pilote »,
+plutôt que par les captures prises pendant la refonte.
+
 ### Course animée sur une vraie photo de circuit
 
 Un circuit (Salbris) a maintenant, en plus de son tracé stylisé du §1.2bis,
