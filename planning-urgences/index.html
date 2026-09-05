@@ -236,6 +236,41 @@ tbody tr.cover td.ok{color:var(--green)}
 #editor .ef{display:flex;gap:6px;align-items:center;margin-top:8px}
 #editor .ef .spacer{flex:1}
 
+/* ---------- fenêtre des disponibilités ---------- */
+#dispo{
+  position:fixed;z-index:100;display:none;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(560px,94vw);max-height:92vh;overflow:auto;background:#fff;border:1px solid var(--border2);
+  border-radius:var(--r-lg);box-shadow:var(--shadow-lg);padding:18px;
+}
+#dispo.show{display:block}
+#dispo h3{font-size:15px;margin-bottom:2px}
+#dispo .ds{font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5}
+table.dispo{width:100%;border-collapse:separate;border-spacing:4px}
+table.dispo th{font-size:11px;font-weight:700;color:var(--text2);text-align:center;padding:2px}
+table.dispo th.j{text-align:left;width:96px;font-size:12px;color:var(--text)}
+/* Pas de fond ici : la couleur vient de la classe du code (.c-M, .c-J…), déclarée
+   plus haut — un background sur .dcell l'écraserait. */
+.dcell{
+  width:100%;height:36px;border-radius:7px;border:1.5px solid var(--border2);
+  font-size:12px;font-weight:800;display:grid;place-items:center;cursor:pointer;
+}
+.dcell.on{border-color:transparent}
+.dcell:hover{border-color:var(--accent)}
+.dcell.off{background:#f1f5f9;color:#cbd5e1;text-decoration:line-through}
+table.dispo tr.we th.j{color:var(--accent-dark)}
+.dpresets{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
+.dsum{
+  font-size:12px;font-weight:600;background:var(--accent-soft);color:var(--accent-dark);
+  border-radius:var(--r-sm);padding:8px 10px;margin-top:10px;line-height:1.5;
+}
+.dsum.ko{background:var(--red2);color:var(--red)}
+.btn-dispo{
+  background:#fff;border:1.5px solid var(--border2);color:var(--text2);border-radius:6px;
+  padding:4px 8px;font-size:11.5px;font-weight:700;white-space:nowrap;
+}
+.btn-dispo:hover{border-color:var(--accent);color:var(--accent-dark)}
+.btn-dispo.actif{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-dark)}
+
 /* ---------- tables (équipe, contrôles) ---------- */
 .table-wrap{overflow-x:auto;border-radius:var(--r-sm)}
 table.data{width:100%;border-collapse:collapse;font-size:13px}
@@ -587,6 +622,24 @@ table.data input,table.data select{padding:5px 7px;font-size:12.5px}
   </div>
 </div>
 
+<div id="dispo">
+  <h3 id="dispoNom"></h3>
+  <div class="ds">
+    Cliquez sur un créneau pour le rendre <b>indisponible</b>. Un créneau barré ne sera
+    <b>jamais</b> attribué automatiquement à cet agent — au même titre qu'un congé posé.
+    Un jour entièrement barré devient son jour non travaillé et accueille sa journée aménagée.
+  </div>
+  <div class="dpresets" id="dispoPresets"></div>
+  <table class="dispo" id="dispoGrille"></table>
+  <div class="dsum" id="dispoResume"></div>
+  <div class="ef" style="display:flex;gap:6px;margin-top:14px">
+    <button class="btn-ghost btn-sm" id="dispoTout">Tout rendre disponible</button>
+    <span style="flex:1"></span>
+    <button class="btn-outline btn-sm" id="dispoAnnuler">Annuler</button>
+    <button class="btn btn-sm" id="dispoValider">Enregistrer</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -671,12 +724,13 @@ function agentsDefaut(){
     nom:e[0], prenom:e[1], quotite:e[2], roulement:e[3],
     groupeWE:(iA++ % 2 === 0) ? 'A' : 'B',
     jourJA:e[4] === undefined ? '' : e[4],
+    bloque:[],
     recAncre:'', actif:true, remplacant:false,
   }));
   list.push({id:'r1', nom:'Remplaçant 1', prenom:'', quotite:100, roulement:'mixte',
-             groupeWE:'A', jourJA:'', recAncre:'', actif:true, remplacant:true});
+             groupeWE:'A', jourJA:'', bloque:[], recAncre:'', actif:true, remplacant:true});
   list.push({id:'r2', nom:'Remplaçant 2', prenom:'', quotite:100, roulement:'mixte',
-             groupeWE:'B', jourJA:'', recAncre:'', actif:true, remplacant:true});
+             groupeWE:'B', jourJA:'', bloque:[], recAncre:'', actif:true, remplacant:true});
   return list;
 }
 
@@ -713,6 +767,7 @@ function chargerEtat(){
       if(!a.groupeWE) a.groupeWE = 'A';
       if(!a.roulement) a.roulement = 'mixte';
       if(a.jourJA === undefined) a.jourJA = '';
+      if(!Array.isArray(a.bloque)) a.bloque = [];
       if(a.actif === undefined) a.actif = true;
     });
     if(!etat.planning || typeof etat.planning !== 'object') etat.planning = {};
@@ -976,6 +1031,30 @@ function codesSemaine(agentId, jour){
 function plafondSemaine(agent){
   return agent.quotite >= 100 ? etat.config.joursMaxSemaine100 : etat.config.joursMaxSemaine80;
 }
+/* Disponibilités récurrentes : `agent.bloque` liste les créneaux que l'agent ne peut
+   pas tenir, sous la forme "<jour>:<poste>" (2:N = pas de nuit le mercredi).
+   Une liste vide signifie « disponible sur tout ». */
+function indisponible(agent, jour, poste){
+  const b = agent.bloque;
+  if(!b || !b.length) return false;
+  return b.indexOf(jourSemaine(jour) + ':' + poste) >= 0;
+}
+/* Vrai si l'agent ne peut tenir aucun poste ce jour de la semaine : ce jour-là est
+   de fait un jour non travaillé, il accueillera en priorité sa journée aménagée. */
+function jourEntierBloque(agent, jourSem){
+  const b = agent.bloque;
+  if(!b || !b.length) return false;
+  return POSTES.every(p => b.indexOf(jourSem + ':' + p) >= 0);
+}
+function nbCreneauxBloques(agent){ return (agent.bloque || []).length; }
+/* Jour où l'agent n'aurait de toute façon pas travaillé : créneaux tous bloqués,
+   ou week-end dont ce n'est pas son tour. */
+function jourSansTravail(agent, jour){
+  if(jourEntierBloque(agent, jourSemaine(jour))) return true;
+  if(estWeekend(jour) && !agent.remplacant && !weekendTravaille(agent, jour)) return true;
+  return false;
+}
+
 /* Jour de JA souhaité par l'agent : 0 = lundi … 6 = dimanche, -1 si indifférent.
    Attention : Number('') vaut 0, il faut donc écarter la chaîne vide explicitement. */
 function jourJAsouhaite(agent){
@@ -1044,12 +1123,19 @@ function placerREC(debut, fin, rapport){
     while(ech < fin && garde++ < 400){
       ech = jourPlus(ech, pas);
       if(ech < debut || ech > fin) continue;
-      // si l'échéance tombe sur un jour déjà occupé, on décale au plus près
+      // Si l'échéance tombe sur un jour déjà occupé, on décale au plus près. On évite
+      // d'abord les jours que l'agent n'aurait de toute façon pas travaillés — jour
+      // déclaré indisponible, ou week-end qui n'est pas son tour : y poser un REC lui
+      // ferait perdre une vraie journée de récupération.
       let pose = null;
-      for(const d of [0,1,-1,2,-2,3,-3]){
-        const j = jourPlus(ech, d);
-        if(j < debut || j > fin) continue;
-        if(libre(a.id, j)){ pose = j; break; }
+      for(const eviterInutiles of [true, false]){
+        for(const d of [0,1,-1,2,-2,3,-3]){
+          const j = jourPlus(ech, d);
+          if(j < debut || j > fin) continue;
+          if(eviterInutiles && jourSansTravail(a, j)) continue;
+          if(libre(a.id, j)){ pose = j; break; }
+        }
+        if(pose) break;
       }
       if(pose){ poserCellule(a.id, pose, 'REC'); rapport.rec++; }
       else rapport.recNonPoses.push({agent:a.id, jour:ech});
@@ -1120,6 +1206,10 @@ function candidatValide(a, jour, poste, equipeNuit, tolerance, autoriserRempl){
       if(!a.remplacant && equipeNuit.has(a.id)) return false;
     }
   }
+  // disponibilités déclarées de l'agent : au même rang qu'un congé posé, jamais
+  // forcées automatiquement — si plus personne n'est disponible, le poste est
+  // signalé non couvert et la responsable arbitre
+  if(indisponible(a, jour, poste)) return false;
   // 11 h de repos : règle jamais franchie automatiquement
   if(!reposOK(a.id, jour, poste)) return false;
   // jours consécutifs
@@ -1213,7 +1303,17 @@ function poserJAetRH(jours, debut, fin, rapport){
       if(a.quotite >= 100) return;
       if(codesSemaine(a.id, lundi).indexOf('JA') >= 0) return;   // déjà posée à la main
       let choix = null, meilleur = -Infinity;
-      // 1) le jour souhaité par l'agent, s'il est libre cette semaine-là
+      // 1) un jour où l'agent n'est disponible sur aucun poste est de fait son jour
+      //    non travaillé : la JA y va, sinon il serait payé un RH et travaillerait
+      //    un jour de moins que sa quotité
+      let pose = null;
+      for(let d = 0; d < 7 && pose === null; d++){
+        if(!jourEntierBloque(a, d)) continue;
+        const j = jourPlus(lundi, d);
+        if(j >= debut && j <= fin && libre(a.id, j)) pose = j;
+      }
+      if(pose){ poserCellule(a.id, pose, 'JA'); rapport.ja++; return; }
+      // 2) le jour souhaité par l'agent, s'il est libre cette semaine-là
       const souhait = jourJAsouhaite(a);
       if(souhait >= 0){
         const j = jourPlus(lundi, souhait);
@@ -1223,7 +1323,7 @@ function poserJAetRH(jours, debut, fin, rapport){
         }
         rapport.jaHorsSouhait.push({agent:a.id, semaine:lundi});
       }
-      // 2) sinon, le jour libre le plus adapté
+      // 3) sinon, le jour libre le plus adapté
       joursSem.forEach(j => {
         if(!libre(a.id, j)) return;
         // on préfère une JA collée à des jours travaillés, pour garder les RH groupés
@@ -1381,6 +1481,11 @@ function controler(debut, fin){
         serie = 0;
       }
 
+      // affectation sur un créneau déclaré indisponible (forcément une saisie manuelle)
+      if(estPoste(c) && indisponible(a, j, c))
+        add('warn', j, a.id, 'Poste ' + c + ' alors que l’agent est déclaré indisponible le ' +
+            JOURS_LONG[jourSemaine(j)] + ' sur ce poste');
+
       // dépannage
       const cel = cellule(a.id, j);
       if(cel && cel.d)
@@ -1518,6 +1623,9 @@ function controlerCase(agentId, jour, code){
       msgs.push({dur:false, t:'Sureffectif sur le poste ' + code + ' ce jour-là (' + (n+1) + '/' + besoin + ')'});
   }
 
+  if(estPoste(code) && indisponible(a, jour, code))
+    msgs.push({dur:false, t:'Cet agent est déclaré indisponible sur le poste ' + code +
+               ' le ' + JOURS_LONG[jourSemaine(jour)]});
   if(code === 'JA' && a.quotite >= 100)
     msgs.push({dur:false, t:'La journée aménagée est réservée aux agents à temps partiel'});
 
@@ -1708,7 +1816,7 @@ function dessinerResume(){
 /* ------------------------------ onglet équipe ------------------------------ */
 function dessinerEquipe(){
   let h = '<thead><tr><th>Nom</th><th>Prénom</th><th>Quotité</th><th>Roulement</th>' +
-          '<th>Groupe WE</th><th>JA souhaitée</th><th>Dernier REC (ancre)</th><th>Actif</th><th></th></tr></thead><tbody>';
+          '<th>Groupe WE</th><th>JA souhaitée</th><th>Disponibilités</th><th>Dernier REC (ancre)</th><th>Actif</th><th></th></tr></thead><tbody>';
   etat.agents.forEach(a => {
     h += '<tr data-id="' + a.id + '">' +
       '<td><input data-f="nom" value="' + esc(a.nom) + '" style="width:130px"></td>' +
@@ -1726,6 +1834,9 @@ function dessinerEquipe(){
         '<option value="">— indifférent —</option>' +
         JOURS_LONG.map((d, i) => '<option value="' + i + '"' +
         (jourJAsouhaite(a) === i ? ' selected' : '') + '>' + d + '</option>').join('') + '</select></td>' +
+      '<td><button class="btn-dispo' + (nbCreneauxBloques(a) ? ' actif' : '') +
+        '" data-dispo="' + a.id + '">' + (nbCreneauxBloques(a)
+          ? resumeDispos(a) : 'tout') + '</button></td>' +
       '<td><input type="date" data-f="recAncre" value="' + esc(a.recAncre || '') + '"' +
         (a.remplacant ? ' disabled' : '') + '></td>' +
       '<td style="text-align:center"><input type="checkbox" data-f="actif"' + (a.actif ? ' checked' : '') +
@@ -1978,6 +2089,97 @@ function validerEditeur(){
   fermerEditeur();
   toutRedessiner();
   toast('Case du ' + fmtJourCourt(j) + ' mise à jour');
+}
+
+/* --------------------- disponibilités récurrentes --------------------- */
+
+let dispoAgent = null, dispoBloque = [];
+
+/* Résumé court affiché sur le bouton du tableau Équipe. */
+function resumeDispos(a){
+  const jours = [];
+  for(let d = 0; d < 7; d++){
+    if(jourEntierBloque(a, d)) jours.push(JOURS_FR[d].replace('.', ''));
+  }
+  const partiels = [];
+  POSTES.forEach(p => {
+    let n = 0;
+    for(let d = 0; d < 7; d++) if((a.bloque || []).indexOf(d + ':' + p) >= 0) n++;
+    if(n === 7) partiels.push('pas de ' + p);
+  });
+  const bouts = [];
+  if(jours.length) bouts.push('sans ' + jours.join(', '));
+  if(partiels.length) bouts.push(partiels.join(', '));
+  if(!bouts.length) bouts.push(nbCreneauxBloques(a) + ' créneau(x)');
+  return bouts.join(' · ');
+}
+
+function ouvrirDispos(agentId){
+  const a = agentParId(agentId);
+  if(!a) return;
+  dispoAgent = a;
+  dispoBloque = (a.bloque || []).slice();
+  document.getElementById('dispoNom').textContent = 'Disponibilités — ' + nomAgent(a);
+  dessinerDispos();
+  document.getElementById('dispo').classList.add('show');
+  document.getElementById('backdrop').classList.add('show');
+}
+function fermerDispos(){
+  document.getElementById('dispo').classList.remove('show');
+  document.getElementById('backdrop').classList.remove('show');
+  dispoAgent = null;
+}
+function estBloque(d, p){ return dispoBloque.indexOf(d + ':' + p) >= 0; }
+function basculer(d, p){
+  const k = d + ':' + p, i = dispoBloque.indexOf(k);
+  if(i >= 0) dispoBloque.splice(i, 1); else dispoBloque.push(k);
+}
+function dessinerDispos(){
+  let h = '<tr><th class="j"></th>' +
+          POSTES.map(p => '<th>' + p + '<div style="font-weight:500;color:var(--muted);font-size:9px">' +
+          esc(CODES[p].h) + '</div></th>').join('') + '</tr>';
+  for(let d = 0; d < 7; d++){
+    h += '<tr' + (d >= 5 ? ' class="we"' : '') + '><th class="j">' + JOURS_LONG[d] + '</th>' +
+      POSTES.map(p => {
+        const off = estBloque(d, p);
+        return '<td><div class="dcell ' + (off ? 'off' : 'on c-' + p) + '" data-d="' + d +
+               '" data-p="' + p + '">' + p + '</div></td>';
+      }).join('') + '</tr>';
+  }
+  document.getElementById('dispoGrille').innerHTML = h;
+
+  let ph = '';
+  JOURS_LONG.forEach((d, i) => {
+    const tout = POSTES.every(p => estBloque(i, p));
+    ph += '<button class="btn-dispo' + (tout ? ' actif' : '') + '" data-jour="' + i + '">' +
+          (tout ? '✓ ' : '') + 'jamais le ' + d + '</button>';
+  });
+  const sansNuit = POSTES.indexOf('N') >= 0 && [0,1,2,3,4,5,6].every(d => estBloque(d, 'N'));
+  ph += '<button class="btn-dispo' + (sansNuit ? ' actif' : '') + '" data-poste="N">' +
+        (sansNuit ? '✓ ' : '') + 'jamais de nuit</button>';
+  const sansSoir = [0,1,2,3,4,5,6].every(d => estBloque(d, 'S'));
+  ph += '<button class="btn-dispo' + (sansSoir ? ' actif' : '') + '" data-poste="S">' +
+        (sansSoir ? '✓ ' : '') + 'jamais de soir</button>';
+  document.getElementById('dispoPresets').innerHTML = ph;
+
+  // synthèse : l'agent peut-il encore atteindre sa quotité ?
+  let joursOuvrables = 0;
+  for(let d = 0; d < 7; d++) if(!POSTES.every(p => estBloque(d, p))) joursOuvrables++;
+  const box = document.getElementById('dispoResume');
+  const dispo = 35 - dispoBloque.length;
+  if(joursOuvrables < plafondSemaine(dispoAgent)){
+    box.className = 'dsum ko';
+    box.innerHTML = '⛔ Seulement <b>' + joursOuvrables + ' jour(s)</b> travaillable(s) par semaine, ' +
+      'alors que la quotité de ' + dispoAgent.quotite + ' % en demande <b>' +
+      plafondSemaine(dispoAgent) + '</b>. Les postes qui ne trouveront personne seront signalés ' +
+      'comme non couverts.';
+  }else{
+    box.className = 'dsum';
+    box.innerHTML = '✅ <b>' + dispo + '</b> créneaux disponibles sur 35 · <b>' + joursOuvrables +
+      ' jours</b> travaillables par semaine (quotité ' + dispoAgent.quotite + ' % : ' +
+      plafondSemaine(dispoAgent) + ' jours travaillés' +
+      (dispoAgent.quotite < 100 ? ' + 1 JA' : '') + ' + ' + etat.config.rhParSemaine + ' RH).';
+  }
 }
 
 /* ==========================================================================
@@ -2252,7 +2454,7 @@ function brancherEvenements(){
   });
 
   // --- éditeur de case
-  document.getElementById('backdrop').onclick = fermerEditeur;
+  document.getElementById('backdrop').onclick = () => { fermerEditeur(); fermerDispos(); };
   document.getElementById('edAnnuler').onclick = fermerEditeur;
   document.getElementById('edValider').onclick = validerEditeur;
   document.getElementById('edVider').onclick = () => { edCode = ''; dessinerChips(); majAvertissementsEditeur(); };
@@ -2264,7 +2466,8 @@ function brancherEvenements(){
     dessinerChips(); majAvertissementsEditeur();
   });
   document.addEventListener('keydown', e => {
-    if(e.key === 'Escape' && edCible) fermerEditeur();
+    if(e.key === 'Escape' && dispoAgent) fermerDispos();
+    else if(e.key === 'Escape' && edCible) fermerEditeur();
     else if(e.key === 'Enter' && edCible && e.target.id !== 'edNote') validerEditeur();
     else if(e.key === 'Enter' && e.target.id === 'edNote') validerEditeur();
   });
@@ -2351,6 +2554,43 @@ function brancherEvenements(){
     sauver(); toutRedessiner();
     toast('Agent supprimé');
   });
+  // --- disponibilités
+  document.getElementById('tblEquipe').addEventListener('click', e => {
+    const b = e.target.closest('[data-dispo]');
+    if(b) ouvrirDispos(b.dataset.dispo);
+  });
+  document.getElementById('dispoGrille').addEventListener('click', e => {
+    const c = e.target.closest('.dcell');
+    if(!c) return;
+    basculer(Number(c.dataset.d), c.dataset.p);
+    dessinerDispos();
+  });
+  document.getElementById('dispoPresets').addEventListener('click', e => {
+    const b = e.target.closest('[data-jour],[data-poste]');
+    if(!b) return;
+    if(b.dataset.jour !== undefined){
+      const d = Number(b.dataset.jour);
+      const tout = POSTES.every(p => estBloque(d, p));
+      POSTES.forEach(p => { if(estBloque(d, p) === tout) basculer(d, p); });
+    }else{
+      const p = b.dataset.poste;
+      const tout = [0,1,2,3,4,5,6].every(d => estBloque(d, p));
+      [0,1,2,3,4,5,6].forEach(d => { if(estBloque(d, p) === tout) basculer(d, p); });
+    }
+    dessinerDispos();
+  });
+  document.getElementById('dispoTout').onclick = () => { dispoBloque = []; dessinerDispos(); };
+  document.getElementById('dispoAnnuler').onclick = fermerDispos;
+  document.getElementById('dispoValider').onclick = () => {
+    if(!dispoAgent) return;
+    snapshot('disponibilités de ' + nomAgent(dispoAgent));
+    dispoAgent.bloque = dispoBloque.slice().sort();
+    const nom = nomAgent(dispoAgent);
+    fermerDispos();
+    sauver(); dessinerEquipe(); toutRedessiner();
+    toast('Disponibilités de ' + nom + ' enregistrées');
+  };
+
   document.getElementById('btnAddAgent').onclick = () => {
     snapshot('ajout d’un agent');
     const nA = etat.agents.filter(a => !a.remplacant && a.groupeWE === 'A').length;
@@ -2358,7 +2598,7 @@ function brancherEvenements(){
     etat.agents.splice(etat.agents.findIndex(a => a.remplacant) >= 0
       ? etat.agents.findIndex(a => a.remplacant) : etat.agents.length, 0, {
       id:'a' + uid(), nom:'NOUVEL AGENT', prenom:'', quotite:80, roulement:'mixte',
-      groupeWE: nA <= nB ? 'A' : 'B', recAncre:'', actif:true, remplacant:false
+      groupeWE: nA <= nB ? 'A' : 'B', jourJA:'', bloque:[], recAncre:'', actif:true, remplacant:false
     });
     sauver(); dessinerEquipe(); toutRedessiner();
     toast('Agent ajouté — renseignez son nom');
@@ -2367,7 +2607,8 @@ function brancherEvenements(){
     snapshot('ajout d’un emplacement de remplacement');
     const n = etat.agents.filter(a => a.remplacant).length + 1;
     etat.agents.push({id:'r' + uid(), nom:'Remplaçant ' + n, prenom:'', quotite:100,
-                      roulement:'mixte', groupeWE:'A', recAncre:'', actif:true, remplacant:true});
+                      roulement:'mixte', groupeWE:'A', jourJA:'', bloque:[],
+                      recAncre:'', actif:true, remplacant:true});
     sauver(); dessinerEquipe(); toutRedessiner();
     toast('Emplacement de remplacement ajouté');
   };
@@ -2445,7 +2686,14 @@ function dessinerAide(){
     <h3 style="margin:14px 0 5px">1. Préparer l’effectif</h3>
     <p>Onglet <b>Équipe</b> : vérifiez la quotité, le roulement (jour / nuit / mixte), le groupe de
     week-end (A ou B, un week-end sur deux), le jour de <b>JA souhaité</b> et la date du dernier REC
-    de chaque agent. Le jour de JA souhaité est respecté chaque fois que c'est possible ; s'il faut
+    de chaque agent, ainsi que ses <b>disponibilités</b>.</p>
+    <p>Le bouton de la colonne <b>Disponibilités</b> ouvre une grille de 7 jours × 5 postes :
+    cliquez sur un créneau pour le rendre indisponible. Un créneau barré ne sera <b>jamais</b>
+    attribué automatiquement, exactement comme un congé posé — si plus personne n'est disponible,
+    le poste est signalé <i>non couvert</i> et c'est vous qui arbitrez. Des raccourcis posent d'un
+    clic les cas courants : « jamais le mercredi », « jamais de nuit », « jamais de soir ».
+    Un jour entièrement barré devient le jour non travaillé de l'agent et accueille sa JA.</p>
+    <p>Le jour de JA souhaité est respecté chaque fois que c'est possible ; s'il faut
     absolument cet agent ce jour-là pour couvrir un poste, sa JA glisse à un autre jour de la même
     semaine et le rapport de génération vous le signale.
     Cette date est l’<b>ancre</b> du compteur : le REC suivant est posé automatiquement 6 semaines après,
@@ -2491,6 +2739,7 @@ function dessinerAide(){
       <li>Un week-end sur deux (groupes A et B).</li>
       <li>1 JA par semaine pour chaque agent à temps partiel, posée le jour souhaité quand
           l'effectif le permet ; 2 RH par semaine en moyenne.</li>
+      <li>Disponibilités déclarées de chaque agent : jamais forcées automatiquement.</li>
       <li>REC automatique toutes les 6 semaines, compteur individuel.</li>
     </ul>
 

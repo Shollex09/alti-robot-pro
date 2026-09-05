@@ -59,7 +59,7 @@ planning-urgences/
 
 ```js
 etat = {
-  agents: [{ id, nom, prenom, quotite, roulement, groupeWE, jourJA, recAncre, actif, remplacant }],
+  agents: [{ id, nom, prenom, quotite, roulement, groupeWE, jourJA, bloque, recAncre, actif, remplacant }],
   planning: { "<agentId>|<AAAA-MM-JJ>": { c:code, n:annotation, v:verrou, d:dépannage, m:manuel } },
   config: { besoins, rhParSemaine, recSemaines, reposMinHeures, maxJoursConsecutifs, … },
   moisAffiche: "AAAA-MM"
@@ -134,11 +134,33 @@ couvert plutôt que d'être comblé au mépris du repos légal.
 | 2 RH par semaine en moyenne | plafond hebdomadaire (5 j à 100 %, 4 j à 80 %) |
 | 1 JA par semaine pour les agents à 80 % | `poserJAetRH` |
 | Jour de JA souhaité par l'agent | pénalité de score, non bloquante |
+| Disponibilités récurrentes par agent | filtre dur, jamais relâché |
 | REC automatique toutes les 6 semaines | ancre individuelle `recAncre` |
 
 Toutes sont **également vérifiées après coup** par `controler()`, y compris sur un planning
 modifié à la main : l'onglet **Contrôles** liste chaque écart, et l'éditeur de case
 prévient *avant* validation.
+
+### Disponibilités récurrentes
+
+`agent.bloque` liste les créneaux que l'agent ne peut pas tenir, sous la forme
+`"<jour>:<poste>"` — `2:N` = pas de nuit le mercredi, une liste vide = disponible sur tout.
+La saisie se fait dans une grille 7 jours × 5 postes (colonne *Disponibilités* de l'onglet
+Équipe), avec des raccourcis pour les cas courants.
+
+Le filtre est **dur et jamais relâché**, au même rang qu'un congé posé : aucun palier de
+dépannage ne force un agent sur un créneau qu'il a déclaré impossible. Si plus personne
+n'est disponible, le poste est signalé *non couvert* dans le rapport et dans l'onglet
+Contrôles, et la responsable arbitre — quitte à poser la case elle-même, l'éditeur
+l'avertissant sans l'en empêcher.
+
+Deux conséquences volontaires :
+
+- un jour dont les 5 créneaux sont barrés devient le jour non travaillé de l'agent et
+  accueille en priorité sa JA — sinon il recevrait un RH et l'agent travaillerait un jour
+  de moins que sa quotité ;
+- le REC évite les jours que l'agent n'aurait de toute façon pas travaillés (jour barré,
+  ou week-end qui n'est pas son tour), pour ne pas gâcher une vraie journée de récupération.
 
 ### Jour de JA souhaité
 
