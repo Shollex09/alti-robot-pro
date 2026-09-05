@@ -119,8 +119,9 @@ marquée « dépannage » (coin orange) avec le motif consigné dans le rapport 
 **Jamais relâchés, à aucun palier :**
 
 - les 11 h de repos entre deux postes ;
-- la limite de 4 jours travaillés consécutifs ;
-- le plafond hebdomadaire lié à la quotité (4 jours à 80 %, 5 jours à 100 %) ;
+- la limite de 6 jours travaillés consécutifs ;
+- la limite de 2 nuits consécutives, et le repos sécurité qui suit chaque bloc ;
+- le budget hebdomadaire (voir ci-dessous) ;
 - les disponibilités déclarées de l'agent ;
 - l'unicité du poste de nuit.
 
@@ -139,7 +140,8 @@ congé décalé), et le manque lui saute aux yeux au lieu d'être absorbé en si
 | Poste N tenu par une seule personne | filtre + contrôle, jamais relâché |
 | 11 h de repos entre deux postes | `reposOK` / `reposEntre`, jamais relâché |
 | Roulements jour et nuit distincts | équipe de nuit hebdomadaire |
-| Maximum 4 jours travaillés consécutifs | `serieAvec` |
+| Maximum 6 jours travaillés consécutifs | `serieAvec` |
+| Maximum 2 nuits consécutives, puis repos sécurité | `nuitsConsecutivesAvec`, `poserRS` |
 | 1 week-end sur 2 | groupes A/B × rang de la semaine |
 | 2 RH par semaine en moyenne | plafond hebdomadaire (5 j à 100 %, 4 j à 80 %) |
 | 1 JA par semaine pour les agents à 80 % | `poserJAetRH` |
@@ -150,6 +152,57 @@ congé décalé), et le manque lui saute aux yeux au lieu d'être absorbé en si
 Toutes sont **également vérifiées après coup** par `controler()`, y compris sur un planning
 modifié à la main : l'onglet **Contrôles** liste chaque écart, et l'éditeur de case
 prévient *avant* validation.
+
+### Le budget de la semaine
+
+Un plafond fixe (4 jours à 80 %, 5 à 100 %) ne suffit pas : une semaine ne fait que
+7 jours et tout doit y tenir. `tientDansLaSemaine()` vérifie donc, avant chaque
+affectation, que l'équation reste satisfaite :
+
+```
+jours travaillés + repos sécurité + congés et REC posés + journée aménagée
+                 + RH réglementaires  ≤  7
+```
+
+Conséquences directes, toutes vérifiées par les tests :
+
+- une semaine où tombe un REC descend à 3 jours travaillés pour un 80 %, sinon il ne
+  resterait qu'un seul RH ;
+- **une nuit isolée coûte deux jours de semaine** (elle-même et son repos sécurité), ce
+  qui limite un agent à 2 nuits par semaine environ. L'équipe de nuit compte donc
+  4 agents par semaine et non 3.
+
+C'est cette équation, et non un plafond fixe, qui garantit les 2 RH hebdomadaires.
+
+### Repos sécurité (RS)
+
+Le service fait 1 ou 2 nuits d'affilée, jamais plus, suivies d'un repos sécurité.
+`nuitsConsecutivesAvec()` plafonne les blocs à 2, et `poserRS()` pose le RS le lendemain
+de la dernière nuit de chaque bloc. Le RS interrompt le décompte des jours consécutifs.
+
+### Rythme des blocs
+
+Le service travaille par blocs de 2 à 3 jours plutôt que par journées isolées. Le score
+pénalise donc une affectation qui créerait une journée de travail entourée de repos, et
+favorise celles qui prolongent un bloc existant ou soudent deux blocs séparés d'un jour.
+
+La pénalité a été calibrée par balayage sur 3 mois générés :
+
+| Pénalité | Journées isolées | Blocs de 2-3 j | Repos moyen | Écart de charge |
+|---|---|---|---|---|
+| 0 | 36 % | 52 % | 3,6 j | 1 poste |
+| −35 (retenue) | **24 %** | **64 %** | **3,9 j** | 2 postes |
+| −70 | 17 % | 62 % | 4,4 j | 3 postes |
+
+−35 domine −70 : autant de blocs de 2-3 jours, mais des plages de repos plus courtes.
+Avant ce réglage, le score pénalisait au contraire tout regroupement et produisait
+58 % de journées de travail isolées.
+
+> **Limite arithmétique connue.** Avec 5 postes par jour et 14 agents, un agent à 80 %
+> travaille 2,4 jours par semaine et se repose donc 4,6 jours. Des blocs de travail de
+> 2 à 3 jours impliquent mécaniquement des plages de repos de 3 à 5 jours : on ne peut
+> pas obtenir simultanément « travail par blocs de 2-3 jours » et « repos de 2-3 jours »
+> à ce niveau d'effectif. Le compromis retenu privilégie les blocs de travail.
 
 ### Disponibilités récurrentes
 

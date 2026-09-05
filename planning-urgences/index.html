@@ -49,6 +49,7 @@
   --c-REC:#ffd7a8; --c-REC-t:#7a3f04;
   --c-RF:#ffd0e4;  --c-RF-t:#8c1f52;
   --c-RH:#e2e8f0;  --c-RH-t:#475569;
+  --c-RS:#cfe1ea;  --c-RS-t:#17505f;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -195,6 +196,7 @@ tbody tr.sep-row td,tbody tr.sep-row th{border-bottom:2px solid var(--border2)}
 .c-REC{background-color:var(--c-REC);color:var(--c-REC-t)}
 .c-RF{background-color:var(--c-RF);color:var(--c-RF-t)}
 .c-RH{background-color:var(--c-RH);color:var(--c-RH-t)}
+.c-RS{background-color:var(--c-RS);color:var(--c-RS-t)}
 .c-X{background-color:#fff;color:var(--muted)}
 
 /* coverage footer rows */
@@ -676,14 +678,15 @@ const CODES = {
   REC:{type:'absence',lib:'Récupération',     h:'toutes les 6 semaines'},
   RF: {type:'absence',lib:'Récup. jour férié',h:''},
   RH: {type:'repos',  lib:'Repos hebdomadaire',h:''},
+  RS: {type:'repos',  lib:'Repos sécurité',    h:'après un poste de nuit'},
 };
 const POSTES = ['M','J','DJ','S','N'];
 const POSTES_JOUR = ['M','J','DJ','S'];
 /* Ordre d'affectation : les postes les plus contraignants d'abord
    (la nuit n'a qu'un seul titulaire, le soir bloque le lendemain matin). */
 const ORDRE_AFFECTATION = ['N','S','M','J','DJ'];
-const ABSENCES = ['CR','JA','REC','RF','RH'];
-const CODES_REPOS = ['RH','CR','REC','RF'];   // interrompent les jours consécutifs
+const ABSENCES = ['CR','JA','REC','RF','RH','RS'];
+const CODES_REPOS = ['RH','RS','CR','REC','RF'];   // interrompent les jours consécutifs
 const JOURS_FR = ['lun.','mar.','mer.','jeu.','ven.','sam.','dim.'];
 const JOURS_LONG = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
 const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août',
@@ -718,10 +721,12 @@ function configDefaut(){
     rhParSemaine:       2,
     recSemaines:        6,
     reposMinHeures:     11,
-    maxJoursConsecutifs:4,
+    maxJoursConsecutifs:6,   // limite donnée par le service (le cahier des charges disait 4)
+    maxNuitsConsecutives:2,  // 1 ou 2 nuits, puis un repos sécurité
     weekendAlterne:     true,
     jaInterrompt:       true,   // JA casse-t-il le décompte des jours consécutifs ?
-    equipeNuitTaille:   3,      // agents affectés au roulement de nuit chaque semaine
+    equipeNuitTaille:   4,      // agents affectés au roulement de nuit chaque semaine
+                                // (le repos sécurité limite chacun à ~2 nuits)
     joursMaxSemaine100: 5,
     joursMaxSemaine80:  4,
   };
@@ -1021,6 +1026,28 @@ function consecutifsApres(agentId, jour){
   }
   return n;
 }
+/* Nombre de blocs de nuits dans la semaine : chacun impose un repos sécurité,
+   qui consomme lui aussi un jour du budget hebdomadaire de l'agent. */
+function blocsNuitsSemaine(agentId, jour){
+  const lundi = lundiDe(jour);
+  let n = 0;
+  for(let i = 0; i < 7; i++){
+    const j = jourPlus(lundi, i);
+    if(codeDe(agentId, j) === 'N' && codeDe(agentId, jourPlus(j, 1)) !== 'N') n++;
+  }
+  return n;
+}
+
+/* Nombre de nuits consécutives si l'on posait une nuit ce jour-là (veille + jour + lendemain).
+   Le repos sécurité impose de ne pas dépasser 2 nuits d'affilée. */
+function nuitsConsecutivesAvec(agentId, jour){
+  let n = 1, d = jourPlus(jour, -1);
+  for(let i = 0; i < 8 && codeDe(agentId, d) === 'N'; i++){ n++; d = jourPlus(d, -1); }
+  d = jourPlus(jour, 1);
+  for(let i = 0; i < 8 && codeDe(agentId, d) === 'N'; i++){ n++; d = jourPlus(d, 1); }
+  return n;
+}
+
 /* Longueur de la série de travail si l'on pose `code` le `jour`. */
 function serieAvec(agentId, jour, code){
   if(!estPoste(code)) return 0;
@@ -1040,6 +1067,39 @@ function codesSemaine(agentId, jour){
 }
 function plafondSemaine(agent){
   return agent.quotite >= 100 ? etat.config.joursMaxSemaine100 : etat.config.joursMaxSemaine80;
+}
+
+/* Une semaine ne fait que 7 jours. Cette fonction vérifie qu'en y ajoutant ce poste
+   il reste la place pour tout ce qui est dû à l'agent : les RH réglementaires, la
+   journée aménagée des temps partiels, les congés et récupérations déjà posés, et le
+   repos sécurité qu'impose chaque bloc de nuits — celui-ci comptant pour un jour au
+   même titre qu'un repos. Une nuit isolée coûte donc deux jours de semaine.
+   C'est cette équation, et non un plafond fixe, qui garantit les 2 RH hebdomadaires. */
+function tientDansLaSemaine(agent, jour, poste){
+  const lundi = lundiDe(jour);
+  const codes = codesSemaine(agent.id, jour);
+  let poses = 0, ja = 0, travailles = 0, rs = 0;
+  codes.forEach(c => {
+    if(c === 'CR' || c === 'REC' || c === 'RF') poses++;
+    else if(c === 'JA') ja++;
+    else if(c === 'RS') rs++;
+    else if(estPoste(c)) travailles++;
+  });
+  if(travailles + 1 > plafondSemaine(agent)) return false;
+
+  // repos sécurité : un par bloc de nuits de la semaine, plus celui du lundi si
+  // l'agent était de nuit le dimanche précédent
+  let blocs = blocsNuitsSemaine(agent.id, jour);
+  if(poste === 'N' && codeDe(agent.id, jourPlus(jour, -1)) !== 'N'
+                   && codeDe(agent.id, jourPlus(jour,  1)) !== 'N') blocs++;   // nouveau bloc
+  if(codeDe(agent.id, jourPlus(lundi, -1)) === 'N') blocs++;
+
+  const total = travailles + 1
+              + Math.max(rs, blocs)
+              + poses
+              + (agent.quotite < 100 ? Math.max(0, 1 - ja) : 0)
+              + etat.config.rhParSemaine;
+  return total <= 7;
 }
 /* Disponibilités récurrentes : `agent.bloque` liste les créneaux que l'agent ne peut
    pas tenir, sous la forme "<jour>:<poste>" (2:N = pas de nuit le mercredi).
@@ -1203,11 +1263,22 @@ function equipeNuitSemaine(lundi, rnd){
 /* --- filtres et score --- */
 function candidatValide(a, jour, poste, equipeNuit, tolerance, autoriserRempl){
   if(!a.actif) return false;
-  if(a.remplacant && !(autoriserRempl && tolerance >= 1)) return false;
+  if(a.remplacant && !(autoriserRempl && tolerance >= 2)) return false;
   if(!libre(a.id, jour)) return false;
 
+  // Jour de JA souhaité : au palier strict on ne l'entame pas du tout. C'est le
+  // premier palier à céder si le poste ne peut être couvert autrement — avant de
+  // déranger un remplaçant ou de casser l'alternance des week-ends.
+  if(tolerance < 1 && !a.remplacant){
+    const souhait = jourJAsouhaite(a);
+    if(souhait >= 0){
+      if(jourSemaine(jour) === souhait) return false;
+      // une nuit consomme aussi le lendemain, par le repos sécurité
+      if(poste === 'N' && jourSemaine(jourPlus(jour, 1)) === souhait) return false;
+    }
+  }
   // roulement jour / nuit — jamais mélangés sur une même semaine
-  if(tolerance < 3){
+  if(tolerance < 4){
     if(poste === 'N'){
       if(a.roulement === 'jour') return false;
       if(!a.remplacant && !equipeNuit.has(a.id)) return false;
@@ -1226,20 +1297,27 @@ function candidatValide(a, jour, poste, equipeNuit, tolerance, autoriserRempl){
   // Combler un poste avec un agent sur son 5e jour d'affilée n'est pas un dépannage
   // acceptable — mieux vaut signaler le poste non couvert et laisser arbitrer.
   if(serieAvec(a.id, jour, poste) > etat.config.maxJoursConsecutifs) return false;
+  // nuits consécutives : 1 ou 2 au maximum, le repos sécurité vient ensuite.
+  // Règle de sécurité elle aussi, jamais franchie en dépannage.
+  if(poste === 'N' && nuitsConsecutivesAvec(a.id, jour) > etat.config.maxNuitsConsecutives) return false;
   // Plafond hebdomadaire : jamais dépassé non plus. En semaine ordinaire les agents
   // sont naturellement bien en dessous (2 à 3 jours pour un 80 %) ; c'est en période
   // chargée que le planning les fait monter jusqu'au plafond — c'est là le « RH
   // réduit ». Au-delà, le poste est signalé non couvert : la responsable arbitre
   // (renfort, intérimaire, congé décalé) plutôt que de faire travailler un agent
   // au-delà de ce que sa quotité autorise.
-  if(!a.remplacant && joursTravaillesSemaine(a.id, jour) >= plafondSemaine(a)) return false;
+  // Le repos sécurité qui suit chaque bloc de nuits occupe lui aussi un jour : il faut
+  // le compter, sinon un agent enchaînant les nuits n'aurait plus la place pour ses
+  // deux RH et sa journée aménagée.
+  if(!a.remplacant && !tientDansLaSemaine(a, jour, poste)) return false;
   // alternance des week-ends
-  if(tolerance < 2 && estWeekend(jour) && !a.remplacant && !weekendTravaille(a, jour)) return false;
+  if(tolerance < 3 && estWeekend(jour) && !a.remplacant && !weekendTravaille(a, jour)) return false;
   return true;
 }
 
 function nouveauxCompteurs(){
-  const c = {travailles:{}, we:{}, parPoste:{}, poids:{}, poidsTotal:0, total:0, totalWE:0};
+  const c = {travailles:{}, we:{}, parPoste:{}, poids:{}, poidsTotal:0, total:0, totalWE:0,
+             parSemaine: 7 * POSTES.reduce((n, p) => n + (etat.config.besoins[p] || 0), 0)};
   POSTES.forEach(p => { c.parPoste[p] = {total:0}; });
   agentsActifs().forEach(a => {
     c.travailles[a.id] = 0; c.we[a.id] = 0;
@@ -1266,22 +1344,42 @@ function scoreCandidat(a, jour, poste, cpt, rnd){
   s += 18 * (cpt.parPoste[poste].total * poids - (cpt.parPoste[poste][a.id] || 0));
   // 3. équité des week-ends
   if(estWeekend(jour)) s += 25 * (cpt.totalWE * poids - (cpt.we[a.id] || 0));
-  // 4. continuité : garder le même poste d'un jour sur l'autre (rythme du roulement).
-  //    On regarde la veille et le lendemain car le week-end est rempli en premier.
+  // 3 bis. équité de la semaine en cours : sans elle, l'équité globale se satisfait
+  //    d'un agent qui travaille beaucoup une semaine puis pas du tout la suivante,
+  //    ce qui produit des repos de dix jours d'affilée.
+  s += 35 * (cpt.parSemaine * poids - joursTravaillesSemaine(a.id, jour));
+  // 4. Rythme du service : les agents travaillent par blocs de 2 à 3 jours et se
+  //    reposent 2 à 3 jours d'affilée. Une journée de travail isolée fragmente
+  //    aussi bien le travail que le repos — c'est elle qu'il faut éviter.
+  //    On regarde la veille et le lendemain, le week-end étant rempli en premier.
   const hier = codeDe(a.id, jourPlus(jour, -1));
   const demain = codeDe(a.id, jourPlus(jour, 1));
-  if(hier === poste || demain === poste)        s += (poste === 'N' ? 55 : 30);
-  else if(estPoste(hier) || estPoste(demain))   s += 6;
-  // 5. ne pas allonger inutilement les séries de travail
-  s -= 12 * (serieAvec(a.id, jour, poste) - 1);
-  // 6. jour de JA souhaité : on n'y affecte l'agent qu'en dernier recours, avant
+  const voisins = (estPoste(hier) ? 1 : 0) + (estPoste(demain) ? 1 : 0);
+  //    Valeur calibrée : à -35 on obtient le meilleur taux de blocs de 2 à 3 jours
+  //    (64 %) tout en gardant des plages de repos plus courtes qu'avec une pénalité
+  //    plus forte, qui concentre le travail et creuse les repos.
+  if(voisins === 0)      s -= 35;   // créerait une journée de travail isolée
+  else if(voisins === 1) s += 60;   // prolonge un bloc existant
+  else                   s += 40;   // soude deux blocs séparés d'un seul jour
+  // 5. même poste d'un jour sur l'autre : confort du roulement
+  if(hier === poste || demain === poste) s += (poste === 'N' ? 55 : 25);
+  // 6. au-delà de 3 jours d'affilée le bloc devient trop long pour la quotité
+  const serie = serieAvec(a.id, jour, poste);
+  if(serie > 3) s -= 45 * (serie - 3);
+  // 7. jour de JA souhaité : on n'y affecte l'agent qu'en dernier recours, avant
   //    toutefois de déranger un remplaçant (pénalité plus faible que la sienne)
   if(jourSemaine(jour) === jourJAsouhaite(a)) s -= 400;
-  // 7. un agent dont le roulement est « nuit » ne peut tenir que ce poste : l'équité
+  //    Une nuit consomme aussi le lendemain (repos sécurité) : elle ne doit pas venir
+  //    occuper le jour que l'agent réserve à sa JA, ni son jour d'indisponibilité.
+  if(poste === 'N'){
+    const lendemain = jourSemaine(jourPlus(jour, 1));
+    if(lendemain === jourJAsouhaite(a) || jourEntierBloque(a, lendemain)) s -= 400;
+  }
+  // 8. un agent dont le roulement est « nuit » ne peut tenir que ce poste : l'équité
   //    générale, calculée sur les 5 postes, le sous-évaluerait. On le remet en tête sur
   //    la nuit — les autres agents du roulement prennent le reste (repos, week-ends).
   if(a.roulement === 'nuit' && poste === 'N') s += 45;
-  // 8. les remplaçants restent le dernier recours
+  // 9. les remplaçants restent le dernier recours
   if(a.remplacant) s -= 500;
   // 7. départage stable
   s += rnd() * 2;
@@ -1302,9 +1400,21 @@ function choisirAgent(jour, poste, equipeNuit, cpt, rnd, tolerance, autoriserRem
    règles qui ne sont jamais relâchées : 11 h de repos, 4 jours consécutifs, plafond
    hebdomadaire, disponibilités déclarées, unicité du poste de nuit. */
 const MOTIFS_TOLERANCE = [
-  '', 'renfort remplaçant', 'alternance des week-ends non respectée',
-  'roulement jour/nuit dérogé'
+  '', 'jour de JA souhaité entamé', 'renfort remplaçant',
+  'alternance des week-ends non respectée', 'roulement jour/nuit dérogé'
 ];
+
+/* --- repos sécurité : le lendemain de la dernière nuit d'un bloc --- */
+function poserRS(jours, debut, fin, rapport){
+  agentsAffichables().forEach(a => jours.forEach(j => {
+    if(codeDe(a.id, j) !== 'N') return;
+    const lendemain = jourPlus(j, 1);
+    if(codeDe(a.id, lendemain) === 'N') return;          // le bloc de nuits continue
+    if(lendemain < debut || lendemain > fin) return;
+    if(libre(a.id, lendemain)){ poserCellule(a.id, lendemain, 'RS'); rapport.rs++; }
+    else rapport.rsNonPoses.push({agent:a.id, jour:lendemain});
+  }));
+}
 
 /* --- étiquetage des jours non travaillés : JA puis RH --- */
 function poserJAetRH(jours, debut, fin, rapport){
@@ -1372,8 +1482,9 @@ function genererPlanning(debut, fin, options){
   if(!jours.length) return null;
   const rnd = prng(debut + '|' + fin + '|' + etat.agents.map(a => a.id).join(','));
   const rapport = {
-    debut, fin, jours:jours.length, postes:0, rh:0, ja:0, rec:0,
-    ancresPosees:0, depannages:[], nonCouverts:[], recNonPoses:[], jaNonPosees:[], jaHorsSouhait:[]
+    debut, fin, jours:jours.length, postes:0, rh:0, ja:0, rec:0, rs:0,
+    ancresPosees:0, depannages:[], nonCouverts:[], recNonPoses:[], jaNonPosees:[],
+    jaHorsSouhait:[], rsNonPoses:[]
   };
 
   viderPourGeneration(jours, opts.preserverManuel !== false);
@@ -1404,19 +1515,22 @@ function genererPlanning(debut, fin, options){
 
       for(let n = deja; n < besoin; n++){
         let agent = null, tol = 0;
-        for(tol = 0; tol <= 3; tol++){
+        for(tol = 0; tol <= 4; tol++){
           agent = choisirAgent(jour, poste, equipeNuit, cpt, rnd, tol, !!opts.remplacants);
           if(agent) break;
         }
         if(!agent){ rapport.nonCouverts.push({jour, poste}); continue; }
-        poserCellule(agent.id, jour, poste, {depannage: tol > 0});
+        // Le palier 1 ne déroge qu'à une préférence, déjà signalée dans jaHorsSouhait :
+        // inutile de marquer la case en dépannage, ce serait du bruit visuel.
+        poserCellule(agent.id, jour, poste, {depannage: tol > 1});
         enregistrer(cpt, agent, jour, poste);
         rapport.postes++;
-        if(tol > 0) rapport.depannages.push({jour, poste, agent:agent.id, motif:MOTIFS_TOLERANCE[tol]});
+        if(tol > 1) rapport.depannages.push({jour, poste, agent:agent.id, motif:MOTIFS_TOLERANCE[tol]});
       }
     }
   }
 
+  poserRS(jours, debut, fin, rapport);
   poserJAetRH(jours, debut, fin, rapport);
   return rapport;
 }
@@ -2259,7 +2373,7 @@ const COULEURS = {
   M:['#d6f0e2','#0d5c3c'], J:['#d9e8fb','#0b4a80'], DJ:['#e4dcfa','#4527a0'],
   S:['#ffe3c7','#8a4b06'], N:['#39406e','#ffffff'], CR:['#ffe14d','#5c4700'],
   JA:['#fff6b0','#6b5800'], REC:['#ffd7a8','#7a3f04'], RF:['#ffd0e4','#8c1f52'],
-  RH:['#e2e8f0','#475569'], '':['#ffffff','#334155']
+  RH:['#e2e8f0','#475569'], RS:['#cfe1ea','#17505f'], '':['#ffffff','#334155']
 };
 
 function telecharger(nom, contenu, type){
@@ -2384,7 +2498,8 @@ function afficherRapport(r){
   if(!r){ box.innerHTML = ''; return; }
   const l = [];
   l.push(['✅', r.postes + ' postes affectés sur ' + r.jours + ' jours', 'info']);
-  l.push(['🛌', r.rh + ' repos hebdomadaires · ' + r.ja + ' journées aménagées · ' + r.rec + ' récupérations', 'info']);
+  l.push(['🛌', r.rh + ' repos hebdomadaires · ' + r.rs + ' repos sécurité · ' +
+          r.ja + ' journées aménagées · ' + r.rec + ' récupérations', 'info']);
   if(r.ancresPosees) l.push(['🕐', r.ancresPosees + ' compteur(s) REC initialisé(s) — modifiables dans l’onglet Équipe', 'info']);
   if(r.depannages.length){
     const par = {};
@@ -2405,6 +2520,7 @@ function afficherRapport(r){
   }
   if(r.jaNonPosees.length) l.push(['⚠️', r.jaNonPosees.length + ' journée(s) aménagée(s) non plaçable(s) (semaine trop chargée)', 'warn']);
   if(r.recNonPoses.length) l.push(['⚠️', r.recNonPoses.length + ' récupération(s) non plaçable(s) à l’échéance', 'warn']);
+  if(r.rsNonPoses.length) l.push(['⚠️', r.rsNonPoses.length + ' repos sécurité non posé(s) : le lendemain de nuit était déjà occupé', 'warn']);
   box.innerHTML = l.map(x =>
     '<div class="alert-item ' + x[2] + '"><span class="ic">' + x[0] + '</span><div class="bd"><div class="msg">' +
     esc(x[1]) + '</div></div></div>').join('');
@@ -2774,7 +2890,8 @@ function dessinerAide(){
 
     <h3 style="margin:14px 0 5px">3. Générer</h3>
     <p>Onglet <b>Génération</b> (ou le bouton « Générer ce mois »). L’application affecte les postes
-    M, J, DJ, S et N, puis complète avec les JA et les RH. Le rapport indique ce qui n’a pas pu être
+    M, J, DJ, S et N, pose le repos sécurité après chaque bloc de nuits, puis complète avec les JA
+    et les RH. Elle cherche des blocs de travail de 2 à 3 jours plutôt que des journées isolées. Le rapport indique ce qui n’a pas pu être
     couvert normalement.</p>
 
     <h3 style="margin:14px 0 5px">4. Ajuster à la main</h3>
@@ -2803,8 +2920,11 @@ function dessinerAide(){
       <li>Le poste de nuit N n’est jamais tenu par plus d’une personne.</li>
       <li>11 h de repos minimum entre deux postes — <b>jamais franchi</b> par la génération automatique
           (un poste S suivi d’un M le lendemain ne laisserait que 7 h).</li>
-      <li>4 jours travaillés consécutifs au maximum ; RH, CR, REC et RF remettent le compteur à zéro.</li>
-      <li>Plafond hebdomadaire lié à la quotité : 4 jours à 80 %, 5 jours à 100 %.</li>
+      <li>6 jours travaillés consécutifs au maximum ; RH, RS, CR, REC et RF remettent le compteur à zéro.</li>
+      <li><b>1 ou 2 nuits d'affilée au maximum</b>, suivies d'un <b>repos sécurité (RS)</b> posé automatiquement le lendemain.</li>
+      <li>Plafond hebdomadaire lié à la quotité : 4 jours à 80 %, 5 jours à 100 %. Une semaine ne
+          faisant que 7 jours, ce plafond baisse d'autant quand s'y ajoutent un REC, un congé ou
+          un repos sécurité — les 2 RH restent toujours garantis.</li>
       <li>Jour et nuit ne se mélangent pas sur une même semaine pour un même agent.</li>
       <li>Un week-end sur deux (groupes A et B).</li>
       <li>1 JA par semaine pour chaque agent à temps partiel, posée le jour souhaité quand
@@ -2815,8 +2935,8 @@ function dessinerAide(){
     <p style="margin-top:10px">
       En cas de manque, l'application élargit sa recherche par paliers — remplaçants, puis
       alternance des week-ends, puis roulement jour/nuit — et signale la case d'un coin orange.
-      Mais elle ne franchit <b>jamais</b> les 11 h de repos, les 4 jours consécutifs, le plafond
-      hebdomadaire ni les indisponibilités déclarées : si personne ne peut tenir le poste, il
+      Mais elle ne franchit <b>jamais</b> les 11 h de repos, les 6 jours consécutifs, les 2 nuits
+      d'affilée, le plafond hebdomadaire ni les indisponibilités déclarées : si personne ne peut tenir le poste, il
       est marqué <b>non couvert</b> et c'est à vous d'arbitrer (renfort, intérimaire, congé
       décalé). Le manque reste ainsi visible au lieu d'être absorbé en silence.
     </p>
