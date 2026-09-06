@@ -3372,7 +3372,7 @@ async function envoyerAuPartage(){
     const parMois = planningParMois();
     for(const mois of Object.keys(parMois)){
       const contenu = JSON.stringify(parMois[mois]);
-      if(dernierEcrit[mois] === contenu) continue;
+      if(dernierEcrit[mois] != null && dernierEcrit[mois] === contenu) continue;
       await bdd.doc('planning/' + mois).set({cases:parMois[mois], maj:new Date().toISOString()});
       dernierEcrit[mois] = contenu;
     }
@@ -3409,12 +3409,31 @@ async function lireDuPartage(mois){
     dernierEcrit.__config = JSON.stringify({agents:etat.agents, config:etat.config});
   }
   const d = await bdd.doc('planning/' + mois).get();
-  const cases = (d.exists && d.data && d.data.cases) || {};
+  const distant = (d.exists && d.data && d.data.cases) || {};
+
+  // L'espace partagé ne fait pas autorité quand il est vide. Sans cette précaution, un
+  // planning établi sur l'appareil disparaissait dès que la connexion au partage
+  // aboutissait — c'est ce qui se produisait quand la responsable générait un mois
+  // avant que la connexion, lente sur téléphone, ne soit établie.
+  if(!Object.keys(distant).length){
+    const local = {};
+    Object.keys(etat.planning).forEach(k => {
+      if(k.split('|')[1].slice(0, 7) === mois) local[k] = etat.planning[k];
+    });
+    if(Object.keys(local).length){
+      if(peutModifier){
+        dernierEcrit[mois] = null;      // rien de partagé : on publie ce qu'on a
+        await envoyerAuPartage();
+      }
+      return;                            // dans tous les cas, on garde le planning local
+    }
+  }
+
   Object.keys(etat.planning).forEach(k => {
     if(k.split('|')[1].slice(0, 7) === mois) delete etat.planning[k];
   });
-  Object.assign(etat.planning, cases);
-  dernierEcrit[mois] = JSON.stringify(cases);
+  Object.assign(etat.planning, distant);
+  dernierEcrit[mois] = JSON.stringify(distant);
 }
 
 /* Le mois affiché est suivi en direct : ce qu'écrit la responsable apparaît
@@ -3427,6 +3446,12 @@ function suivreMois(mois){
     const cases = (snap.exists && snap.data && snap.data.cases) || {};
     const actuel = JSON.stringify(cases);
     if(dernierEcrit[mois] === actuel) return;
+    // Même précaution que ci-dessus : pour qui peut écrire, un mois vide côté partagé
+    // signifie que son envoi n'est pas encore arrivé, jamais qu'il faut tout effacer.
+    if(!Object.keys(cases).length && peutModifier){
+      const aDuLocal = Object.keys(etat.planning).some(k => k.split('|')[1].slice(0, 7) === mois);
+      if(aDuLocal){ planifierEnvoi(); return; }
+    }
     Object.keys(etat.planning).forEach(k => {
       if(k.split('|')[1].slice(0, 7) === mois) delete etat.planning[k];
     });
