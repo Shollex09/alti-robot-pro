@@ -219,12 +219,26 @@ capabilities: { db: { rules: [
 ]}}
 ```
 
-L'accès se donne par adresse e-mail depuis le menu *Partager* de la page, avec deux
-niveaux : « peut consulter » (lecture seule) et « peut modifier ». La page ne fait
+Deux barrières se superposent. La première, appliquée par le service : l'accès se
+donne par adresse e-mail depuis le menu *Partager* de la page, avec deux niveaux : « peut consulter » (lecture seule) et « peut modifier ». La page ne fait
 qu'adapter son affichage : elle établit ses droits en tentant une écriture anodine,
 masque les commandes de modification en consultation et n'affiche l'onglet *Accès*
 qu'à la propriétaire. Ce registre lui sert de mémoire — qui a été autorisé, à quel
-niveau, depuis quand — sans jamais être ce qui donne l'accès.
+niveau, depuis quand.
+
+La seconde barrière est un **code personnel** par personne, demandé à l'ouverture.
+Elle répond à un risque que le partage seul ne couvre pas : une collègue autorisée qui
+ferait suivre le lien. Le destinataire tombe alors sur un écran de saisie, et le code
+étant nominatif, la responsable sait lequel a servi. Retirer quelqu'un du registre
+désactive son code aussitôt ; « Créer un code » en génère un nouveau et annule l'ancien.
+Tant qu'aucun code n'existe, la page s'ouvre sans en demander.
+
+Les codes en clair restent dans l'espace réservé à la propriétaire ; seules leurs
+empreintes SHA-256 sont lisibles par les autres, ce qui permet à la page de vérifier une
+saisie sans jamais contenir la liste. Format : 8 caractères d'un alphabet sans I, O, 0
+ni 1, pour éviter les erreurs de lecture. Cette barrière dissuade la rediffusion, elle
+ne prétend pas résister à quelqu'un de déterminé et techniquement outillé — c'est la
+première barrière qui joue ce rôle.
 
 > **Limite arithmétique connue.** Avec 5 postes par jour et 14 agents, un agent à 80 %
 > travaille 2,4 jours par semaine et se repose donc 4,6 jours. Des blocs de travail de
