@@ -305,6 +305,23 @@ table.dispo tr.we th.j{color:var(--accent-dark)}
 .btn-dispo:hover{border-color:var(--accent);color:var(--accent-dark)}
 .btn-dispo.actif{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-dark)}
 
+/* ---------- où trouver le fichier enregistré ---------- */
+#fichier{
+  position:fixed;z-index:100;display:none;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(470px,94vw);max-height:92vh;overflow:auto;background:#fff;border:1px solid var(--border2);
+  border-radius:var(--r-lg);box-shadow:var(--shadow-lg);padding:20px 22px;
+}
+#fichier.show{display:block}
+#fichier h3{font-size:16px;margin-bottom:10px}
+#fichier .fs{font-size:13px;line-height:1.6;color:var(--text2);margin-bottom:9px}
+#fichier .fl{font-size:13px;line-height:1.6;color:var(--text2);margin:0 0 9px;padding-left:19px}
+#fichier .fl li{margin-bottom:6px}
+#fichier .fnom{
+  background:var(--accent-soft);color:var(--accent-dark);border-radius:var(--r-sm);
+  padding:9px 12px;margin-bottom:14px;font-weight:800;font-size:14px;
+  word-break:break-all;text-align:center;
+}
+
 /* ---------- tables (équipe, contrôles) ---------- */
 .table-wrap{overflow-x:auto;border-radius:var(--r-sm)}
 table.data{width:100%;border-collapse:collapse;font-size:13px}
@@ -804,6 +821,36 @@ table.data input,table.data select{padding:5px 7px;font-size:12.5px}
     <span style="flex:1"></span>
     <button class="btn-outline btn-sm" id="dispoAnnuler">Annuler</button>
     <button class="btn btn-sm" id="dispoValider">Enregistrer</button>
+  </div>
+</div>
+
+<div id="fichier">
+  <h3>🖨️ Le planning est enregistré</h3>
+  <p class="fs">
+    Votre navigateur n'autorise pas cette page à ouvrir elle-même la fenêtre d'impression.
+    Le planning a donc été enregistré sous&nbsp;:
+  </p>
+  <div class="fnom" id="fichierNom"></div>
+  <p class="fs"><b>Où le retrouver</b></p>
+  <ul class="fl">
+    <li><b>Sur ordinateur</b> — regardez en haut à droite de votre navigateur, l'icône
+      de téléchargement <b>⬇</b> (ou la barre qui vient d'apparaître en bas) : cliquez
+      sur le fichier. Sinon il est dans votre dossier <b>Téléchargements</b>.</li>
+    <li><b>Sur téléphone ou tablette</b> — application <b>Fichiers</b>, dossier
+      <b>Téléchargements</b>.</li>
+  </ul>
+  <p class="fs">
+    <b>Ouvrez-le d'un double-clic</b> : il s'affiche comme une page et la fenêtre
+    d'impression se lance toute seule. Sinon, <b>Ctrl + P</b> (ou <b>⌘ + P</b>),
+    en <b>paysage</b>, avec « graphiques d'arrière-plan » coché pour garder les couleurs.
+  </p>
+  <p class="fs" style="color:var(--muted)">
+    Vous pouvez le garder&nbsp;: c'est le planning du mois figé, à rouvrir ou à réimprimer
+    quand vous voulez.
+  </p>
+  <div style="display:flex;margin-top:14px">
+    <span style="flex:1"></span>
+    <button class="btn" id="fichierOk">J'ai compris</button>
   </div>
 </div>
 
@@ -2733,21 +2780,24 @@ if(enLigne()){
     .then(d => { _enregistreur = d || null; _attenteEnregistreur = null; });
 }
 
-function telecharger(nom, contenu, type){
+/* Rend une promesse : vraie si le fichier est parti, fausse si l'hôte a refusé ou
+   si l'utilisatrice a décliné. L'impression s'en sert pour n'expliquer où trouver
+   le fichier que lorsqu'il existe vraiment. `silencieux` évite de doubler ce
+   message par un bandeau. */
+function telecharger(nom, contenu, type, silencieux){
   /* Cliqué avant que l'hôte ait répondu, le bouton attend plutôt que de tomber sur
      le lien de téléchargement, inerte en ligne. */
   if(_attenteEnregistreur){
-    _attenteEnregistreur.then(() => telecharger(nom, contenu, type));
-    return;
+    return _attenteEnregistreur.then(() => telecharger(nom, contenu, type, silencieux));
   }
   if(_enregistreur){
-    _enregistreur.save({filename:nom, data:contenu})
-      .then(() => toast('Fichier enregistré'))
+    return _enregistreur.save({filename:nom, data:contenu})
+      .then(() => { if(!silencieux) toast('Fichier enregistré'); return true; })
       .catch(e => {
-        if(e && e.code === 'declined') return;               // l'utilisatrice a refusé
-        toast('Enregistrement impossible : ' + ((e && e.message) || 'erreur'), true);
+        if(!(e && e.code === 'declined'))                     // l'utilisatrice a refusé
+          toast('Enregistrement impossible : ' + ((e && e.message) || 'erreur'), true);
+        return false;
       });
-    return;
   }
   const blob = new Blob([contenu], {type});
   const url = URL.createObjectURL(blob);
@@ -2755,6 +2805,7 @@ function telecharger(nom, contenu, type){
   a.href = url; a.download = nom;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return Promise.resolve(true);
 }
 
 /* Le tableur mis en forme est un fichier .xls, format qu'Excel ouvre mais que
@@ -2854,19 +2905,36 @@ function exporterExcel(){
    directe, puis, si le navigateur ne l'a pas ouverte, on rouvre le planning dans un
    onglet ordinaire, et à défaut on le remet sous forme de fichier à ouvrir.
    L'événement beforeprint sert de témoin : il ne part pas si l'appel a été bloqué. */
+/* Tout se joue dans le fil du clic, sans setTimeout : passé le geste de
+   l'utilisatrice, le navigateur traite l'ouverture d'onglet comme une fenêtre
+   intempestive et la refuse — on tombait alors systématiquement sur le fichier.
+   Rien n'a besoin d'attendre : la grille est déjà dans la page, activerVue() ne
+   fait que changer des classes. */
 function imprimer(){
   activerVue('planning');
-  setTimeout(() => {
-    let ouverte = false;
-    const temoin = () => { ouverte = true; };
-    window.addEventListener('beforeprint', temoin);
-    try{ window.print(); }catch(e){}
-    window.removeEventListener('beforeprint', temoin);
-    if(ouverte || !dansUnCadre()) return;
-    if(ouvrirPourImpression()) return;
-    telecharger('planning-' + etat.moisAffiche + '.html', pageImprimable(), 'text/html');
-    toast('Impression bloquée ici : le planning est mis dans un fichier à ouvrir');
-  }, 60);
+  let ouverte = false;
+  const temoin = () => { ouverte = true; };
+  window.addEventListener('beforeprint', temoin);
+  try{ window.print(); }catch(e){}
+  window.removeEventListener('beforeprint', temoin);
+  if(ouverte || !dansUnCadre()) return;
+  if(ouvrirPourImpression()) return;
+  const nom = 'planning-' + etat.moisAffiche + '.html';
+  telecharger(nom, pageImprimable(), 'text/html', true)
+    .then(ok => { if(ok) expliquerFichier(nom); });
+}
+
+/* Un fichier enregistré par l'hôte atterrit dans les téléchargements du
+   navigateur, sans que la page sache où. Un message fugitif ne suffit pas :
+   on laisse à l'écran de quoi le retrouver. */
+function expliquerFichier(nom){
+  document.getElementById('fichierNom').textContent = nom;
+  document.getElementById('fichier').classList.add('show');
+  document.getElementById('backdrop').classList.add('show');
+}
+function fermerFichier(){
+  document.getElementById('fichier').classList.remove('show');
+  document.getElementById('backdrop').classList.remove('show');
 }
 
 function dansUnCadre(){
@@ -3138,7 +3206,8 @@ function brancherEvenements(){
   });
 
   // --- éditeur de case
-  document.getElementById('backdrop').onclick = () => { fermerEditeur(); fermerDispos(); };
+  document.getElementById('backdrop').onclick = () => { fermerEditeur(); fermerDispos(); fermerFichier(); };
+  document.getElementById('fichierOk').onclick = fermerFichier;
   document.getElementById('edAnnuler').onclick = fermerEditeur;
   document.getElementById('edValider').onclick = validerEditeur;
   document.getElementById('edVider').onclick = () => { edCode = ''; dessinerChips(); majAvertissementsEditeur(); };
@@ -3150,7 +3219,8 @@ function brancherEvenements(){
     dessinerChips(); majAvertissementsEditeur();
   });
   document.addEventListener('keydown', e => {
-    if(e.key === 'Escape' && dispoAgent) fermerDispos();
+    if(e.key === 'Escape' && document.getElementById('fichier').classList.contains('show')) fermerFichier();
+    else if(e.key === 'Escape' && dispoAgent) fermerDispos();
     else if(e.key === 'Escape' && edCible) fermerEditeur();
     else if(e.key === 'Enter' && edCible && e.target.id !== 'edNote') validerEditeur();
     else if(e.key === 'Enter' && e.target.id === 'edNote') validerEditeur();
@@ -3477,10 +3547,13 @@ function dessinerAide(){
     <p>Onglet <b>Contrôles</b> : la liste de tout ce qui cloche sur la période, cliquable pour aller
     directement au mois concerné. Puis <b>PDF / Imprimer</b> (paysage) ou <b>Excel</b>.</p>
     <p><b>Depuis le lien partagé</b>, le navigateur interdit à la page d'ouvrir elle-même la fenêtre
-    d'impression. Le bouton rouvre alors le planning dans un onglet à part — ou vous propose de
-    l'enregistrer en fichier, à ouvrir d'un double-clic. Dans les deux cas l'impression part toute
-    seule ; sinon <b>Ctrl + P</b>, en paysage, avec les « graphiques d'arrière-plan » cochés pour
-    garder les couleurs. Depuis le fichier installé sur le poste, le bouton imprime directement.</p>
+    d'impression. Le bouton rouvre alors le planning <b>dans un onglet à part</b>, où l'impression
+    part toute seule. Si votre navigateur bloque aussi les nouveaux onglets, le planning est
+    <b>enregistré en fichier</b> — il atterrit dans vos <b>Téléchargements</b> (icône ⬇ du
+    navigateur, en haut à droite) et s'ouvre d'un double-clic ; l'application vous rappelle alors
+    son nom et où le chercher. Si la fenêtre d'impression ne s'ouvre pas d'elle-même :
+    <b>Ctrl + P</b>, en paysage, avec les « graphiques d'arrière-plan » cochés pour garder les
+    couleurs. Depuis le fichier installé sur le poste, le bouton imprime directement.</p>
 
     <h3 style="margin:16px 0 5px">Repères visuels sur la grille</h3>
     <ul style="padding-left:20px">

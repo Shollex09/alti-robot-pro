@@ -273,6 +273,19 @@ Le repli n'est armé que si la page est effectivement dans un cadre
 (`window.self !== window.top`) : hors cadre, un `beforeprint` manquant signalerait un
 navigateur atypique, pas un blocage, et le repli serait une gêne.
 
+> **La cascade doit tenir dans le fil du clic.** Enveloppée dans un `setTimeout`, elle
+> perdait le geste de l'utilisatrice : le navigateur traite alors `window.open()` comme
+> une fenêtre intempestive et la refuse, quels que soient les droits du cadre. L'étape 2
+> ne se produisait jamais et tout le monde tombait sur le fichier. Rien n'avait besoin
+> d'attendre — la grille est déjà dans la page, `activerVue()` ne fait que changer des
+> classes.
+
+L'étape 3 se termine par un panneau qui reste à l'écran : un fichier remis à l'hôte
+atterrit dans les téléchargements du navigateur, sans que la page sache où, et un
+message fugitif laisse l'utilisatrice le chercher. Le panneau nomme le fichier et dit
+où le trouver, par appareil. Il n'apparaît que si l'enregistrement a réellement abouti
+— un refus ne doit pas envoyer chercher un fichier qui n'existe pas.
+
 `pageImprimable()` construit le document autonome à partir de la feuille de style de
 l'application, lue dans `#cssApp`, et de la grille telle qu'elle est affichée. Ses
 règles `@media print` sont **extraites de leur bloc** par `reglesImpression()` — un
