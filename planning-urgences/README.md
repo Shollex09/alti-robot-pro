@@ -248,14 +248,35 @@ première barrière qui joue ce rôle.
 
 ### Amplitude horaire d'un agent
 
-Un agent dont la journée s'arrête à 19 h ne peut pas tenir le poste S (14 h – 00 h).
-Cela s'exprime avec les disponibilités : `['S']` en sixième colonne de l'effectif
-initial barre ce poste tous les jours de la semaine, et le raccourci « jamais de soir »
-de la grille fait la même chose en un clic. GOY Olivia (7 h – 19 h) est livrée ainsi.
+L'amplitude s'écrit `[ouverture, fermeture]` en heures depuis minuit, la fermeture
+pouvant déborder sur le lendemain : `14 h – 7 h` s'écrit `[14, 31]`. Un poste n'est
+tenable que s'il tient entièrement dans la fenêtre, ce dont `postesHorsAmplitude()`
+déduit les créneaux à barrer.
 
-Conséquence mesurée : privée du poste le plus long, elle reçoit davantage de postes
-courts et son temps de travail reste aligné sur celui de ses collègues (301 h contre
-292 à 308 h sur 13 semaines).
+| Amplitude | Postes tenables | Agents |
+|---|---|---|
+| 7 h – 19 h | M, J, DJ | GOY |
+| 14 h – 7 h | S, N | REHILA, LACHARME, GARDIN, PERRET, LAFAURIE |
+| toute la journée | les cinq | les autres |
+
+**Conséquence structurelle, mesurée.** Ces amplitudes coupent l'équipe en deux :
+huit agents seulement peuvent tenir les trois postes du matin (M, J, DJ), soit
+21 postes par semaine, tandis que treize se partagent les 14 postes de soir et de
+nuit. Le premier groupe travaille davantage, et l'alternance des week-ends, qui en
+écarte la moitié chaque samedi, impose parfois une dérogation — toujours signalée.
+
+Deux termes du score corrigent ce que la structure permet encore :
+
+- **priorité à l'agent le plus contraint** (poids 60 par poste indisponible) : sans
+  elle, ceux qui ont le choix se servent d'abord et l'agent restreint n'atteint plus
+  son temps de travail. Calibrée par balayage — l'écart entre agents à 80 % revient de
+  68 h à 38 h sur 13 semaines, et celui entre les deux équipes de 3,1 à 1,3 h par semaine ;
+- **concentration des nuits par paires** (pénalité -120) : jour et nuit ne se mélangeant
+  pas, une nuit isolée immobilise l'agent toute la semaine pour 12 h. Sans cette
+  pénalité l'équipe de nuit tombait à 21,4 h par semaine contre 23,2 h pour celle de jour.
+
+PERRET, seul agent dont l'amplitude et le roulement ne laissent qu'un poste (S), est le
+cas limite : son temps de travail dépend entièrement de la disponibilité de ce poste.
 
 ### Disponibilités récurrentes
 
