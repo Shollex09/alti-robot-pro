@@ -348,6 +348,15 @@ table.data input,table.data select{padding:5px 7px;font-size:12.5px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media (max-width:900px){.grid2{grid-template-columns:1fr}}
 
+#moisVierge{
+  display:none;align-items:center;gap:14px;flex-wrap:wrap;
+  background:var(--orange2);border:1px solid #f0d19a;color:var(--orange);
+  border-radius:var(--r);padding:11px 14px;margin-bottom:12px;font-size:13px;line-height:1.5;
+}
+#moisVierge.show{display:flex}
+#moisVierge > div{flex:1;min-width:240px}
+#moisVierge .btn{background:var(--orange);color:#fff;white-space:nowrap}
+
 .toast{
   position:fixed;left:50%;bottom:22px;transform:translate(-50%,14px);z-index:200;
   background:#1e293b;color:#fff;padding:10px 18px;border-radius:22px;font-size:13px;font-weight:600;
@@ -457,6 +466,13 @@ table.data input,table.data select{padding:5px 7px;font-size:12.5px}
 
   <div class="card">
     <div class="print-title" id="printTitle"></div>
+    <div id="moisVierge" class="no-print">
+      <div>
+        <b id="moisViergeTitre"></b>
+        <span id="moisViergeTexte"></span>
+      </div>
+      <button class="btn btn-sm si-modif" id="btnGenererCeMois">⚙️ Générer ce mois</button>
+    </div>
     <div id="gridWrap"><div class="empty">Chargement…</div></div>
     <div class="legend" id="legend"></div>
   </div>
@@ -1139,6 +1155,11 @@ function nuitSeule(agent){ return agent.roulement === 'nuit-seule'; }
 function agentParId(id){ return etat.agents.find(a => a.id === id) || null; }
 function nomAgent(a){ return a ? (a.nom + (a.prenom ? ' ' + a.prenom : '')) : '?'; }
 function agentsActifs(){ return etat.agents.filter(a => a.actif && !a.remplacant); }
+/* Un jour dont aucune case n'est remplie n'est pas un jour en sous-effectif : il n'est
+   simplement pas encore généré. Le confondre avec un manque d'effectif noyait la
+   responsable sous des dizaines de fausses erreurs à l'ouverture d'un mois vierge. */
+function jourGenere(jour){ return etat.agents.some(a => !!codeDe(a.id, jour)); }
+function moisGenere(moisISO){ return joursDuMois(moisISO).some(jourGenere); }
 function agentsAffichables(){ return etat.agents.filter(a => a.actif); }
 
 /* Le groupe A travaille les week-ends de rang pair, le groupe B les impairs. */
@@ -1764,6 +1785,7 @@ function controler(debut, fin){
 
   /* --- couverture des postes --- */
   jours.forEach(j => {
+    if(!jourGenere(j)) return;            // journée pas encore générée : rien à contrôler
     const compte = {};
     POSTES.forEach(p => compte[p] = []);
     etat.agents.forEach(a => {
@@ -1832,6 +1854,7 @@ function controler(debut, fin){
     actifs.forEach(a => {
       if(a.remplacant) return;
       const codes = codesSemaine(a.id, lundi);
+      if(!codes.some(Boolean)) return;     // semaine pas encore générée pour cet agent
       const postes = codes.filter(estPoste);
       const nuits = postes.filter(c => c === 'N').length;
       const jourx = postes.length - nuits;
@@ -1876,7 +1899,8 @@ function controler(debut, fin){
   }
 
   /* --- compteur REC --- */
-  actifs.forEach(a => {
+  const periodeGeneree = jours.some(jourGenere);
+  if(periodeGeneree) actifs.forEach(a => {
     if(a.remplacant || !a.recAncre) return;
     const limite = 7 * cfg.recSemaines;
     let dernier = a.recAncre;
@@ -2123,9 +2147,14 @@ function dessinerGrille(){
     corps += '<tr class="cover"><th class="agent-col">Poste ' + p + ' <span style="font-weight:500;color:var(--muted)">' +
              esc(CODES[p].h) + '</span></th>';
     jours.forEach(j => {
+      if(!jourGenere(j)){
+        corps += '<td' + (jourSemaine(j) === 6 ? ' class="we-sep"' : '') +
+                 ' style="color:var(--muted)">—</td>';
+        return;
+      }
       let n = 0;
       etat.agents.forEach(a => { if(codeDe(a.id, j) === p) n++; });
-      const cls = n < besoin ? 'ko' : (n > besoin ? 'ko' : 'ok');
+      const cls = n === besoin ? 'ok' : 'ko';
       corps += '<td class="' + cls + (jourSemaine(j) === 6 ? ' we-sep' : '') + '">' + n + '</td>';
     });
     corps += '</tr>';
@@ -2135,6 +2164,17 @@ function dessinerGrille(){
     '<table class="planning"><thead>' + hWeeks + hDow + hNum + '</thead><tbody>' + corps + '</tbody></table>';
   document.getElementById('printTitle').textContent =
     'Planning secrétaires — Urgences CH Mâcon — ' + libelleMois(etat.moisAffiche);
+
+  const vierge = !jours.some(jourGenere);
+  const bandeau = document.getElementById('moisVierge');
+  bandeau.classList.toggle('show', vierge);
+  if(vierge){
+    document.getElementById('moisViergeTitre').textContent =
+      libelleMois(etat.moisAffiche) + ' n’est pas encore généré.';
+    document.getElementById('moisViergeTexte').textContent = peutModifier
+      ? ' Les cases sont vides et les contrôles restent silencieux tant que le mois n’a pas été établi.'
+      : ' La responsable ne l’a pas encore établi.';
+  }
 }
 
 function dessinerLegende(){
@@ -2277,25 +2317,31 @@ function dessinerControles(){
   const nWarn = al.filter(a => a.niveau === 'warn').length;
   const nInfo = al.filter(a => a.niveau === 'info').length;
   const jours = joursEntre(d, f);
-  let manquants = 0;
-  jours.forEach(j => POSTES.forEach(p => {
-    let n = 0;
-    etat.agents.forEach(a => { if(codeDe(a.id, j) === p) n++; });
-    if(n < (etat.config.besoins[p] || 0)) manquants += (etat.config.besoins[p] || 0) - n;
-  }));
+  let manquants = 0, joursVierges = 0;
+  jours.forEach(j => {
+    if(!jourGenere(j)){ joursVierges++; return; }   // pas encore généré : rien ne manque
+    POSTES.forEach(p => {
+      let n = 0;
+      etat.agents.forEach(a => { if(codeDe(a.id, j) === p) n++; });
+      if(n < (etat.config.besoins[p] || 0)) manquants += (etat.config.besoins[p] || 0) - n;
+    });
+  });
   document.getElementById('kpisControles').innerHTML =
     kpi('Erreurs', nErr, nErr ? 'red' : 'green') +
     kpi('Avertissements', nWarn, nWarn ? 'orange' : 'green') +
     kpi('Dépannages', nInfo, nInfo ? 'orange' : 'green') +
     kpi('Postes non couverts', manquants, manquants ? 'red' : 'green') +
-    kpi('Jours contrôlés', jours.length, '');
+    kpi('Jours contrôlés', (jours.length - joursVierges) + (joursVierges
+        ? ' <span style="font-size:12px;color:var(--muted)">/ ' + jours.length + '</span>' : ''), '');
 
   const filtre = niveau === 'err' ? ['err'] : (niveau === 'warn' ? ['err', 'warn'] : ['err', 'warn', 'info']);
   const vus = al.filter(a => filtre.indexOf(a.niveau) >= 0);
   const ic = {err:'⛔', warn:'⚠️', info:'🛟'};
   const cl = {err:'err', warn:'warn', info:'info'};
   let h = '';
-  if(!vus.length) h = '<div class="empty">✅ Aucun point à signaler sur cette période.</div>';
+  if(!vus.length) h = '<div class="empty">' + (joursVierges === jours.length
+    ? '📄 Cette période n’est pas encore générée — rien à contrôler pour l’instant.'
+    : '✅ Aucun point à signaler sur cette période.') + '</div>';
   vus.slice(0, 400).forEach(a => {
     const who = a.agentId ? nomAgent(agentParId(a.agentId)) : 'Service';
     h += '<div class="alert-item ' + cl[a.niveau] + '" data-goto="' + esc(a.jour) + '"><span class="ic">' +
@@ -2730,6 +2776,11 @@ function importerJson(fichier){
 function allerAuMois(moisISO){
   etat.moisAffiche = moisISO;
   document.getElementById('moisPicker').value = moisISO;
+  // les contrôles suivent le mois affiché, sinon le compteur de l'onglet et la liste
+  // qu'il ouvre portent sur deux périodes différentes
+  const b = joursDuMois(moisISO);
+  document.getElementById('ctrlDebut').value = b[0];
+  document.getElementById('ctrlFin').value = b[b.length - 1];
   sauver(); toutRedessiner();
   if(bdd){
     lireDuPartage(moisISO).then(() => { suivreMois(moisISO); toutRedessiner(); }).catch(() => {});
@@ -2917,6 +2968,10 @@ function brancherEvenements(){
   });
 
   // --- génération
+  document.getElementById('btnGenererCeMois').onclick = () => {
+    const b = bornesMois();
+    lancerGeneration(b.debut, b.fin);
+  };
   document.getElementById('btnGenMois').onclick = () => {
     const b = bornesMois();
     lancerGeneration(b.debut, b.fin);
@@ -3555,11 +3610,13 @@ demarrerPartage()
   .catch(() => {})
   .then(() => {
     if(peutModifier && !Object.keys(etat.planning).length){
-      const b = bornesMois();
-      genererPlanning(b.debut, b.fin, {preserverManuel:false, remplacants:false});
+      // trois mois d'un coup : en n'en générant qu'un, le mois suivant s'ouvrait vide
+      const debut = bornesMois().debut;
+      const [an, mo] = etat.moisAffiche.split('-').map(Number);
+      const dernier = new Date(Date.UTC(an, mo + 2, 0));
+      genererPlanning(debut, iso(dernier), {preserverManuel:false, remplacants:false});
       sauver(); toutRedessiner();
-      toast('Planning de ' + libelleMois(etat.moisAffiche) +
-            ' généré pour la découverte — modifiez ou régénérez à votre convenance');
+      toast('Trois mois générés pour la découverte — modifiez ou régénérez à votre convenance');
     }
   });
 
