@@ -862,7 +862,7 @@ const EFFECTIF_INITIAL = [
   ['DUPRAT',   'Sandra',     100, 'jour',  ''],
   ['ARTHUS',   'Emilie',      80, 'jour',   2],
   ['BERRY',    'Nathalie',    80, 'jour',   2],
-  ['GOY',      'Olivia',      80, 'jour',  ''],
+  ['GOY',      'Olivia',      80, 'jour',  '', ['S']],   // 7 h – 19 h : ni soir ni nuit
   ['MERCIER',  'Cindy',       80, 'nuit',  ''],
   ['EN NACHI', 'Dounia',     100, 'nuit-seule', ''],
   ['REHILA',   'Selma',       80, 'nuit',  ''],
@@ -904,7 +904,8 @@ function agentsDefaut(){
       nom:e[0], prenom:e[1], quotite:e[2], roulement:e[3],
       groupeWE:(rang[e[3]] % 2 === 1) ? 'A' : 'B',
       jourJA:e[4] === undefined ? '' : e[4],
-      bloque:[],
+      // postes que l'agent ne tient jamais, quelle que soit la journée
+      bloque:(e[5] || []).reduce((l, poste) => l.concat([0,1,2,3,4,5,6].map(d => d + ':' + poste)), []),
       recAncre:'', actif:true, remplacant:false,
     };
   });
@@ -1584,9 +1585,12 @@ function scoreCandidat(a, jour, poste, cpt, rnd){
     //    Mieux vaut donc concentrer les nuits par paires sur peu d'agents que d'en
     //    immobiliser un de plus pour une seule nuit : celui qui en a déjà une passe
     //    devant, et l'on n'engage un agent supplémentaire qu'à défaut.
+    //    Valeur calibrée : à -120 les deux équipes travaillent le même nombre d'heures
+    //    (22,2 h contre 22,8 h par semaine) ; à -60 la nuit tombait à 21,4 h, des agents
+    //    se retrouvant avec une seule nuit dans la semaine, soit 12 h en tout.
     const nuitsSemaine = codesSemaine(a.id, jour).filter(c => c === 'N').length;
     if(nuitsSemaine >= 1) s += 120;
-    else                  s -= 60;
+    else                  s -= 120;
   }
   // 8. un agent dont le roulement est « nuit » ne peut tenir que ce poste : l'équité
   //    générale, calculée sur les 5 postes, le sous-évaluerait. On le remet en tête sur
@@ -2512,17 +2516,44 @@ function majAvertissementsEditeur(){
     (dur ? '⛔ Règle non respectée' : '⚠️ À vérifier') + '</b><ul>' +
     msgs.map(m => '<li>' + esc(m.t) + '</li>').join('') + '</ul></div>';
 }
+/* Postes non couverts ce jour-là, après une modification. */
+function postesDecouverts(jour){
+  const out = [];
+  POSTES.forEach(p => {
+    let n = 0;
+    etat.agents.forEach(a => { if(codeDe(a.id, jour) === p) n++; });
+    for(let k = n; k < (etat.config.besoins[p] || 0); k++) out.push(p);
+  });
+  return out;
+}
+
 function validerEditeur(){
   if(!edCible) return;
   snapshot('modification d’une case');
   const note = document.getElementById('edNote').value.trim();
   const verrou = document.getElementById('edVerrou').checked;
   const k = cle(edCible.agentId, edCible.jour);
+  const ancien = codeDe(edCible.agentId, edCible.jour);
   delete etat.planning[k];
   poserCellule(edCible.agentId, edCible.jour, edCode, {note, verrou, manuel:true});
-  sauver();
   const j = edCible.jour;
   fermerEditeur();
+
+  // Retirer quelqu'un d'un poste laissait le poste vide sans rien dire. Poser un congé
+  // sur une case étant le geste le plus courant, la semaine est réajustée aussitôt —
+  // les congés, les verrous et les autres modifications manuelles sont préservés, et
+  // le bouton Annuler revient sur l'ensemble.
+  let repris = [];
+  if(estPoste(ancien) && ancien !== edCode && postesDecouverts(j).length){
+    const r = reajusterAutour(j, j);
+    repris = postesDecouverts(j);
+    sauver(); toutRedessiner();
+    toast(repris.length
+      ? 'Case mise à jour — poste ' + repris.join(', ') + ' toujours à pourvoir le ' + fmtJourCourt(j)
+      : 'Case mise à jour — la semaine a été réajustée (↶ Annuler pour revenir)');
+    return;
+  }
+  sauver();
   toutRedessiner();
   toast('Case du ' + fmtJourCourt(j) + ' mise à jour');
 }

@@ -246,6 +246,17 @@ première barrière qui joue ce rôle.
 > pas obtenir simultanément « travail par blocs de 2-3 jours » et « repos de 2-3 jours »
 > à ce niveau d'effectif. Le compromis retenu privilégie les blocs de travail.
 
+### Amplitude horaire d'un agent
+
+Un agent dont la journée s'arrête à 19 h ne peut pas tenir le poste S (14 h – 00 h).
+Cela s'exprime avec les disponibilités : `['S']` en sixième colonne de l'effectif
+initial barre ce poste tous les jours de la semaine, et le raccourci « jamais de soir »
+de la grille fait la même chose en un clic. GOY Olivia (7 h – 19 h) est livrée ainsi.
+
+Conséquence mesurée : privée du poste le plus long, elle reçoit davantage de postes
+courts et son temps de travail reste aligné sur celui de ses collègues (301 h contre
+292 à 308 h sur 13 semaines).
+
 ### Disponibilités récurrentes
 
 `agent.bloque` liste les créneaux que l'agent ne peut pas tenir, sous la forme
