@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
+<style id="cssApp">
 :root{
   --bg:#eef2f7;
   --card:#ffffff;
@@ -378,8 +378,12 @@ table.data input,table.data select{padding:5px 7px;font-size:12.5px}
   #gridWrap{max-height:none;overflow:visible;border:none;border-radius:0}
   table.planning{font-size:8px;width:100%}
   table.planning thead th{position:static}
-  th.agent-col{position:static;min-width:0;width:132px;max-width:132px;font-size:7.5px}
-  tbody th.agent-col{height:auto}
+  th.agent-col{position:static;min-width:0;width:150px;max-width:150px;font-size:7.5px}
+  .agent-cell{gap:4px}
+  /* La règle d'écran « tbody th.agent-col » est plus spécifique que « th.agent-col » :
+     sans reprendre le même niveau de sélecteur, la taille ci-dessus reste ignorée et
+     les noms sont tronqués sur le papier (« MARIAMO… »). */
+  tbody th.agent-col{height:auto;font-size:7.5px}
   .agent-cell .q{font-size:6px;padding:0 2px}
   tbody tr.cover th.agent-col span{display:none}   /* les horaires sont dans la légende */
   td.day.today{box-shadow:none}                    /* pas de surlignage du jour sur le papier */
@@ -2715,11 +2719,27 @@ const COULEURS = {
    passe par l'hôte, qui demande confirmation à l'utilisatrice. On sonde cette
    possibilité au démarrage pour que le bouton réponde tout de suite. */
 let _enregistreur = null;
-if(typeof window !== 'undefined' && window.claude && typeof window.claude.use === 'function'){
-  window.claude.use('downloads').then(d => { _enregistreur = d; }).catch(() => {});
+let _attenteEnregistreur = null;
+
+/* La page est-elle servie par l'hébergement en ligne ? Le savoir tout de suite, sans
+   attendre la résolution de la capacité, évite de partir sur un format ou un mode
+   d'impression que l'hôte refuse. */
+function enLigne(){
+  return typeof window !== 'undefined' && !!window.claude && typeof window.claude.use === 'function';
+}
+if(enLigne()){
+  _attenteEnregistreur = window.claude.use('downloads')
+    .catch(() => null)
+    .then(d => { _enregistreur = d || null; _attenteEnregistreur = null; });
 }
 
 function telecharger(nom, contenu, type){
+  /* Cliqué avant que l'hôte ait répondu, le bouton attend plutôt que de tomber sur
+     le lien de téléchargement, inerte en ligne. */
+  if(_attenteEnregistreur){
+    _attenteEnregistreur.then(() => telecharger(nom, contenu, type));
+    return;
+  }
   if(_enregistreur){
     _enregistreur.save({filename:nom, data:contenu})
       .then(() => toast('Fichier enregistré'))
@@ -2768,7 +2788,7 @@ function exporterCSV(){
 }
 
 function exporterExcel(){
-  if(_enregistreur) return exporterCSV();   // le .xls n'est pas accepté en ligne
+  if(enLigne()) return exporterCSV();   // le .xls n'est pas accepté en ligne
   const {jours} = bornesMois();
   const agents = agentsAffichables();
   const bord = 'border:0.5pt solid #b8c4d4;';
@@ -2825,6 +2845,94 @@ function exporterExcel(){
     bloc + '</table></body></html>';
   telecharger('planning-' + etat.moisAffiche + '.xls', '﻿' + doc, 'application/vnd.ms-excel;charset=utf-8');
   toast('Fichier Excel exporté');
+}
+
+/* --------------------------- impression --------------------------- */
+
+/* Consultée en ligne, la page tourne dans un cadre cloisonné où window.print() est
+   ignoré sans le moindre message : le bouton paraît mort. On tente donc l'impression
+   directe, puis, si le navigateur ne l'a pas ouverte, on rouvre le planning dans un
+   onglet ordinaire, et à défaut on le remet sous forme de fichier à ouvrir.
+   L'événement beforeprint sert de témoin : il ne part pas si l'appel a été bloqué. */
+function imprimer(){
+  activerVue('planning');
+  setTimeout(() => {
+    let ouverte = false;
+    const temoin = () => { ouverte = true; };
+    window.addEventListener('beforeprint', temoin);
+    try{ window.print(); }catch(e){}
+    window.removeEventListener('beforeprint', temoin);
+    if(ouverte || !dansUnCadre()) return;
+    if(ouvrirPourImpression()) return;
+    telecharger('planning-' + etat.moisAffiche + '.html', pageImprimable(), 'text/html');
+    toast('Impression bloquée ici : le planning est mis dans un fichier à ouvrir');
+  }, 60);
+}
+
+function dansUnCadre(){
+  try{ return window.self !== window.top; }catch(e){ return true; }
+}
+
+/* Le planning rouvert dans un onglet à part. Si l'onglet hérite du cloisonnement,
+   l'impression automatique y sera encore refusée — mais le Ctrl + P du navigateur,
+   lui, fonctionne toujours : d'où le rappel affiché en tête. */
+function ouvrirPourImpression(){
+  let f = null;
+  try{ f = window.open('', '_blank'); }catch(e){ return false; }
+  if(!f) return false;
+  try{
+    f.document.open();
+    f.document.write(pageImprimable());
+    f.document.close();
+    return true;
+  }catch(e){
+    try{ f.close(); }catch(_){}
+    return false;
+  }
+}
+
+/* Document autonome : la feuille de style de l'application, ses règles d'impression
+   sorties de leur @media pour valoir aussi à l'écran, et le tableau du mois tel qu'il
+   est affiché. Ouvert d'un double-clic, il lance l'impression tout seul. */
+function pageImprimable(){
+  /* Le repli sur l'ensemble des feuilles couvre le cas où l'hébergement remanierait
+     la balise : sans style, la page sortirait en noir et blanc sans qu'on le voie. */
+  const css = (document.getElementById('cssApp') || {}).textContent ||
+              Array.prototype.map.call(document.querySelectorAll('style'), s => s.textContent).join('\n');
+  const titre = 'Planning secrétaires — Urgences CH Mâcon — ' + libelleMois(etat.moisAffiche);
+  return '<!doctype html>\n<html lang="fr">\n<head>\n<meta charset="utf-8">\n' +
+    '<title>' + esc(titre) + '</title>\n' +
+    '<style>\n' + css + '\n</style>\n' +
+    '<style>\n' + reglesImpression(css) + '\n' +
+    'body{background:#fff;margin:0;padding:6mm}\n' +
+    '.rappel{background:#fdf0dc;border:1px solid #f0d19a;color:#b45309;border-radius:8px;' +
+    'padding:9px 12px;margin-bottom:10px;font-size:13px;line-height:1.5}\n' +
+    /* Les règles d'impression valent ici sans condition : le rappel doit être remasqué
+       explicitement au moment d'imprimer, sinon il sortirait sur le papier. */
+    '@media print{.rappel{display:none!important}}\n</style>\n' +
+    '</head>\n<body onload="window.print()">\n' +
+    '<div class="rappel">Si la fenêtre d’impression ne s’ouvre pas d’elle-même, ' +
+    'faites <b>Ctrl + P</b> (ou <b>⌘ + P</b>) — en <b>paysage</b>, et cochez ' +
+    '« graphiques d’arrière-plan » pour garder les couleurs.</div>\n' +
+    '<div class="print-title">' + esc(titre) + '</div>\n' +
+    '<div id="gridWrap">' + document.getElementById('gridWrap').innerHTML + '</div>\n' +
+    '<div class="legend">' + document.getElementById('legend').innerHTML + '</div>\n' +
+    '</body>\n</html>\n';
+}
+
+/* Sort le contenu du bloc @media print pour l'appliquer sans condition : dans le
+   document autonome, l'écran doit déjà montrer la feuille telle qu'elle sortira. */
+function reglesImpression(css){
+  const i = css.indexOf('@media print');
+  if(i < 0) return '';
+  const ouv = css.indexOf('{', i);
+  if(ouv < 0) return '';
+  let n = 0;
+  for(let k = ouv; k < css.length; k++){
+    if(css[k] === '{') n++;
+    else if(css[k] === '}'){ n--; if(!n) return css.slice(ouv + 1, k); }
+  }
+  return '';
 }
 
 function exporterJson(){
@@ -3295,7 +3403,7 @@ function brancherEvenements(){
   });
 
   // --- exports
-  document.getElementById('btnPrint').onclick = () => { activerVue('planning'); setTimeout(() => window.print(), 60); };
+  document.getElementById('btnPrint').onclick = imprimer;
   document.getElementById('btnXls').onclick = exporterExcel;
   document.getElementById('btnExportJson').onclick = exporterJson;
   document.getElementById('btnImportJson').onclick = () => document.getElementById('fileImport').click();
@@ -3368,6 +3476,11 @@ function dessinerAide(){
     <h3 style="margin:14px 0 5px">5. Vérifier et diffuser</h3>
     <p>Onglet <b>Contrôles</b> : la liste de tout ce qui cloche sur la période, cliquable pour aller
     directement au mois concerné. Puis <b>PDF / Imprimer</b> (paysage) ou <b>Excel</b>.</p>
+    <p><b>Depuis le lien partagé</b>, le navigateur interdit à la page d'ouvrir elle-même la fenêtre
+    d'impression. Le bouton rouvre alors le planning dans un onglet à part — ou vous propose de
+    l'enregistrer en fichier, à ouvrir d'un double-clic. Dans les deux cas l'impression part toute
+    seule ; sinon <b>Ctrl + P</b>, en paysage, avec les « graphiques d'arrière-plan » cochés pour
+    garder les couleurs. Depuis le fichier installé sur le poste, le bouton imprime directement.</p>
 
     <h3 style="margin:16px 0 5px">Repères visuels sur la grille</h3>
     <ul style="padding-left:20px">

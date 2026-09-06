@@ -246,6 +246,48 @@ première barrière qui joue ce rôle.
 > pas obtenir simultanément « travail par blocs de 2-3 jours » et « repos de 2-3 jours »
 > à ce niveau d'effectif. Le compromis retenu privilégie les blocs de travail.
 
+### Publication de la version en ligne
+
+`python3 apercu.py` reconstruit `apercu-en-ligne.html` (non versionné) depuis
+`index.html` : l'hébergement fournit lui-même `<!doctype>`, `<html>`, `<head>` et
+`<body>`, et le service worker n'a pas de sens dans un cadre cloisonné. Le script
+s'arrête sur assertion plutôt que de publier un fichier amputé — il vérifie notamment
+que `id="cssApp"` survit, sans quoi le document imprimable sortirait sans mise en
+forme, en silence.
+
+### Impression sous cloisonnement
+
+Consultée par le lien de partage, la page tourne dans un cadre `sandbox` sans
+`allow-modals` : `window.print()` y est **ignoré sans exception ni message**, et le
+bouton paraît mort. Aucune API ne déclare cet état ; le témoin retenu est l'événement
+`beforeprint`, qui ne part pas quand l'appel a été écarté. D'où la cascade de
+`imprimer()` :
+
+| Étape | Condition | Résultat |
+|---|---|---|
+| 1. `window.print()` | `beforeprint` a été émis | la fenêtre d'impression s'ouvre, on s'arrête là |
+| 2. `window.open()` | la page est dans un cadre et la pop-up passe | le planning est réécrit dans un onglet ordinaire, qui s'imprime seul |
+| 3. `downloads.save()` | pop-up refusée | le planning devient un fichier `.html` à ouvrir d'un double-clic |
+
+Le repli n'est armé que si la page est effectivement dans un cadre
+(`window.self !== window.top`) : hors cadre, un `beforeprint` manquant signalerait un
+navigateur atypique, pas un blocage, et le repli serait une gêne.
+
+`pageImprimable()` construit le document autonome à partir de la feuille de style de
+l'application, lue dans `#cssApp`, et de la grille telle qu'elle est affichée. Ses
+règles `@media print` sont **extraites de leur bloc** par `reglesImpression()` — un
+simple comptage d'accolades — pour valoir aussi à l'écran : le document montre alors
+la feuille telle qu'elle sortira. `@page{size:A4 landscape}` remonte au passage à la
+racine, où il reste valide.
+
+> **Piège de spécificité, deuxième occurrence.** La règle d'écran
+> `tbody th.agent-col{font-size:12.5px}` (0,1,2) l'emportait sur la règle d'impression
+> `th.agent-col{font-size:7.5px}` (0,1,1) : une `@media` n'ajoute pas de spécificité.
+> Les noms sortaient tronqués (`MARIAMO…`) sans que rien ne le signale. Même cause que
+> le `td.day{background:#fff}` qui effaçait les couleurs des codes. Toute règle
+> d'impression qui vise un élément déjà stylé par un sélecteur plus profond doit
+> reprendre ce niveau.
+
 ### Amplitude horaire d'un agent
 
 L'amplitude s'écrit `[ouverture, fermeture]` en heures depuis minuit, la fermeture
