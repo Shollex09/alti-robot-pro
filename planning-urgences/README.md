@@ -198,6 +198,68 @@ La pénalité a été calibrée par balayage sur 3 mois générés :
 Avant ce réglage, le score pénalisait au contraire tout regroupement et produisait
 58 % de journées de travail isolées.
 
+### Plages de repos : le plafond de RH et la passe d'échange
+
+Le service impose **1 ou 2 RH d'affilée au maximum** : au-delà, l'agent n'est plus en
+repos hebdomadaire, il est sans travail. L'affectation gloutonne produisait pourtant
+des plages de sept jours — le score regroupe le travail en blocs, ces blocs se calent
+aux extrémités des semaines, et les repos de deux semaines consécutives se soudent.
+
+Avant de corriger, on a mesuré **pourquoi** l'agent ne travaillait pas, sur les 985
+journées appartenant à une plage de 3 jours ou plus :
+
+| Motif | Part |
+|---|---|
+| **aucun — le poste était allé à quelqu'un d'autre** | **52 %** |
+| week-end hors de son tour | 15 % |
+| amplitude horaire de l'agent | 9 % |
+| roulement de jour (pas de nuit) | 9 % |
+| jour et nuit séparés dans la semaine | 9 % |
+| budget de la semaine | 4 % |
+| 11 h de repos | 0 % |
+
+La moitié de ces journées n'était donc bloquée par aucune règle. `equilibrerRepos()`
+reprend ces postes-là après l'affectation et les redonne à qui se repose depuis trop
+longtemps. Elle **déplace** le travail, elle n'en crée pas : la couverture est
+identique poste pour poste. Un échange n'est accepté que s'il ramène la plage sous le
+plafond sans en ouvrir une plus longue chez le cédant — le nombre de journées au-delà
+du plafond décroît strictement, ce qui garantit l'arrêt.
+
+Un ajout s'est révélé indispensable : **ne jamais échanger vers un agent déjà plus
+chargé que le cédant**, à quotité égale. Sans ce garde-fou, l'écart de temps de travail
+entre agents à 80 % passait de 45 h à 122 h sur 13 semaines — la passe déshabillait
+toujours les mêmes. Une tolérance sur cet écart a été balayée (0, 4, 8, 12, 20 h) : elle
+n'améliore pas les plages et dégrade l'équité jusqu'à 69 h. **Tolérance nulle retenue.**
+
+Résultat sur 3 mois, à couverture et dépannages inchangés (0 poste non couvert,
+6 dépannages, 0 erreur) :
+
+| | Avant | Après |
+|---|---|---|
+| Plages de RH > 2 jours | 50 % | **28 %** |
+| BESSON (polyvalente) | 7 RH d'affilée | **4** |
+| Écart de charge entre 80 % (13 sem.) | 45 h | **29 h** |
+| Journées de travail isolées | 23 % | 57 % |
+| Blocs de 2-3 jours | 59 % | 40 % |
+
+> **Deux règles du service sont arithmétiquement incompatibles.** 35 postes par semaine
+> pour 14 agents font 2,5 journées travaillées par agent, donc 4,5 journées de repos.
+> Un bloc de travail de 3 jours laisse alors mécaniquement 4 jours de repos derrière
+> lui : « travailler par blocs de 2-3 jours » et « au plus 2 RH d'affilée » ne peuvent
+> pas tenir ensemble. Le service ayant tranché pour le plafond de RH, les blocs cèdent —
+> d'où la dégradation assumée des deux dernières lignes. Le réglage
+> `maxRHConsecutifs` (onglet Réglages) permet de revenir en arrière : à 5, la passe
+> d'échange se calme et les blocs reviennent.
+
+**Limite résiduelle, structurelle.** Les agents restreints à l'amplitude 14 h – 7 h
+(REHILA, LACHARME, GARDIN, LAFAURIE) ne peuvent tenir que S et N, PERRET que S, et
+EN NACHI que N. Six agents se partagent 7 postes du soir et 7 de nuit, quand huit
+agents seulement peuvent couvrir les 21 postes de journée. Ils travaillent donc
+1,8 à 2,2 jours par semaine et leurs plages de repos restent de 6 à 8 jours — aucun
+réglage n'y change rien, la passe d'échange n'a pas de poste à leur donner. Les agents
+polyvalents, eux, descendent à 3-5. Le contrôle signale chaque plage dépassant le
+plafond plutôt que de la taire.
+
 ### Partage et droits d'accès
 
 Ouverte depuis le fichier local, l'application travaille en mémoire du navigateur et

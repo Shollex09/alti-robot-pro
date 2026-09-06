@@ -959,6 +959,7 @@ function configDefaut(){
     reposMinHeures:     11,
     maxJoursConsecutifs:6,   // limite donnée par le service (le cahier des charges disait 4)
     maxNuitsConsecutives:2,  // 1 ou 2 nuits, puis un repos sécurité
+    maxRHConsecutifs:   2,   // 1 ou 2 RH d'affilée : au-delà, l'agent n'est plus au travail
     weekendAlterne:     true,
     jaInterrompt:       true,   // JA casse-t-il le décompte des jours consécutifs ?
     equipeNuitTaille:   4,      // agents au roulement de nuit chaque semaine :
@@ -1269,6 +1270,17 @@ function reposOK(agentId, jour, code, mini){
     if(estPoste(cap) && reposEntre(code, jour, cap, ap) < mini) return false;
   }
   return true;
+}
+
+/* Longueur de la plage sans poste qui contient `jour` — bornée à la période examinée.
+   C'est elle que plafonne la règle « 1 ou 2 RH d'affilée » : au-delà, l'agent n'est
+   plus en repos hebdomadaire, il est absent du travail. */
+function reposAutour(agentId, jour, debut, fin){
+  let n = 1, d = jourPlus(jour, -1), garde = 0;
+  while(d >= debut && garde++ < 40 && !estPoste(codeDe(agentId, d))){ n++; d = jourPlus(d, -1); }
+  d = jourPlus(jour, 1); garde = 0;
+  while(d <= fin && garde++ < 40 && !estPoste(codeDe(agentId, d))){ n++; d = jourPlus(d, 1); }
+  return n;
 }
 
 /* Nombre de jours travaillés consécutifs qui se terminent la veille de `jour`. */
@@ -1787,8 +1799,8 @@ function genererPlanning(debut, fin, options){
   const rnd = prng(debut + '|' + fin + '|' + etat.agents.map(a => a.id).join(','));
   const rapport = {
     debut, fin, jours:jours.length, postes:0, rh:0, ja:0, rec:0, rs:0,
-    ancresPosees:0, depannages:[], nonCouverts:[], recNonPoses:[], jaNonPosees:[],
-    jaHorsSouhait:[], rsNonPoses:[]
+    ancresPosees:0, echangesRepos:0, depannages:[], nonCouverts:[], recNonPoses:[],
+    jaNonPosees:[], jaHorsSouhait:[], rsNonPoses:[]
   };
 
   viderPourGeneration(jours, opts.preserverManuel !== false);
@@ -1838,9 +1850,69 @@ function genererPlanning(debut, fin, options){
     ordreJours.forEach(j => POSTES_JOUR.forEach(p => remplir(j, p)));
   }
 
+  equilibrerRepos(jours, rapport);
   poserRS(jours, debut, fin, rapport);
   poserJAetRH(jours, debut, fin, rapport);
   return rapport;
+}
+
+/* --- plages de repos trop longues : on échange les postes, on n'en crée pas ---
+   L'affectation gloutonne laisse des plages de repos d'une semaine entière alors que
+   rien ne l'imposait : mesure faite, la moitié de ces journées n'était bloquée par
+   aucune règle — le poste était simplement allé à quelqu'un d'autre. Cette passe
+   reprend ces postes-là pour les donner à qui se repose depuis trop longtemps.
+
+   Elle ne modifie ni la couverture ni le volume de travail : un poste change de
+   titulaire, il ne disparaît pas. L'échange n'est accepté que s'il ramène la plage
+   sous le plafond sans en ouvrir une plus longue chez le cédant — le nombre de
+   journées au-delà du plafond décroît donc à chaque échange, ce qui garantit l'arrêt. */
+function equilibrerRepos(jours, rapport){
+  const cap = etat.config.maxRHConsecutifs || 2;
+  const debut = jours[0], fin = jours[jours.length - 1];
+
+  /* Charge horaire courante, rapportée à la quotité : sans elle, l'échange déshabille
+     toujours les mêmes. Les agents restreints à une amplitude étroite se reposent
+     forcément davantage — leur donner la priorité sans regarder les heures ferait
+     glisser tout le travail vers les polyvalents. */
+  const heures = {};
+  const charge = a => (heures[a.id] || 0) / (a.quotite / 100);
+  const recompter = () => {
+    etat.agents.forEach(a => { heures[a.id] = 0; });
+    jours.forEach(j => etat.agents.forEach(a => { heures[a.id] += heuresDe(codeDe(a.id, j)); }));
+  };
+  recompter();
+
+  let echanges = 0;
+  for(let passe = 0; passe < 6; passe++){
+    let bouge = false;
+    agentsActifs().forEach(preneur => {
+      jours.forEach(j => {
+        if(!libre(preneur.id, j)) return;
+        if(reposAutour(preneur.id, j, debut, fin) <= cap) return;
+        for(const p of ORDRE_AFFECTATION){
+          if(!(etat.config.besoins[p] || 0)) continue;
+          if(!candidatValide(preneur, j, p, 0, false)) continue;
+          const cedant = etat.agents.find(x => codeDe(x.id, j) === p);
+          if(!cedant || cedant.remplacant || cedant.id === preneur.id) continue;
+          const cel = cellule(cedant.id, j);
+          if(cel && (cel.v || cel.m)) continue;      // verrouillé ou posé à la main
+          if(charge(preneur) >= charge(cedant)) continue;   // ne pas creuser l'écart
+          const sauve = etat.planning[cle(cedant.id, j)];
+          delete etat.planning[cle(cedant.id, j)];
+          if(reposAutour(cedant.id, j, debut, fin) <= cap){
+            poserCellule(preneur.id, j, p);
+            heures[cedant.id] -= heuresDe(p);
+            heures[preneur.id] += heuresDe(p);
+            echanges++; bouge = true;
+            return;                                  // au jour suivant
+          }
+          etat.planning[cle(cedant.id, j)] = sauve;   // échange refusé : on remet
+        }
+      });
+    });
+    if(!bouge) break;
+  }
+  if(rapport) rapport.echangesRepos = echanges;
 }
 
 /* Recalcule uniquement les semaines touchées par une modification (pose d'absence). */
@@ -1936,6 +2008,25 @@ function controler(debut, fin){
       if(cel && cel.d)
         add('info', j, a.id, 'Poste ' + cel.c + ' comblé en dépannage — à vérifier');
     });
+
+    // Plages de RH trop longues. Au-delà de 2 jours d'affilée ce n'est plus un repos
+    // hebdomadaire : l'agent est simplement sans travail, et il faut soit lui en
+    // donner, soit poser le vrai motif de son absence.
+    const capRH = cfg.maxRHConsecutifs || 0;
+    if(capRH){
+      let serieRH = 0, debutRH = null;
+      const signaler = () => {
+        if(serieRH > capRH)
+          add('warn', debutRH, a.id, serieRH + ' RH consécutifs à partir du ' + fmtJourCourt(debutRH) +
+              ' (maximum ' + capRH + ') — donnez-lui du travail sur ces jours ou posez le motif réel');
+        serieRH = 0;
+      };
+      jours.forEach(j => {
+        if(codeDe(a.id, j) === 'RH'){ if(!serieRH) debutRH = j; serieRH++; }
+        else signaler();
+      });
+      signaler();
+    }
   });
 
   /* --- règles hebdomadaires --- */
@@ -2485,6 +2576,7 @@ function dessinerReglages(){
     ['recSemaines',         'REC : échéance en semaines',            2, 20, ''],
     ['reposMinHeures',      'Repos minimum entre deux postes (h)',   8, 16, ''],
     ['maxJoursConsecutifs', 'Jours travaillés consécutifs maximum',  2, 7,  ''],
+    ['maxRHConsecutifs',    'RH consécutifs maximum',                1, 7,  ''],
     ['joursMaxSemaine100',  'Jours travaillés / semaine à 100 %',    3, 7,  ''],
     ['joursMaxSemaine80',   'Jours travaillés / semaine à 80 %',     2, 7,  ''],
     ['equipeNuitTaille',    'Agents dans le roulement de nuit / semaine', 1, 8, ''],
@@ -3068,6 +3160,8 @@ function afficherRapport(r){
   l.push(['🛌', r.rh + ' repos hebdomadaires · ' + r.rs + ' repos sécurité · ' +
           r.ja + ' journées aménagées · ' + r.rec + ' récupérations', 'info']);
   if(r.ancresPosees) l.push(['🕐', r.ancresPosees + ' compteur(s) REC initialisé(s) — modifiables dans l’onglet Équipe', 'info']);
+  if(r.echangesRepos) l.push(['🔄', r.echangesRepos + ' poste(s) redonné(s) à un agent qui se reposait depuis trop longtemps '
+          + '(plages de repos raccourcies, couverture inchangée)', 'info']);
   if(r.depannages.length){
     const par = {};
     r.depannages.forEach(d => { par[d.motif] = (par[d.motif] || 0) + 1; });
@@ -3572,6 +3666,10 @@ function dessinerAide(){
       <li>11 h de repos minimum entre deux postes — <b>jamais franchi</b> par la génération automatique
           (un poste S suivi d’un M le lendemain ne laisserait que 7 h).</li>
       <li>6 jours travaillés consécutifs au maximum ; RH, RS, CR, REC et RF remettent le compteur à zéro.</li>
+      <li><b>1 ou 2 RH d'affilée au maximum.</b> Après l'affectation, l'application reprend les
+          postes qui n'étaient bloqués par aucune règle pour les redonner à qui se repose depuis
+          trop longtemps — elle déplace le travail, elle n'en crée pas, la couverture est
+          identique. Ce qui dépasse encore est signalé dans les <b>Contrôles</b>.</li>
       <li><b>1 ou 2 nuits d'affilée au maximum</b>, suivies d'un <b>repos sécurité (RS)</b> posé automatiquement le lendemain.</li>
       <li>Plafond hebdomadaire lié à la quotité : 4 jours à 80 %, 5 jours à 100 %. Une semaine ne
           faisant que 7 jours, ce plafond baisse d'autant quand s'y ajoutent un REC, un congé ou
