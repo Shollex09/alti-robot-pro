@@ -21,6 +21,7 @@ contraintes du besoin :
 | Doit fonctionner hors ligne | PWA : `sw.js` met tout en cache, y compris la police |
 | Données de planning (RH, congés) | Rien ne sort du poste — pas d'envoi réseau |
 | Diffusion papier | Feuille d'impression A4 paysage dédiée + export Excel |
+| Consultation par l'équipe | Publication en ligne avec partage par e-mail et code personnel |
 
 Stockage : **`localStorage`** (mémoire du navigateur), avec export/import JSON pour la
 sauvegarde et le transfert d'un poste à l'autre. Une base type SQLite imposerait un
@@ -88,14 +89,14 @@ sur deux jours :
    manuelles et les annotations libres sont préservées.
 2. **REC** : pose des récupérations arrivées à échéance (compteur individuel de 6 semaines
    à partir de l'ancre de chaque agent, décalage au jour libre le plus proche si occupé).
-3. **Semaine par semaine** : constitution de l'équipe de nuit (les agents « nuit », complétés
-   par les agents « mixte » qui n'ont pas fait de nuit depuis le plus longtemps, en
-   garantissant qu'au moins un d'entre eux est de tour ce week-end-là).
+3. **Semaine par semaine**, les nuits d'abord : elles déterminent qui reste disponible
+   pour la journée. Il n'y a pas d'équipe de nuit désignée d'avance — la séparation se
+   lit sur ce que l'agent a effectivement dans sa semaine (voir « Code retiré »).
 4. **Jour par jour, samedi et dimanche d'abord** : le week-end ne dispose que de la moitié
    de l'effectif (alternance A/B), il doit être servi avant que les jours de semaine
    n'épuisent les plafonds hebdomadaires.
    Les postes sont pourvus dans l'ordre `N, S, M, J, DJ` — du plus contraignant au moins
-   contraignant.
+   contraignant — et chacun peut demander plusieurs titulaires (`config.besoins`).
 5. **Choix de l'agent** : parmi ceux qui passent tous les filtres, celui qui obtient le
    meilleur score — équité de charge globale, équité par poste, équité des week-ends,
    continuité du roulement, série de travail la plus courte.
@@ -112,9 +113,10 @@ marquée « dépannage » (coin orange) avec le motif consigné dans le rapport 
 
 | Palier | Ce qui est relâché |
 |---|---|
-| 1 | appel aux remplaçants (si l'option est cochée) |
-| 2 | alternance des week-ends |
-| 3 | séparation des roulements jour et nuit |
+| 1 | jour de JA souhaité par l'agent |
+| 2 | appel aux remplaçants (si l'option est cochée) |
+| 3 | alternance des week-ends |
+| 4 | séparation des roulements journée et nuit |
 
 **Jamais relâchés, à aucun palier :**
 
@@ -122,8 +124,8 @@ marquée « dépannage » (coin orange) avec le motif consigné dans le rapport 
 - la limite de 6 jours travaillés consécutifs ;
 - la limite de 2 nuits consécutives, et le repos sécurité qui suit chaque bloc ;
 - le budget hebdomadaire (voir ci-dessous) ;
-- les disponibilités déclarées de l'agent ;
-- l'unicité du poste de nuit.
+- les disponibilités déclarées de l'agent, amplitude horaire comprise ;
+- l'effectif déclaré de chaque poste, qui n'est jamais dépassé.
 
 Le « RH réduit » évoqué dans le besoin initial se produit naturellement sans franchir
 ces limites : en semaine ordinaire un agent à 80 % travaille 2 à 3 jours, bien en dessous
@@ -136,10 +138,11 @@ congé décalé), et le manque lui saute aux yeux au lieu d'être absorbé en si
 
 | Règle | Où |
 |---|---|
-| 1 M + 1 J + 1 DJ + 1 S + 1 N par jour, week-ends compris | `config.besoins` (modifiable) |
-| Poste N tenu par une seule personne | filtre + contrôle, jamais relâché |
+| 1 M + 2 DJ + 1 S + 2 N par jour, week-ends compris | `config.besoins` (modifiable) |
+| Effectif de chaque poste jamais dépassé | filtre + contrôle |
 | 11 h de repos entre deux postes | `reposOK` / `reposEntre`, jamais relâché |
-| Roulements jour et nuit distincts | équipe de nuit hebdomadaire |
+| Postes de journée et nuit séparés dans la semaine, le soir excepté | `candidatValide` |
+| 1 ou 2 RH d'affilée au maximum | `equilibrerRepos` + contrôle |
 | Maximum 6 jours travaillés consécutifs | `serieAvec` |
 | Maximum 2 nuits consécutives, puis repos sécurité | `nuitsConsecutivesAvec`, `poserRS` |
 | 1 week-end sur 2 | groupes A/B × rang de la semaine |
@@ -197,6 +200,79 @@ La pénalité a été calibrée par balayage sur 3 mois générés :
 −35 domine −70 : autant de blocs de 2-3 jours, mais des plages de repos plus courtes.
 Avant ce réglage, le score pénalisait au contraire tout regroupement et produisait
 58 % de journées de travail isolées.
+
+### L'effectif par poste, relevé heure par heure
+
+Le service a d'abord été configuré à **un agent par poste**. Le tableau « effectif
+présent heure par heure » de l'onglet Réglages semblait confirmer la description
+donnée oralement — il ne la confirmait qu'à moitié : la nuit y était tenue par une
+seule personne et le soir par deux, alors que le service en compte deux et trois.
+
+L'effectif réellement demandé, tranche par tranche :
+
+| Tranche | Présentes |
+|---|---|
+| 00 h – 09 h | 2 |
+| 09 h – 11 h | 1 |
+| 11 h – 14 h | 3 |
+| 14 h – 16 h | 4 |
+| 16 h – 00 h | 3 |
+
+Une recherche exhaustive sur les cinq postes (chaque combinaison de 0 à 4 titulaires,
+la nuit bornée à 2) ne laisse qu'une seule solution à moins de 3 heures-agent d'écart :
+
+    M = 1    J = 0    DJ = 2    S = 1    N = 2
+
+Deux conséquences, contre-intuitives mais forcées par l'arithmétique :
+
+- **La seconde personne de la journée arrive à 11 h, pas à 9 h.** Trois présentes de
+  16 h à 19 h imposent `DJ + S = 3`, donc deux décalés ; trois seulement de 11 h à
+  14 h interdisent alors le poste J. Le poste « Journée 9 h – 17 h » n'est plus pourvu
+  et sa ligne disparaît de la grille.
+- **De 7 h à 9 h, une seule personne.** Deux présentes à 7 h – 9 h exigeraient deux
+  postes du matin, or le matin dure jusqu'à 16 h : il y en aurait alors deux à 9 h – 11 h
+  au lieu d'une. C'est le seul point où la courbe livrée s'écarte de la description,
+  et il est vérifié à part dans `test5.js`.
+
+> **Ce relevé renverse le diagnostic précédent.** La configuration à un agent par poste
+> demandait 329 h par semaine, soit 9,4 ETP pour un effectif de 11,8 — d'où le constat,
+> erroné, d'un service surdimensionné et les longues plages de repos qui en découlaient.
+> La configuration corrigée demande **413 h par semaine, exactement 11,8 ETP**. L'équipe
+> n'est pas trop nombreuse : elle est **au complet, en permanence**, sans marge pour les
+> congés, les récupérations ni les journées aménagées.
+
+Effet mesuré sur 3 mois : la charge rejoint enfin les quotités — 34,8 h par semaine pour
+un 100 %, 26 à 29 h pour un 80 % (contre 23,5 h en moyenne auparavant) — et les plages de
+repos des agents polyvalents tombent de 6-7 jours à 2-4.
+
+### La nuit est saturée
+
+Sept agents savent tenir la nuit. Chacun n'en fait que **deux par semaine** : trois nuits
+imposeraient deux repos sécurité, plus une journée aménagée et deux RH, soit 8 jours dans
+une semaine qui n'en compte que 7. La capacité est donc de 7 × 2 = **14 nuits par semaine,
+exactement le besoin**. Zéro marge : le moindre congé ouvre un trou.
+
+Mesure sur 3 mois : 6 nuits non pourvues sur 182, soit 3,3 %. Toutes sont signalées.
+Un huitième agent capable de nuit ramène ce chiffre à 0 — c'est la seule chose qui le
+puisse, aucun réglage n'y suffit.
+
+> **Le soir redevient compatible avec la nuit.** La règle « jour et nuit ne se mélangent
+> jamais dans une semaine » était une déduction faite sur les plannings papier, et elle se
+> contredisait pour les agentes dont l'amplitude est justement 14 h – 7 h : leur seule
+> disponibilité étant le soir et la nuit, les séparer les enfermait dans 2 nuits par
+> semaine, soit 24 h — sous leur quotité. La séparation ne vaut désormais que pour les
+> postes de **journée** (M, J, DJ). Les enchaînements dangereux restent exclus par les
+> 11 h de repos : une nuit suivie d'un soir le lendemain n'en laisse que 7. Effet : la
+> charge de l'équipe de nuit passe de 24,1 h à 28,3 h par semaine, ses plages de repos
+> de 7 jours à 4-6, et les nuits non pourvues de 10 à 6.
+
+### Code retiré
+
+`equipeNuitSemaine()` et `derniereNuitIlYA()` constituaient une équipe de nuit désignée
+d'avance. Elles ne sont plus appelées depuis que la séparation jour/nuit se lit sur la
+semaine réelle de l'agent — mais le réglage qu'elles servaient, « agents dans le roulement
+de nuit », était resté dans l'onglet Réglages : un bouton sans le moindre effet. Les deux
+fonctions et le réglage ont été retirés.
 
 ### Plages de repos : le plafond de RH et la passe d'échange
 

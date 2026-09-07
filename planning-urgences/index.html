@@ -603,7 +603,7 @@ table.data input,table.data select{padding:5px 7px;font-size:12.5px}
       <i>équipe de nuit</i> = fait partie du groupe habilité à la nuit ; les semaines où il n'est pas
       au roulement de nuit, il tient des postes de jour · <i>nuit uniquement</i> = référent de nuit,
       présent à chaque roulement et sur aucun poste de jour.
-      Jour et nuit ne se mélangent jamais sur une même semaine.<br>
+      Les postes de journée (M, J, DJ) et la nuit ne se mélangent jamais sur une même semaine ; le soir, lui, reste compatible avec la nuit.<br>
       <b>Groupe WE</b> : les groupes A et B travaillent un week-end sur deux, en alternance.<br>
       <b>Disponibilités</b> : amplitude horaire de l'agent, ou créneaux qu'il ne tient jamais.
       Une amplitude de 14 h – 7 h ne laisse que le soir et la nuit ; 7 h – 19 h exclut au
@@ -864,7 +864,7 @@ table.data input,table.data select{padding:5px 7px;font-size:12.5px}
    ========================================================================== */
 
 const STORAGE_KEY = 'planning_urgences_macon_v1';
-const APP_VERSION = 1;
+const APP_VERSION = 2;
 
 /* Heures exprimées en heures depuis minuit du jour où le code est posé.
    S finit à 24 (minuit) et N finit à 31 (7h le lendemain) : cela permet de
@@ -953,7 +953,12 @@ const EFFECTIF_INITIAL = [
 
 function configDefaut(){
   return {
-    besoins:            {M:1, J:1, DJ:1, S:1, N:1},
+    /* Effectif par poste, relevé avec le service heure par heure :
+       2 de 00 h à 9 h, 1 de 9 h à 11 h, 3 de 11 h à 14 h, 4 de 14 h à 16 h,
+       3 de 16 h à minuit. La nuit est donc tenue à deux, et la seconde personne
+       de la journée arrive à 11 h (DJ) plutôt qu'à 9 h (J) — c'est la seule
+       combinaison de ces cinq postes qui reproduit exactement cette courbe. */
+    besoins:            {M:1, J:0, DJ:2, S:1, N:2},
     rhParSemaine:       2,
     recSemaines:        6,
     reposMinHeures:     11,
@@ -962,10 +967,6 @@ function configDefaut(){
     maxRHConsecutifs:   2,   // 1 ou 2 RH d'affilée : au-delà, l'agent n'est plus au travail
     weekendAlterne:     true,
     jaInterrompt:       true,   // JA casse-t-il le décompte des jours consécutifs ?
-    equipeNuitTaille:   4,      // agents au roulement de nuit chaque semaine :
-                                // la référente plus trois, le repos sécurité et la
-                                // limite de 2 nuits d'affilée bridant chacun
-                                // (le repos sécurité limite chacun à ~2 nuits)
     joursMaxSemaine100: 5,
     joursMaxSemaine80:  4,
   };
@@ -1022,7 +1023,7 @@ function chargerEtat(){
     const base = etatDefaut();
     const etat = Object.assign(base, s);
     etat.config = Object.assign(configDefaut(), s.config || {});
-    etat.config.besoins = Object.assign({M:1,J:1,DJ:1,S:1,N:1}, (s.config||{}).besoins || {});
+    etat.config.besoins = Object.assign(configDefaut().besoins, (s.config||{}).besoins || {});
     if(!Array.isArray(etat.agents) || !etat.agents.length) etat.agents = agentsDefaut();
     etat.agents.forEach(a => {
       if(!a.groupeWE) a.groupeWE = 'A';
@@ -1033,6 +1034,16 @@ function chargerEtat(){
       if(a.actif === undefined) a.actif = true;
     });
     if(!etat.planning || typeof etat.planning !== 'object') etat.planning = {};
+    /* L'effectif par poste livré au départ (1 partout) sous-estimait le service :
+       il ne donnait qu'une personne la nuit et deux le soir. Une configuration
+       restée exactement sur ces valeurs vient de cette erreur et non d'un choix,
+       on la remet à jour ; toute valeur modifiée depuis est respectée. */
+    if((s.version || 1) < 2){
+      const b = etat.config.besoins;
+      if(b.M === 1 && b.J === 1 && b.DJ === 1 && b.S === 1 && b.N === 1)
+        etat.config.besoins = configDefaut().besoins;
+      etat.version = APP_VERSION;
+    }
     return etat;
   }catch(e){
     console.error('Chargement impossible', e);
@@ -1490,55 +1501,6 @@ function placerREC(debut, fin, rapport){
   });
 }
 
-/* --- équipe de nuit de la semaine --- */
-function derniereNuitIlYA(agentId, jour){
-  for(let d = 1; d <= 120; d++){
-    if(codeDe(agentId, jourPlus(jour, -d)) === 'N') return d;
-  }
-  return 999;
-}
-function equipeNuitSemaine(lundi, rnd){
-  const cfg = etat.config;
-  const nuitsAPourvoir = 7 * (cfg.besoins.N || 1);
-  const dispos = agentsActifs().filter(a => {
-    if(!faitDesNuits(a)) return false;
-    if(nuitSeule(a)) return true;            // référente de nuit : de tous les roulements
-    // agent réellement absent plus de 4 jours dans la semaine : inutile de le mettre
-    // en nuit. On ne compte que les absences (congé, récupération), pas les repos :
-    // sur un planning déjà rempli, RH et RS feraient sortir tout le monde.
-    let abs = 0;
-    for(let i = 0; i < 7; i++){
-      const c = codeDe(a.id, jourPlus(lundi, i));
-      if(c === 'CR' || c === 'REC' || c === 'RF') abs++;
-    }
-    return abs <= 4;
-  });
-  // On tourne à l'intérieur de l'équipe : priorité à ceux qui n'ont pas fait de nuit
-  // depuis le plus longtemps. Ceux qui ne sont pas retenus cette semaine-là restent
-  // disponibles pour les postes de jour.
-  const candidats = dispos.slice().sort((x, y) => {
-    const dx = derniereNuitIlYA(x.id, lundi), dy = derniereNuitIlYA(y.id, lundi);
-    if(dy !== dx) return dy - dx;
-    return x.id < y.id ? -1 : 1;
-  });
-  // les agents « uniquement de nuit » sont de tous les roulements ; les autres tournent
-  const equipe = candidats.filter(nuitSeule);
-  candidats.forEach(a => {
-    if(equipe.length < cfg.equipeNuitTaille && !nuitSeule(a)) equipe.push(a);
-  });
-  // le week-end doit rester couvrable : il faut dans l'équipe au moins un agent
-  // dont c'est le tour de week-end, sinon les nuits du samedi et du dimanche
-  // tomberaient systématiquement en dépannage
-  if(cfg.weekendAlterne && nuitsAPourvoir > 0){
-    const samedi = jourPlus(lundi, 5);
-    if(!equipe.some(a => weekendTravaille(a, samedi))){
-      const renfort = candidats.find(a => equipe.indexOf(a) < 0 && weekendTravaille(a, samedi));
-      if(renfort) equipe.push(renfort);
-    }
-  }
-  return new Set(equipe.map(a => a.id));
-}
-
 /* --- filtres et score --- */
 function candidatValide(a, jour, poste, tolerance, autoriserRempl){
   if(!a.actif) return false;
@@ -1560,13 +1522,20 @@ function candidatValide(a, jour, poste, tolerance, autoriserRempl){
   // jour ne fera pas de nuit, une référente de nuit ne tiendra pas de poste de jour.
   if(poste === 'N' && !faitDesNuits(a)) return false;
   if(poste !== 'N' && nuitSeule(a)) return false;
-  // Jour et nuit ne se mélangent pas sur une même semaine. La règle se lit sur ce que
-  // l'agent a effectivement dans sa semaine — et non sur une équipe de nuit désignée
-  // d'avance, qui privait de week-end ceux qui n'obtenaient finalement aucune nuit.
+  /* Les postes de JOURNÉE (M, J, DJ) ne se mélangent pas avec la nuit sur une même
+     semaine. La règle se lit sur ce que l'agent a effectivement dans sa semaine — et
+     non sur une équipe de nuit désignée d'avance, qui privait de week-end ceux qui
+     n'obtenaient finalement aucune nuit.
+     Le SOIR, lui, reste compatible avec la nuit : 14 h – 00 h et 19 h – 7 h sont deux
+     rythmes voisins, pas opposés, et les agentes dont l'amplitude est justement
+     14 h – 7 h n'ont que ces deux postes — les séparer les enfermait dans 2 nuits par
+     semaine, soit 24 h, sous leur quotité. Les enchaînements dangereux restent exclus
+     par les 11 h de repos : une nuit suivie d'un soir le lendemain n'en laisse que 7. */
   if(tolerance < 4 && !a.remplacant){
     const semaine = codesSemaine(a.id, jour).filter(estPoste);
-    if(poste === 'N'){ if(semaine.some(c => c !== 'N')) return false; }
-    else if(semaine.some(c => c === 'N')) return false;
+    const estJournee = c => c !== 'N' && c !== 'S';
+    if(poste === 'N'){ if(semaine.some(estJournee)) return false; }
+    else if(poste !== 'S' && semaine.some(c => c === 'N')) return false;
   }
   // disponibilités déclarées de l'agent : au même rang qu'un congé posé, jamais
   // forcées automatiquement — si plus personne n'est disponible, le poste est
@@ -1960,8 +1929,6 @@ function controler(debut, fin){
       const n = compte[p].length;
       if(n < besoin)
         add('err', j, null, 'Poste ' + p + ' non couvert (' + n + '/' + besoin + ')', p);
-      else if(p === 'N' && n > 1)
-        add('err', j, compte[p][1], 'Deux agents sur la nuit : le poste N ne doit être tenu que par une seule personne', p);
       else if(n > besoin)
         add('warn', j, compte[p][n-1], 'Sureffectif sur le poste ' + p + ' (' + n + '/' + besoin + ')', p);
     });
@@ -2039,11 +2006,12 @@ function controler(debut, fin){
       if(!codes.some(Boolean)) return;     // semaine pas encore générée pour cet agent
       const postes = codes.filter(estPoste);
       const nuits = postes.filter(c => c === 'N').length;
-      const jourx = postes.length - nuits;
+      // Le soir reste compatible avec la nuit : seuls les postes de journée comptent.
+      const jourx = postes.filter(c => c !== 'N' && c !== 'S').length;
 
       if(nuits > 0 && jourx > 0)
-        add('warn', lundi, a.id, 'Semaine ' + semaineISO(lundi) + ' : postes de jour et de nuit mélangés (' +
-            jourx + ' jour / ' + nuits + ' nuit)');
+        add('warn', lundi, a.id, 'Semaine ' + semaineISO(lundi) + ' : postes de journée et de nuit mélangés (' +
+            jourx + ' de journée / ' + nuits + ' de nuit)');
 
       if(!complete) return;
       const rh = codes.filter(c => c === 'RH').length;
@@ -2137,12 +2105,14 @@ function controlerCase(agentId, jour, code){
     // roulement
     const codes = codesSemaine(agentId, jour).filter(estPoste);
     const nuits = codes.filter(c => c === 'N').length;
+    const journee = codes.filter(c => c !== 'N' && c !== 'S').length;
     if(code === 'N' && !faitDesNuits(a))
       msgs.push({dur:false, t:'Cet agent ne fait pas partie de l’équipe de nuit'});
-    if(code === 'N' && codes.length - nuits > 0)
-      msgs.push({dur:false, t:'Jour et nuit mélangés sur la même semaine'});
-    if(code !== 'N' && nuits > 0)
-      msgs.push({dur:false, t:'Jour et nuit mélangés sur la même semaine'});
+    // Le soir (14 h – 00 h) reste compatible avec la nuit dans une même semaine.
+    if(code === 'N' && journee > 0)
+      msgs.push({dur:false, t:'Postes de journée et de nuit mélangés sur la même semaine'});
+    if(code !== 'N' && code !== 'S' && nuits > 0)
+      msgs.push({dur:false, t:'Postes de journée et de nuit mélangés sur la même semaine'});
     // plafond
     const dejaCode = codeDe(agentId, jour);
     const travailles = joursTravaillesSemaine(agentId, jour) + (estPoste(dejaCode) ? 0 : 1);
@@ -2153,8 +2123,8 @@ function controlerCase(agentId, jour, code){
     let n = 0;
     etat.agents.forEach(x => { if(x.id !== agentId && codeDe(x.id, jour) === code) n++; });
     const besoin = cfg.besoins[code] || 0;
-    if(code === 'N' && n >= 1)
-      msgs.push({dur:true, t:'La nuit est déjà tenue par ' + nomAgent(etat.agents.find(x => x.id !== agentId && codeDe(x.id, jour) === 'N'))});
+    if(code === 'N' && n + 1 > besoin && besoin > 0)
+      msgs.push({dur:true, t:'La nuit est déjà tenue par ' + besoin + ' agent(s) ce jour-là'});
     else if(n + 1 > besoin)
       msgs.push({dur:false, t:'Sureffectif sur le poste ' + code + ' ce jour-là (' + (n+1) + '/' + besoin + ')'});
   }
@@ -2566,7 +2536,7 @@ function dessinerReglages(){
     h += '<tr><td><span class="tag" style="background:var(--c-' + p + ');color:var(--c-' + p + '-t)">' + p +
          '</span> ' + esc(CODES[p].lib) + '</td><td>' + esc(CODES[p].h) + '</td>' +
          '<td><input type="number" min="0" max="6" step="1" data-besoin="' + p + '" value="' +
-         (etat.config.besoins[p] || 0) + '" style="width:66px"' + (p === 'N' ? ' max="1"' : '') + '></td></tr>';
+         (etat.config.besoins[p] || 0) + '" style="width:66px"></td></tr>';
   });
   h += '</tbody>';
   document.getElementById('tblBesoins').innerHTML = h;
@@ -2579,7 +2549,6 @@ function dessinerReglages(){
     ['maxRHConsecutifs',    'RH consécutifs maximum',                1, 7,  ''],
     ['joursMaxSemaine100',  'Jours travaillés / semaine à 100 %',    3, 7,  ''],
     ['joursMaxSemaine80',   'Jours travaillés / semaine à 80 %',     2, 7,  ''],
-    ['equipeNuitTaille',    'Agents dans le roulement de nuit / semaine', 1, 8, ''],
   ];
   let t = '<thead><tr><th>Règle</th><th style="width:100px">Valeur</th></tr></thead><tbody>';
   R.forEach(r => {
@@ -3108,7 +3077,7 @@ function importerJson(fichier){
       snapshot('restauration d’une sauvegarde');
       etat = Object.assign(etatDefaut(), s);
       etat.config = Object.assign(configDefaut(), s.config || {});
-      etat.config.besoins = Object.assign({M:1,J:1,DJ:1,S:1,N:1}, (s.config || {}).besoins || {});
+      etat.config.besoins = Object.assign(configDefaut().besoins, (s.config || {}).besoins || {});
       sauver(); initChamps(); toutRedessiner(); dessinerReglages();
       toast('Sauvegarde restaurée');
     }catch(e){
@@ -3490,7 +3459,6 @@ function brancherEvenements(){
   document.getElementById('tblBesoins').addEventListener('change', e => {
     const p = e.target.dataset.besoin; if(!p) return;
     let v = Math.max(0, Math.min(6, Number(e.target.value) || 0));
-    if(p === 'N') v = Math.min(1, v);          // la nuit n'a jamais plus d'un titulaire
     etat.config.besoins[p] = v; e.target.value = v;
     sauver(); toutRedessiner(); dessinerEffectifHoraire();
   });
@@ -3662,7 +3630,7 @@ function dessinerAide(){
     <h3 style="margin:16px 0 5px">Règles appliquées automatiquement</h3>
     <ul style="padding-left:20px">
       <li>Couverture identique 7 jours sur 7, week-ends compris (réglable dans <b>Réglages</b>).</li>
-      <li>Le poste de nuit N n’est jamais tenu par plus d’une personne.</li>
+      <li>Le nombre d’agents sur chaque poste, nuit comprise, suit l’onglet <b>Réglages</b>.</li>
       <li>11 h de repos minimum entre deux postes — <b>jamais franchi</b> par la génération automatique
           (un poste S suivi d’un M le lendemain ne laisserait que 7 h).</li>
       <li>6 jours travaillés consécutifs au maximum ; RH, RS, CR, REC et RF remettent le compteur à zéro.</li>
@@ -3674,7 +3642,7 @@ function dessinerAide(){
       <li>Plafond hebdomadaire lié à la quotité : 4 jours à 80 %, 5 jours à 100 %. Une semaine ne
           faisant que 7 jours, ce plafond baisse d'autant quand s'y ajoutent un REC, un congé ou
           un repos sécurité — les 2 RH restent toujours garantis.</li>
-      <li>Jour et nuit ne se mélangent pas sur une même semaine pour un même agent.</li>
+      <li>Les postes de <b>journée</b> (M, J, DJ) et la <b>nuit</b> ne se mélangent pas sur une même semaine ; le <b>soir</b> (14 h – 00 h) reste compatible avec la nuit, c'est le rythme des agentes dont l'amplitude est 14 h – 7 h.</li>
       <li>Un week-end sur deux (groupes A et B).</li>
       <li>1 JA par semaine pour chaque agent à temps partiel, posée le jour souhaité quand
           l'effectif le permet ; 2 RH par semaine en moyenne.</li>
