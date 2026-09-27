@@ -39,7 +39,7 @@ export function ParametresScreen({
             Taux horaire entretien (€ HT/h)
           </span>
           <span className="text-xs text-emerald-800/60">
-            Tonte, taille de haies, débroussaillage, élagage
+            Tonte, taille de haies, débroussaillage, engazonnement, massifs
           </span>
           <input
             type="number"
@@ -48,6 +48,25 @@ export function ParametresScreen({
             value={form.tauxHoraireEntretienHT}
             onChange={(e) =>
               update("tauxHoraireEntretienHT", Number(e.target.value))
+            }
+            className="mt-1 rounded-lg border border-black/10 px-3 py-2"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-sm font-medium text-emerald-950">
+            Taux horaire élagage / abattage (€ HT/h)
+          </span>
+          <span className="text-xs text-emerald-800/60">
+            Travail en hauteur, certification CS Taille et Soins des Arbres
+          </span>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={form.tauxHoraireElagageHT}
+            onChange={(e) =>
+              update("tauxHoraireElagageHT", Number(e.target.value))
             }
             className="mt-1 rounded-lg border border-black/10 px-3 py-2"
           />

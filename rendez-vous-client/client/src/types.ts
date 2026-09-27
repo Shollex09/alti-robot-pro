@@ -122,12 +122,14 @@ export interface DevisResponseResult {
 
 export interface Tarifs {
   tauxHoraireEntretienHT: number;
+  tauxHoraireElagageHT: number;
   tauxHoraireAmenagementHT: number;
   coefficientMateriaux: number;
 }
 
 export const TARIFS_PAR_DEFAUT: Tarifs = {
   tauxHoraireEntretienHT: 45,
+  tauxHoraireElagageHT: 80,
   tauxHoraireAmenagementHT: 50,
   coefficientMateriaux: 1.3,
 };

@@ -107,6 +107,7 @@ export interface DevisResponseResult {
 
 export interface Tarifs {
   tauxHoraireEntretienHT: number;
+  tauxHoraireElagageHT: number;
   tauxHoraireAmenagementHT: number;
   coefficientMateriaux: number;
 }
