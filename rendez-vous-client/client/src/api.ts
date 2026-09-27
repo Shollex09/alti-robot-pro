@@ -10,7 +10,13 @@ import type {
   Tarifs,
 } from "./types";
 
-async function postJson<T>(url: string, body: unknown): Promise<T> {
+// En dev, le proxy Vite redirige /api vers le serveur local (voir vite.config.ts).
+// En prod (serveur et client hébergés séparément), VITE_API_BASE_URL pointe
+// vers l'URL publique du serveur, ex: https://rendez-vous-client-api.onrender.com
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const url = `${API_BASE_URL}${path}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

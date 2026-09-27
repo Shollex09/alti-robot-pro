@@ -77,6 +77,47 @@ Voir `server/.env.example` :
 - `CLAUDE_MODEL` — modèle Claude à utiliser (par défaut `claude-opus-5`).
 - `PORT` — port du serveur Express (par défaut `3001`).
 
+Voir aussi `client/.env.example` — `VITE_API_BASE_URL` n'est utile qu'en
+production (client et serveur hébergés séparément, voir plus haut) ; en
+développement local, laisse-la vide.
+
+## Déployer en ligne (pour tester sur ton téléphone)
+
+Pas besoin d'ordinateur pour tester l'app une fois qu'elle est en ligne : tout
+se fait depuis le tableau de bord d'un hébergeur, dans le navigateur de ton
+téléphone. [Render](https://render.com) a un plan gratuit qui convient bien
+(deux services séparés, l'un pour le serveur, l'un pour le client).
+
+1. **Crée un compte** sur render.com (bouton « Sign up », connexion possible
+   directement avec ton compte GitHub — ça prend une minute).
+2. **Déploie le serveur** : New → Web Service → connecte le dépôt
+   `alti-robot-pro` → renseigne :
+   - Branch : `claude/rendez-vous-client-simulator-ux0c15` (ou `master` une
+     fois le PR mergé)
+   - Root Directory : `rendez-vous-client/server`
+   - Build Command : `npm install && npm run build`
+   - Start Command : `npm start`
+   - Onglet Environment → ajoute `ANTHROPIC_API_KEY` (ta clé) et
+     éventuellement `CLAUDE_MODEL`. Pas besoin de renseigner `PORT`, Render le
+     fournit automatiquement.
+   - Déploie, puis note l'URL donnée par Render (ex :
+     `https://rendez-vous-client-api.onrender.com`).
+3. **Déploie le client** : New → Static Site → même dépôt → renseigne :
+   - Branch : la même que ci-dessus
+   - Root Directory : `rendez-vous-client/client`
+   - Build Command : `npm install && npm run build`
+   - Publish Directory : `dist`
+   - Onglet Environment → ajoute `VITE_API_BASE_URL` avec l'URL du serveur
+     obtenue à l'étape 2 (sans `/` à la fin).
+   - Déploie.
+4. **Ouvre l'URL du site statique** (celle du client, ex :
+   `https://rendez-vous-client.onrender.com`) directement sur ton téléphone.
+
+Le plan gratuit de Render met le service serveur en veille après quelques
+minutes d'inactivité : le tout premier appel après une pause peut prendre
+30-60 secondes le temps qu'il se réveille (patiente sur l'écran de génération
+du client).
+
 ## Réglages de tarifs
 
 Depuis l'écran d'accueil → « Réglages de tarifs », tu peux ajuster :
