@@ -1995,6 +1995,116 @@ réseau des polices Google déjà documenté plus haut, ne contient pas l'URL de
 la ressource et n'était donc pas reconnu par le filtre existant
 (`/favicon|fonts\.g/`) — ajout de `ERR_CONNECTION_RESET` à ce filtre.
 
+## Toutes les courses en 2D, racontées par la simulation
+
+La vue animée n'existait que pour Salbris, et ne mettait en scène qu'un
+classement final avec un bruit aléatoire. Chaque course détaillée se regarde
+maintenant sur son circuit, vue du dessus, et ce qu'on voit vient de la
+simulation — les deux points laissés de côté plus haut (rythme tiré des
+formules du §17.3, sortie de piste sur incident seulement) sont faits.
+
+### La piste
+
+- **Circuits dessinés** : le tracé du §1.2bis (réel, ou stylisé pour le
+  karting et Jarama) est relu en points (`pointsDuChemin`), rééchantillonné
+  à pas régulier (`reechantillonner`), lissé — les polylignes GeoJSON ont des
+  angles vifs — puis cadré dans la scène : certains tracés stylisés
+  débordaient de leur viewBox (Genk, Lonato, Jarama). Herbe, dégagements,
+  lignes blanches, asphalte, damier d'arrivée, emplacements de grille, et
+  vibreurs rouge et blanc **dans les virages seulement**, repérés par la
+  courbure.
+- **Salbris** garde sa photo et son tracé extrait.
+- **Profil de vitesse** (`profilVitesse`) : on freine avant un virage, on y
+  passe lentement, on réaccélère en sortie. La position d'une voiture est
+  une fraction de tour *en temps*, convertie en point du tracé par cette
+  courbe : le peloton se resserre au freinage et s'étire en ligne droite,
+  sans que l'ordre en dépende.
+
+### La course
+
+Le résultat vient toujours de `resoudreCourse()` ; la 2D le raconte, elle ne
+le rejoue pas. Un modèle (`modeleCourse2d`), sauvegardé avec le week-end, fixe
+trois ancres :
+
+1. **le départ**, dans l'ordre exact de la grille, voitures en quinconce
+   derrière la ligne ;
+2. **la mi-course**, dans l'ordre provisoire de `preparerCourse()` — celui que
+   cite l'événement de mi-course (« X est 5e ») ;
+3. **l'arrivée**, dans l'ordre officiel du classement.
+
+Entre deux ancres, chaque pilote suit une courbe d'écart lissée, plus un bruit
+qui s'annule aux ancres : les bagarres et les dépassements naissent des
+croisements de courbes. Les écarts viennent de la performance calculée par la
+simulation (§17.3 : pilote, voiture, réglages, aléa) — c'est elle qui décide
+qui file devant et qui recule, plus un tirage au hasard.
+
+- **Mi-course** : s'il y a un événement, la première moitié se joue, la scène
+  se fige à mi-course et la radio du stand appelle ; la seconde moitié se
+  joue après la décision. Conséquence assumée : aucun abandon ne tombe avant
+  la mi-course dans ce cas, puisqu'il n'est tiré qu'à la résolution.
+- **Voiture de sécurité** : quand la simulation en a tiré une, elle entre en
+  piste vers la mi-course ; le peloton ralentit et se range en file indienne
+  dans l'ordre de mi-course, sans dépassement, puis les écarts se recreusent
+  progressivement après la relance. Un premier essai qui les recreusait d'un
+  coup faisait *reculer* les derniers de la file — trouvé par les tests.
+- **Arrêt au stand** : les choix qui passent par les stands (« Rentrer au
+  stand », « Changer de pneus maintenant », « Repasser en slicks » — marqués
+  `arret:true`) font perdre du terrain au pilote, mention STAND au
+  classement ; sous voiture de sécurité, il recule de quatre places environ,
+  et chacun de ceux qu'il laisse filer avance d'une place à mesure qu'il le
+  croise, sans saut.
+- **Abandons**, au moment tiré pour chacun et selon leur cause : une **sortie
+  de piste** quitte l'asphalte et finit dans le dégagement en
+  tête-à-queue, un **accrochage** finit en tête-à-queue au bord, une **panne**
+  se range sur le côté. Triangle jaune à l'endroit de l'arrêt. Aucune voiture
+  ne quitte l'asphalte sans abandon décidé par la simulation. Le point d'arrêt
+  est choisi du côté dégagé, quitte à glisser plus loin là où deux portions de
+  piste se côtoient. Limite connue : sur la photo de Salbris, qui a un pont et
+  un enchevêtrement de portions très proches, environ 1 % des positions n'ont
+  aucun bac à gravier libre ; la voiture s'y arrête au mieux, à cheval sur
+  une portion voisine.
+- **Pluie** : un voile de pluie selon la météo, qui arrive à mi-course si
+  l'événement est « La pluie arrive », qui s'efface si c'est « La piste
+  sèche ».
+- **Tours** : le compteur affiche le vrai nombre de tours (Spa en F1 : 44 ;
+  karting : 10 à 20 selon la catégorie). Cinq tours sont réellement dessinés,
+  c'est un replay accéléré — les écarts sur la piste, eux, sont à l'échelle
+  d'un vrai tour, et le classement les affiche en secondes.
+
+### À l'écran
+
+Compteur de tours, vitesses ×1 / ×2 / ×4, « Passer », trois caméras (circuit
+entier, mon pilote, le leader — les deux dernières en zoom qui suit la
+voiture), classement en direct (les dix premiers, ou les sept premiers puis
+ma position et mes deux voisins), commentaires (départ, prises de tête, mes
+dépassements, voiture de sécurité, abandons avec le tour, dernier tour,
+drapeau à damier). Mon pilote porte un halo turquoise. Pendant la course, la
+petite carte statique du circuit disparaît pour remonter la scène sur
+téléphone. Au débrief, « Revoir la course en 2D » rejoue tout ; c'est aussi
+la seule façon de la voir après une simulation rapide, qui reste rapide.
+
+### Test
+
+Les scripts de test de la session précédente vivaient hors du dépôt et ont
+disparu avec l'environnement. Ceux de cette fonctionnalité sont maintenant
+dans `tests/` :
+
+- `tests/harness.js` charge le jeu dans Node (contexte vm, DOM minimal) ;
+- `tests/course2d.test.js` (58 assertions) : géométrie de chaque type de
+  piste, puis 28 courses complètes (karting et F3, plusieurs circuits dont
+  Salbris) vérifiées à 400 instants chacune — départ dans l'ordre de la
+  grille, rang cité par la radio égal au rang affiché, aucun saut entre les
+  deux moitiés, arrivée dans l'ordre officiel, aucune voiture en course hors
+  de l'asphalte, aucune voiture qui recule, aucun dépassement sous voiture de
+  sécurité, voiture arrêtée qui ne repart pas, sortie de piste réellement
+  hors piste, déterminisme ; puis l'enchaînement à l'écran (première moitié,
+  appel radio, seconde moitié, débrief, revoir), la simulation rapide et une
+  ancienne sauvegarde ;
+- `tests/course2d.browser.js` (16 assertions, Playwright) : la même course
+  dans Chromium, voitures qui avancent vraiment, classement en direct, appel
+  radio à mi-course avec le bon rang, débrief, revoir avec la caméra
+  embarquée, aucune erreur JavaScript.
+
 ## Ce qui reste à faire avant de parler de « jeu »
 
 - Le §22.3 (devenir Team Principal en F1), le seul point du GDD encore ouvert,

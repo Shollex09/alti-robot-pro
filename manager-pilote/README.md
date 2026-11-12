@@ -29,7 +29,9 @@ Installable comme application sur mobile (PWA) et jouable hors ligne.
    transport. Vous ne touchez que 15 % de commission. Si la caisse est vide, c'est
    votre trésorerie qui comble.
 5. **Faire la course** — essais avec réglages à trouver à l'aveugle, qualifications,
-   stratégie, course. Ou simulation rapide, manche par manche, à votre choix.
+   stratégie, course. La course se regarde en 2D sur le circuit, avec classement
+   en direct, et la radio vous appelle à mi-course quand il faut trancher.
+   Ou simulation rapide, manche par manche, à votre choix.
 6. **Gérer l'humain** — conférences de presse, discussions avec le pilote dont
    l'effet dépend de sa personnalité, messages auxquels il faut répondre.
    Un pilote mal suivi change de manager.
@@ -49,3 +51,10 @@ Toutes les écuries sont fictives. Les circuits sont réels et cités par leur n
 
 Un seul fichier `index.html` : HTML, CSS et JavaScript vanilla, sans build ni
 dépendance, à l'image des autres applications de ce dépôt.
+
+## Tests
+
+```
+node tests/course2d.test.js                                  # dans Node
+NODE_PATH=$(npm root -g) node tests/course2d.browser.js      # dans Chromium (Playwright)
+```
